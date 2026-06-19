@@ -1,5 +1,5 @@
-import type { Task } from '@apolla/contracts';
-import type { TaskRepository } from './types';
+import type { Task, User, Project } from '@apolla/contracts';
+import type { TaskRepository, UserRepository, ProjectRepository } from './types';
 
 /** In-memory TaskRepository. Stores deep clones so callers can't mutate persisted state. */
 export class InMemoryTaskRepository implements TaskRepository {
@@ -27,5 +27,50 @@ export class InMemoryTaskRepository implements TaskRepository {
     return [...this.tasks.values()]
       .filter((t) => (ownerId ? t.ownerId === ownerId : true))
       .map((t) => this.clone(t));
+  }
+}
+
+let idSeq = 0;
+function genId(prefix: string): string {
+  idSeq += 1;
+  return `${prefix}_${idSeq}_${idSeq.toString(36)}`;
+}
+
+export class InMemoryUserRepository implements UserRepository {
+  private readonly byId = new Map<string, User>();
+  private readonly byEmail = new Map<string, string>();
+
+  async upsertByEmail(email: string): Promise<User> {
+    const existing = this.byEmail.get(email);
+    if (existing) return structuredClone(this.byId.get(existing)!);
+    const user: User = { id: genId('user'), email };
+    this.byId.set(user.id, user);
+    this.byEmail.set(email, user.id);
+    return structuredClone(user);
+  }
+
+  async get(id: string): Promise<User | undefined> {
+    const u = this.byId.get(id);
+    return u ? structuredClone(u) : undefined;
+  }
+}
+
+export class InMemoryProjectRepository implements ProjectRepository {
+  private readonly projects = new Map<string, Project>();
+
+  async create(project: Project): Promise<Project> {
+    this.projects.set(project.id, structuredClone(project));
+    return structuredClone(project);
+  }
+
+  async get(id: string): Promise<Project | undefined> {
+    const p = this.projects.get(id);
+    return p ? structuredClone(p) : undefined;
+  }
+
+  async list(ownerId: string): Promise<Project[]> {
+    return [...this.projects.values()]
+      .filter((p) => p.ownerId === ownerId)
+      .map((p) => structuredClone(p));
   }
 }

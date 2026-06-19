@@ -14,6 +14,7 @@
     "@apolla/adapter-openai": "workspace:*",
     "@apolla/config": "workspace:*",
     "@apolla/contracts": "workspace:*",
+    "@apolla/db-postgres": "workspace:*",
     "@apolla/harness-core": "workspace:*",
     "@apolla/search-stub": "workspace:*",
     "@apolla/search-tavily": "workspace:*"

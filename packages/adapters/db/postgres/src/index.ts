@@ -5,6 +5,8 @@ import type { TaskRepository } from '@apolla/harness-core';
 
 export type Sql = postgres.Sql;
 
+export { PostgresUserRepository, PostgresProjectRepository } from './repos';
+
 /** Open a connection pool. Reads DATABASE_URL by default. */
 export function createSql(url = process.env.DATABASE_URL): Sql {
   if (!url) throw new Error('DATABASE_URL is not set');
@@ -25,6 +27,21 @@ CREATE TABLE IF NOT EXISTS tasks (
 );
 CREATE INDEX IF NOT EXISTS tasks_owner_idx ON tasks (owner_id);
 CREATE INDEX IF NOT EXISTS tasks_project_idx ON tasks (project_id);
+
+CREATE TABLE IF NOT EXISTS users (
+  id          text PRIMARY KEY,
+  email       text UNIQUE NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS projects (
+  id          text PRIMARY KEY,
+  owner_id    text NOT NULL,
+  name        text NOT NULL,
+  description text NOT NULL DEFAULT '',
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS projects_owner_idx ON projects (owner_id);
 `;
 
 export async function migrate(sql: Sql): Promise<void> {

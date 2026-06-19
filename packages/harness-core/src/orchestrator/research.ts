@@ -54,6 +54,10 @@ export interface RunInput {
   question: string;
   taskId?: string;
   projectId?: string;
+  /** Trusted context appended to plan/synthesis system prompts (e.g. project background, user model). */
+  systemAddendum?: string;
+  /** Untrusted evidence injected via the data channel (e.g. project materials, recalled memory). */
+  extraEvidence?: UntrustedContent[];
 }
 
 /**
@@ -88,6 +92,9 @@ export class ResearchOrchestrator {
       onUsage: (e) => this.d.ledger.recordLLM(e, { taskId, stepId: ctx.stepId }),
     });
 
+    const sys = (base: string) =>
+      input.systemAddendum ? `${base}\n\n${input.systemAddendum}` : base;
+
     const task: Task = {
       id: taskId,
       type: 'research',
@@ -118,7 +125,7 @@ export class ResearchOrchestrator {
       const span1 = this.tracer.startSpan('plan');
       yield { type: 'step-start', state: 'plan', stepId: step.id };
       const planReq = assembleRequest({
-        system: this.d.prompts.render('research.plan').text,
+        system: sys(this.d.prompts.render('research.plan').text),
         user: input.question,
       });
       const plan = await router.json(this.planAlias, planReq, PlanResult);
@@ -133,6 +140,11 @@ export class ResearchOrchestrator {
       yield { type: 'step-start', state: 'search', stepId: step.id };
       const evidence: UntrustedContent[] = [];
       const seen = new Set<string>();
+      for (const uc of input.extraEvidence ?? []) {
+        if (seen.has(uc.sourceId)) continue;
+        seen.add(uc.sourceId);
+        evidence.push(uc);
+      }
       for (const q of plan.subquestions) {
         const result = await this.d.tools.invoke<{ query: string }>('web_search', { query: q }, {
           taskId,
@@ -159,7 +171,7 @@ export class ResearchOrchestrator {
       const span4 = this.tracer.startSpan('generate');
       yield { type: 'step-start', state: 'generate', stepId: step.id };
       const synthReq = assembleRequest({
-        system: this.d.prompts.render('research.synthesize').text,
+        system: sys(this.d.prompts.render('research.synthesize').text),
         user: input.question,
         data: evidence,
       });

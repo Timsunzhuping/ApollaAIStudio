@@ -6,31 +6,46 @@ import {
   WebSearchTool,
   InMemoryCostLedger,
   InMemoryTaskRepository,
+  InMemoryUserRepository,
+  InMemoryProjectRepository,
   PricingBook,
   type LLMAdapter,
   type TaskRepository,
+  type UserRepository,
+  type ProjectRepository,
 } from '@apolla/harness-core';
 import { getRoute } from '@apolla/config';
 import { OpenAIAdapter } from '@apolla/adapter-openai';
 import { AnthropicAdapter } from '@apolla/adapter-anthropic';
 import { StubSearchProvider } from '@apolla/search-stub';
 import { TavilySearchProvider } from '@apolla/search-tavily';
+import {
+  createSql,
+  migrate,
+  PostgresTaskRepository,
+  PostgresUserRepository,
+  PostgresProjectRepository,
+} from '@apolla/db-postgres';
 import { DemoLLMAdapter } from './demo-adapter';
 
 export interface Harness {
   orchestrator: ResearchOrchestrator;
   repo: TaskRepository;
+  users: UserRepository;
+  projects: ProjectRepository;
   ledger: InMemoryCostLedger;
-  pending: Map<string, { question: string }>;
+  pending: Map<string, { question: string; projectId?: string }>;
   mode: 'real' | 'demo';
+  persistence: 'postgres' | 'memory';
+  close: () => Promise<void>;
 }
 
 /**
- * Composition root — the one place real adapters are wired. With OpenAI+Anthropic keys it runs
- * the real models; otherwise it runs an offline demo adapter so the walking skeleton is usable
- * with zero configuration. Search uses Tavily when keyed, else the deterministic stub.
+ * Composition root — the one place real adapters and persistence are wired.
+ * Models: OpenAI+Anthropic when keyed, else an offline DemoLLMAdapter.
+ * Persistence: Postgres when DATABASE_URL is set (migrated on boot), else in-memory.
  */
-export function buildHarness(): Harness {
+export async function buildHarness(): Promise<Harness> {
   const useReal = !!process.env.OPENAI_API_KEY && !!process.env.ANTHROPIC_API_KEY;
   const adapters = new Map<string, LLMAdapter>();
   const pricing = new PricingBook();
@@ -53,9 +68,30 @@ export function buildHarness(): Harness {
   const tools = new ToolRuntime();
   tools.register(new WebSearchTool(search));
 
-  const repo = new InMemoryTaskRepository();
-  const ledger = new InMemoryCostLedger(pricing);
+  let repo: TaskRepository;
+  let users: UserRepository;
+  let projects: ProjectRepository;
+  let persistence: Harness['persistence'];
+  let close = async (): Promise<void> => {};
 
+  if (process.env.DATABASE_URL) {
+    const sql = createSql();
+    await migrate(sql);
+    repo = new PostgresTaskRepository(sql);
+    users = new PostgresUserRepository(sql);
+    projects = new PostgresProjectRepository(sql);
+    persistence = 'postgres';
+    close = async () => {
+      await sql.end();
+    };
+  } else {
+    repo = new InMemoryTaskRepository();
+    users = new InMemoryUserRepository();
+    projects = new InMemoryProjectRepository();
+    persistence = 'memory';
+  }
+
+  const ledger = new InMemoryCostLedger(pricing);
   const orchestrator = new ResearchOrchestrator({
     adapters,
     prompts: new PromptRegistry(),
@@ -66,5 +102,15 @@ export function buildHarness(): Harness {
     env: { ...process.env, DEMO_KEY: 'demo' },
   });
 
-  return { orchestrator, repo, ledger, pending: new Map(), mode: useReal ? 'real' : 'demo' };
+  return {
+    orchestrator,
+    repo,
+    users,
+    projects,
+    ledger,
+    pending: new Map(),
+    mode: useReal ? 'real' : 'demo',
+    persistence,
+    close,
+  };
 }

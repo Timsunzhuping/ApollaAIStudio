@@ -1,22 +1,29 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { exportArtifact } from '@apolla/harness-core';
-import { buildHarness } from './harness';
+import { buildHarness, type Harness } from './harness';
+import { readSession, setSession, clearSession } from './auth';
 import { UI_HTML } from './ui';
 
-const harness = buildHarness();
-const OWNER = 'demo-user';
+const harness: Harness = await buildHarness();
 
 function json(res: ServerResponse, code: number, body: unknown): void {
-  const s = JSON.stringify(body);
   res.writeHead(code, { 'content-type': 'application/json' });
-  res.end(s);
+  res.end(JSON.stringify(body));
 }
 
-async function readBody(req: IncomingMessage): Promise<string> {
+async function readBody(req: IncomingMessage): Promise<any> {
   const chunks: Buffer[] = [];
   for await (const c of req) chunks.push(c as Buffer);
-  return Buffer.concat(chunks).toString('utf8');
+  const raw = Buffer.concat(chunks).toString('utf8');
+  return raw ? JSON.parse(raw) : {};
+}
+
+async function projectContext(projectId: string | undefined, ownerId: string): Promise<string | undefined> {
+  if (!projectId) return undefined;
+  const p = await harness.projects.get(projectId);
+  if (!p || p.ownerId !== ownerId) return undefined;
+  return `Project context — "${p.name}": ${p.description}`.trim();
 }
 
 async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -24,26 +31,62 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   const { pathname } = url;
   const method = req.method ?? 'GET';
 
-  // GET / — workspace UI
   if (method === 'GET' && pathname === '/') {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
     res.end(UI_HTML);
     return;
   }
-
-  // GET /api/health
   if (method === 'GET' && pathname === '/api/health') {
-    json(res, 200, { ok: true, mode: harness.mode });
-    return;
+    return json(res, 200, { ok: true, mode: harness.mode, persistence: harness.persistence });
   }
 
-  // POST /api/tasks { question }
+  // --- Auth ---
+  if (method === 'POST' && pathname === '/api/auth/login') {
+    const body = await readBody(req);
+    const email = String(body.email ?? '').trim().toLowerCase();
+    if (!email.includes('@')) return json(res, 400, { error: 'valid email required' });
+    const user = await harness.users.upsertByEmail(email);
+    setSession(res, user.id);
+    return json(res, 200, { id: user.id, email: user.email });
+  }
+  if (method === 'POST' && pathname === '/api/auth/logout') {
+    clearSession(res);
+    return json(res, 200, { ok: true });
+  }
+
+  // Everything below requires a session.
+  const ownerId = readSession(req);
+  if (method === 'GET' && pathname === '/api/auth/me') {
+    if (!ownerId) return json(res, 401, { error: 'not authenticated' });
+    const user = await harness.users.get(ownerId);
+    return user ? json(res, 200, user) : json(res, 401, { error: 'not authenticated' });
+  }
+  if (!ownerId) return json(res, 401, { error: 'not authenticated' });
+
+  // --- Projects ---
+  if (method === 'POST' && pathname === '/api/projects') {
+    const body = await readBody(req);
+    const name = String(body.name ?? '').trim();
+    if (!name) return json(res, 400, { error: 'name required' });
+    const project = await harness.projects.create({
+      id: randomUUID(),
+      ownerId,
+      name,
+      description: String(body.description ?? ''),
+    });
+    return json(res, 201, project);
+  }
+  if (method === 'GET' && pathname === '/api/projects') {
+    return json(res, 200, await harness.projects.list(ownerId));
+  }
+
+  // --- Tasks ---
   if (method === 'POST' && pathname === '/api/tasks') {
-    const body = await readBody(req).then((b) => (b ? JSON.parse(b) : {}));
+    const body = await readBody(req);
     const question = String(body.question ?? '').trim();
     if (!question) return json(res, 400, { error: 'question is required' });
     const taskId = randomUUID();
-    harness.pending.set(taskId, { question });
+    harness.pending.set(taskId, { question, projectId: body.projectId });
     return json(res, 201, { taskId });
   }
 
@@ -52,7 +95,6 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     const taskId = taskMatch[1]!;
     const sub = taskMatch[2];
 
-    // GET /api/tasks/:id/events — SSE stream that runs the orchestrator
     if (method === 'GET' && sub === '/events') {
       const input = harness.pending.get(taskId);
       if (!input) return json(res, 404, { error: 'unknown task' });
@@ -62,7 +104,14 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
         connection: 'keep-alive',
       });
       try {
-        for await (const ev of harness.orchestrator.run({ ownerId: OWNER, question: input.question, taskId })) {
+        const systemAddendum = await projectContext(input.projectId, ownerId);
+        for await (const ev of harness.orchestrator.run({
+          ownerId,
+          question: input.question,
+          taskId,
+          projectId: input.projectId,
+          systemAddendum,
+        })) {
           res.write(`data: ${JSON.stringify(ev)}\n\n`);
         }
       } catch (e) {
@@ -72,10 +121,10 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       return;
     }
 
-    // GET /api/tasks/:id/export?fmt=md|html
     if (method === 'GET' && sub === '/export') {
       const task = await harness.repo.get(taskId);
-      const artifact = task?.artifacts[0];
+      if (!task || task.ownerId !== ownerId) return json(res, 404, { error: 'no artifact' });
+      const artifact = task.artifacts[0];
       if (!artifact) return json(res, 404, { error: 'no artifact' });
       const fmt = url.searchParams.get('fmt') === 'html' ? 'html' : 'markdown';
       const file = exportArtifact(artifact, fmt);
@@ -87,10 +136,9 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       return;
     }
 
-    // GET /api/tasks/:id — task json
     if (method === 'GET' && !sub) {
       const task = await harness.repo.get(taskId);
-      return task ? json(res, 200, task) : json(res, 404, { error: 'unknown task' });
+      return task && task.ownerId === ownerId ? json(res, 200, task) : json(res, 404, { error: 'unknown task' });
     }
   }
 
@@ -101,5 +149,5 @@ const PORT = Number(process.env.PORT ?? 3000);
 createServer((req, res) => {
   handle(req, res).catch((e) => json(res, 500, { error: e instanceof Error ? e.message : String(e) }));
 }).listen(PORT, () => {
-  console.log(`Apolla BFF [${harness.mode}] → http://localhost:${PORT}`);
+  console.log(`Apolla BFF [${harness.mode}/${harness.persistence}] → http://localhost:${PORT}`);
 });

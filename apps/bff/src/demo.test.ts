@@ -11,7 +11,7 @@ const HAS_KEYS = !!(
 // Deterministic only without provider keys (offline demo mode).
 describe.skipIf(HAS_KEYS)('demo composition root (offline)', () => {
   it('runs research → cited report → cost end-to-end', async () => {
-    const h = buildHarness();
+    const h = await buildHarness();
     expect(h.mode).toBe('demo');
 
     const events: TaskEvent[] = [];
@@ -36,5 +36,6 @@ describe.skipIf(HAS_KEYS)('demo composition root (offline)', () => {
     expect(task?.state).toBe('done');
     expect(task?.citations.length).toBeGreaterThan(0);
     expect(task?.artifacts[0]?.content).toContain('## Sources');
+    await h.close();
   });
 });

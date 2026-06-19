@@ -41,6 +41,9 @@ importers:
       '@apolla/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@apolla/db-postgres':
+        specifier: workspace:*
+        version: link:../../packages/adapters/db/postgres
       '@apolla/harness-core':
         specifier: workspace:*
         version: link:../../packages/harness-core

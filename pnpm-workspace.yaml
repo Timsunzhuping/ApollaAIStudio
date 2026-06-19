@@ -3,6 +3,7 @@ packages:
   - 'packages/adapters/llm/*'
   - 'packages/adapters/media/*'
   - 'packages/adapters/search/*'
+  - 'packages/adapters/db/*'
   - 'apps/*'
   - 'workers/*'
   - 'evals'

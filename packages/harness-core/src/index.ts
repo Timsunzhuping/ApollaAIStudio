@@ -29,3 +29,8 @@ export { InMemoryCostLedger } from './cost/ledger';
 export type { LLMUsageEvent, UsageContext } from './cost/ledger';
 export { NoopTracer, ConsoleTracer } from './obs/tracer';
 export type { Tracer, Span } from './obs/tracer';
+export { InMemoryTaskRepository } from './repo/memory';
+export type { TaskRepository } from './repo/types';
+export { ResearchOrchestrator } from './orchestrator/research';
+export type { ResearchDeps, RunInput } from './orchestrator/research';
+export type { TaskEvent, PlanSketch, Estimate } from './orchestrator/events';

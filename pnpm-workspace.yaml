@@ -5,3 +5,4 @@ packages:
   - 'packages/adapters/search/*'
   - 'apps/*'
   - 'workers/*'
+  - 'evals'

@@ -1,0 +1,24 @@
+{
+  "name": "@apolla/bff",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Sprint 01 demo BFF: research→artifact API (SSE) + workspace UI. Composition root.",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@apolla/adapter-anthropic": "workspace:*",
+    "@apolla/adapter-openai": "workspace:*",
+    "@apolla/config": "workspace:*",
+    "@apolla/contracts": "workspace:*",
+    "@apolla/harness-core": "workspace:*",
+    "@apolla/search-stub": "workspace:*",
+    "@apolla/search-tavily": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2"
+  }
+}

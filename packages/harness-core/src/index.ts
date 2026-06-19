@@ -19,3 +19,7 @@ export { ToolRuntime } from './tools/runtime';
 export type { Tool, ToolContext, ToolFilter, MCPServerConfig } from './tools/types';
 export { WebSearchTool } from './tools/search';
 export type { SearchProvider, SearchHit, SearchOpts, WebSearchArgs } from './tools/search';
+export { SafetyPolicy, PolicyViolation } from './safety/policy';
+export type { Decision, PolicyOptions } from './safety/policy';
+export { wrapAsData, assembleRequest, assertNoUntrustedInMessages } from './safety/untrusted';
+export type { AssembleParams } from './safety/untrusted';

@@ -68,7 +68,9 @@ describe('PromptRegistry', () => {
     expect(() => reg.render('greet', {})).toThrow(/Missing variable/);
   });
 
-  it('loads from @apolla/config without error (empty until T10 authors prompts)', () => {
-    expect(() => new PromptRegistry()).not.toThrow();
+  it('loads the authored research prompts from @apolla/config', () => {
+    const reg = new PromptRegistry();
+    expect(reg.ids()).toContain('research.plan');
+    expect(reg.get('research.synthesize').template).toContain('source');
   });
 });

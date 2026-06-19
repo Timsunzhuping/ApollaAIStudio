@@ -27,9 +27,26 @@ describe('feature gates registry', () => {
 });
 
 describe('prompt/skill loaders', () => {
-  it('return empty arrays before T5/T10 author files', () => {
-    expect(loadPrompts()).toEqual([]);
-    expect(loadSkills()).toEqual([]);
+  it('load the authored research prompts', () => {
+    const ids = loadPrompts().map((p) => p.promptId);
+    expect(ids).toContain('research.plan');
+    expect(ids).toContain('research.synthesize');
+  });
+
+  it('parse PromptVersion fields from frontmatter', () => {
+    const plan = loadPrompts().find((p) => p.promptId === 'research.plan');
+    expect(plan?.version).toBe('1');
+    expect(plan?.rollout).toBe(1);
+    expect(plan?.safetyConstraints).toContain('no-fabrication');
+    expect(plan?.template).toContain('decompose');
+  });
+
+  it('load the research skill', () => {
+    const skills = loadSkills();
+    const research = skills.find((s) => s.name === 'research');
+    expect(research?.tools).toContain('web_search');
+    expect(research?.risk).toBe('read');
+    expect(research?.promptRef).toBe('research.synthesize');
   });
 });
 

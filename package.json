@@ -13,8 +13,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "test": "vitest run",
-    "dev": "echo \"[apolla] dev server lands in Sprint 01 T12/T13\" && exit 0",
-    "eval": "echo \"[apolla] eval harness lands in Sprint 01 T14\" && exit 0",
+    "dev": "pnpm --filter @apolla/bff dev",
+    "eval": "pnpm --filter @apolla/evals eval",
     "contract-test": "vitest run contract"
   },
   "devDependencies": {

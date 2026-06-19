@@ -55,6 +55,19 @@ importers:
         specifier: ^4.19.2
         version: 4.22.4
 
+  evals:
+    dependencies:
+      '@apolla/contracts':
+        specifier: workspace:*
+        version: link:../packages/contracts
+      '@apolla/harness-core':
+        specifier: workspace:*
+        version: link:../packages/harness-core
+    devDependencies:
+      tsx:
+        specifier: ^4.19.2
+        version: 4.22.4
+
   packages/adapters/llm/anthropic:
     dependencies:
       '@apolla/contracts':

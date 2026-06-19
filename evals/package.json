@@ -1,0 +1,18 @@
+{
+  "name": "@apolla/evals",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "LLM product evals — deterministic research golden + citation/cost regression gates.",
+  "scripts": {
+    "eval": "tsx runner.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@apolla/contracts": "workspace:*",
+    "@apolla/harness-core": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2"
+  }
+}

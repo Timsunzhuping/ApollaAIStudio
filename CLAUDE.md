@@ -80,4 +80,14 @@ LLM 测试四类：golden set 回归、citation correctness、cost regression、
 
 ## 命令
 
-> 待阶段 0 搭建 monorepo 后补充（build / test / lint / dev / eval 命令）。
+| 命令 | 作用 |
+|---|---|
+| `pnpm dev` | 启动 Demo BFF（`apps/bff`）→ http://localhost:3000（离线 demo 模式，无需密钥） |
+| `pnpm typecheck` | 全包 TS 类型检查 |
+| `pnpm lint` | ESLint |
+| `pnpm test` | vitest 单测 |
+| `pnpm build` | 各包 tsc 产物 |
+| `pnpm eval` | 研究 golden + 引用正确性 + 成本回归 |
+| `pnpm contract-test` | Provider 契约测试 |
+
+每个能力落地后至少跑 `pnpm typecheck && pnpm test && pnpm eval`。CI 对每个 PR 跑全部门禁。真实模型/搜索：在 `.env` 配 `OPENAI_API_KEY`/`ANTHROPIC_API_KEY`/`TAVILY_API_KEY`。

@@ -140,14 +140,16 @@ T1 → T2 → T3
 - **关键路径**：T9（Orchestrator）是收口点，T10–T13 依赖它。
 - **每完成一个任务**：跑该模块单测 + 相关 eval；提交说明写清「动了哪个注册点 + 加了哪个 eval」。
 
-## Sprint Definition of Done（整体验收）
-- [ ] 空仓库 → `pnpm i && pnpm dev` 起得来。
-- [ ] Web 输入一个真实问题，得到**带引用**的报告，左栏阶段轨迹可见，右栏来源+成本可见。
-- [ ] 一键导出 `.md`/`.html`，引用完整。
-- [ ] 全链路无硬编码模型名、无内联 Prompt；外部内容仅经数据通道。
-- [ ] `pnpm eval` 含研究 golden + 引用正确性 + 成本回归，且接入 CI 为门禁。
-- [ ] Cost Ledger 能给出单任务分步成本。
-- [ ] README/命令/架构文档一致更新。
+## Sprint Definition of Done（整体验收）— ✅ 全部达成
+- [x] 空仓库 → `pnpm i && pnpm dev` 起得来。
+- [x] Web 输入一个真实问题，得到**带引用**的报告，左栏阶段轨迹可见，右栏来源+成本可见。
+- [x] 一键导出 `.md`/`.html`，引用完整。
+- [x] 全链路无硬编码模型名、无内联 Prompt；外部内容仅经数据通道。
+- [x] `pnpm eval` 含研究 golden + 引用正确性 + 成本回归，且接入 CI 为门禁。
+- [x] Cost Ledger 能给出单任务分步成本。
+- [x] README/命令/架构文档一致更新。
+
+> Sprint 01 完成。T1–T15 全部合并到 `main`（PR #1–#11），CI 全门禁绿。后续：里程碑/PRD 的 v1 能力（Memory、Skills、媒体、浏览器动作）在新 Sprint 推进。
 
 ## 风险与提示（给代理）
 - **搜索 provider** 需 env key；无 key 时自动用 stub，保证离线可跑 eval。

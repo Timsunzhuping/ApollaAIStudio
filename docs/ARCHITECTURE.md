@@ -329,8 +329,21 @@ apolla/
 
 ---
 
-## 11. 技术栈与命令（占位，阶段0 后补全）
-- 栈：Next.js + TS（web/ext/desktop）｜ TS BFF ｜ Python AI Workers ｜ Postgres / Redis / 对象存储 / pgvector|Qdrant ｜ Docker + serverless（Modal/Daytona 式）沙箱。
-- 命令（待补）：`build` / `test` / `lint` / `dev` / `eval` / `contract-test`。
+## 11. 技术栈与命令
+- 栈（目标）：Next.js + TS（web/ext/desktop）｜ TS BFF ｜ Python AI Workers ｜ Postgres / Redis / 对象存储 / pgvector|Qdrant ｜ Docker + serverless（Modal/Daytona 式）沙箱。
+- 栈（Sprint 01 现状）：pnpm workspaces + TS（严格）｜ 独立 Node BFF（`apps/bff`，tsx）｜ Repository 内存实现（Postgres 留接口）｜ fetch-based provider 适配器（无 SDK 依赖）。
+- 命令：
+
+| 命令 | 作用 |
+|---|---|
+| `pnpm dev` | 启动 Demo BFF（`apps/bff`）→ http://localhost:3000 |
+| `pnpm typecheck` | 全包 TS 类型检查 |
+| `pnpm lint` | ESLint |
+| `pnpm test` | vitest 单测（含离线端到端 demo） |
+| `pnpm build` | 各包 tsc 产物 |
+| `pnpm eval` | 研究 golden + 引用正确性 + 成本回归 |
+| `pnpm contract-test` | Provider 契约测试 |
+
+CI 对每个 PR 跑 typecheck · lint · test · build · eval 全门禁。
 
 > 维护本文：当新增一类能力（新的 Adapter 种类、新的注册点、新的安全级别）时，更新 §3、§4、§5。功能级细节放 PRD，编排与升级机制放本文。

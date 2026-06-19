@@ -1,0 +1,25 @@
+{
+  "name": "@apolla/db-postgres",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Postgres TaskRepository — durable persistence behind the Sprint 01 Repository interface.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "migrate": "tsx src/migrate.ts"
+  },
+  "dependencies": {
+    "@apolla/contracts": "workspace:*",
+    "@apolla/harness-core": "workspace:*",
+    "postgres": "^3.4.5"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2"
+  }
+}

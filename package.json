@@ -15,6 +15,9 @@
     "test": "vitest run",
     "dev": "pnpm --filter @apolla/bff dev",
     "eval": "pnpm --filter @apolla/evals eval",
+    "db:up": "docker compose -f infra/docker-compose.yml up -d postgres",
+    "db:down": "docker compose -f infra/docker-compose.yml down",
+    "db:migrate": "pnpm --filter @apolla/db-postgres migrate",
     "contract-test": "vitest run contract"
   },
   "devDependencies": {

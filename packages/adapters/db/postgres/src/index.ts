@@ -1,0 +1,76 @@
+import postgres from 'postgres';
+import { Task } from '@apolla/contracts';
+import type { Task as TaskT } from '@apolla/contracts';
+import type { TaskRepository } from '@apolla/harness-core';
+
+export type Sql = postgres.Sql;
+
+/** Open a connection pool. Reads DATABASE_URL by default. */
+export function createSql(url = process.env.DATABASE_URL): Sql {
+  if (!url) throw new Error('DATABASE_URL is not set');
+  return postgres(url);
+}
+
+/** Idempotent schema migration (kept in sync with migrations/0001_init.sql). */
+export const MIGRATION = `
+CREATE TABLE IF NOT EXISTS tasks (
+  id          text PRIMARY KEY,
+  owner_id    text NOT NULL,
+  project_id  text,
+  type        text NOT NULL,
+  state       text NOT NULL,
+  data        jsonb NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS tasks_owner_idx ON tasks (owner_id);
+CREATE INDEX IF NOT EXISTS tasks_project_idx ON tasks (project_id);
+`;
+
+export async function migrate(sql: Sql): Promise<void> {
+  await sql.unsafe(MIGRATION);
+}
+
+/**
+ * Postgres-backed TaskRepository. Implements the Sprint 01 Repository interface unchanged —
+ * the orchestrator and BFF swap to this without code edits (ARCHITECTURE upgrade-by-swap).
+ * The whole Task is stored as JSONB and re-validated through the contract schema on read.
+ */
+export class PostgresTaskRepository implements TaskRepository {
+  constructor(private readonly sql: Sql) {}
+
+  private async upsert(task: TaskT): Promise<void> {
+    await this.sql`
+      INSERT INTO tasks (id, owner_id, project_id, type, state, data, updated_at)
+      VALUES (${task.id}, ${task.ownerId}, ${task.projectId ?? null}, ${task.type}, ${task.state}, ${this.sql.json(task)}, now())
+      ON CONFLICT (id) DO UPDATE SET
+        owner_id = EXCLUDED.owner_id,
+        project_id = EXCLUDED.project_id,
+        type = EXCLUDED.type,
+        state = EXCLUDED.state,
+        data = EXCLUDED.data,
+        updated_at = now()
+    `;
+  }
+
+  async create(task: TaskT): Promise<TaskT> {
+    await this.upsert(task);
+    return Task.parse(task);
+  }
+
+  async save(task: TaskT): Promise<void> {
+    await this.upsert(task);
+  }
+
+  async get(id: string): Promise<TaskT | undefined> {
+    const rows = await this.sql<{ data: unknown }[]>`SELECT data FROM tasks WHERE id = ${id}`;
+    return rows[0] ? Task.parse(rows[0].data) : undefined;
+  }
+
+  async list(ownerId?: string): Promise<TaskT[]> {
+    const rows = ownerId
+      ? await this.sql<{ data: unknown }[]>`SELECT data FROM tasks WHERE owner_id = ${ownerId} ORDER BY created_at`
+      : await this.sql<{ data: unknown }[]>`SELECT data FROM tasks ORDER BY created_at`;
+    return rows.map((r) => Task.parse(r.data));
+  }
+}

@@ -15,7 +15,7 @@
     "test": "vitest run",
     "dev": "echo \"[apolla] dev server lands in Sprint 01 T12/T13\" && exit 0",
     "eval": "echo \"[apolla] eval harness lands in Sprint 01 T14\" && exit 0",
-    "contract-test": "echo \"[apolla] provider contract tests land in Sprint 01 T4\" && exit 0"
+    "contract-test": "vitest run contract"
   },
   "devDependencies": {
     "@types/node": "^22.10.1",

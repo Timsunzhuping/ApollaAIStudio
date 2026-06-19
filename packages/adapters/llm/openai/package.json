@@ -1,0 +1,20 @@
+{
+  "name": "@apolla/adapter-openai",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "OpenAI LLMAdapter (Chat Completions, fetch-based, streaming + structured outputs).",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@apolla/contracts": "workspace:*",
+    "@apolla/harness-core": "workspace:*"
+  }
+}

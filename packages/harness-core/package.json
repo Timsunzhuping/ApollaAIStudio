@@ -1,0 +1,22 @@
+{
+  "name": "@apolla/harness-core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The harness: Model Router, adapter interface, and (later) Prompt Registry, Tool Runtime, Orchestrator.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@apolla/config": "workspace:*",
+    "@apolla/contracts": "workspace:*",
+    "zod": "^3.23.8",
+    "zod-to-json-schema": "^3.23.5"
+  }
+}

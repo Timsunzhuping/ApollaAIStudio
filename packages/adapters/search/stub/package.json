@@ -1,0 +1,19 @@
+{
+  "name": "@apolla/search-stub",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Deterministic fixture SearchProvider — offline default and eval determinism.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@apolla/harness-core": "workspace:*"
+  }
+}

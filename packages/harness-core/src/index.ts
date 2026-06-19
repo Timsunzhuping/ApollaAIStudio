@@ -15,3 +15,7 @@ export { MockAdapter } from './router/mock';
 export type { MockBehavior } from './router/mock';
 export { PromptRegistry } from './prompts/registry';
 export type { GetOpts, RenderedPrompt } from './prompts/registry';
+export { ToolRuntime } from './tools/runtime';
+export type { Tool, ToolContext, ToolFilter, MCPServerConfig } from './tools/types';
+export { WebSearchTool } from './tools/search';
+export type { SearchProvider, SearchHit, SearchOpts, WebSearchArgs } from './tools/search';

@@ -2,5 +2,6 @@ packages:
   - 'packages/*'
   - 'packages/adapters/llm/*'
   - 'packages/adapters/media/*'
+  - 'packages/adapters/search/*'
   - 'apps/*'
   - 'workers/*'

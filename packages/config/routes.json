@@ -1,0 +1,29 @@
+{
+  "$comment": "Model alias → concrete model mapping. The ONLY place model ids appear. Business code uses aliases only. Replace *-PLACEHOLDER ids with real provider model ids at provisioning (kept here so swapping a model never touches business code — ARCHITECTURE §1.2 axiom 3). keyPool values are env-var NAMES, not secrets.",
+  "routes": [
+    {
+      "alias": "gpt_fast",
+      "primary": "openai/gpt-fast-PLACEHOLDER",
+      "fallbackChain": ["anthropic/claude-haiku-PLACEHOLDER"],
+      "keyPool": ["OPENAI_API_KEY"]
+    },
+    {
+      "alias": "gpt_premium",
+      "primary": "openai/gpt-premium-PLACEHOLDER",
+      "fallbackChain": ["anthropic/claude-premium-PLACEHOLDER"],
+      "keyPool": ["OPENAI_API_KEY"]
+    },
+    {
+      "alias": "claude_write",
+      "primary": "anthropic/claude-sonnet-PLACEHOLDER",
+      "fallbackChain": ["openai/gpt-premium-PLACEHOLDER"],
+      "keyPool": ["ANTHROPIC_API_KEY"]
+    },
+    {
+      "alias": "claude_premium",
+      "primary": "anthropic/claude-opus-PLACEHOLDER",
+      "fallbackChain": ["anthropic/claude-sonnet-PLACEHOLDER"],
+      "keyPool": ["ANTHROPIC_API_KEY"]
+    }
+  ]
+}

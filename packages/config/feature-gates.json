@@ -1,0 +1,20 @@
+{
+  "$comment": "Progressive enhancement (ARCHITECTURE §3.2): a feature turns on only when the routed model meets `requires`. `scaffold` names compensation logic that auto-retires once the threshold is met. Thresholds are calibrated by capability probes in the eval harness.",
+  "gates": [
+    {
+      "feature": "auto_skill_write",
+      "requires": { "agenticReliability": 0.7 },
+      "scaffold": null
+    },
+    {
+      "feature": "multi_tool_plan",
+      "requires": { "toolUse": true, "agenticReliability": 0.6 },
+      "scaffold": null
+    },
+    {
+      "feature": "a2ui",
+      "requires": { "structuredReliability": 0.8 },
+      "scaffold": null
+    }
+  ]
+}

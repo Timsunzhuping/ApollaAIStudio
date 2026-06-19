@@ -1,4 +1,6 @@
 packages:
   - 'packages/*'
+  - 'packages/adapters/llm/*'
+  - 'packages/adapters/media/*'
   - 'apps/*'
   - 'workers/*'

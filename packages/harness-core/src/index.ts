@@ -34,3 +34,5 @@ export type { TaskRepository } from './repo/types';
 export { ResearchOrchestrator } from './orchestrator/research';
 export type { ResearchDeps, RunInput } from './orchestrator/research';
 export type { TaskEvent, PlanSketch, Estimate } from './orchestrator/events';
+export { exportArtifact } from './artifact/export';
+export type { ExportFormat, ExportedFile } from './artifact/export';

@@ -108,6 +108,12 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     return json(res, 200, { ok: true });
   }
 
+  // --- Audit ---
+  if (method === 'GET' && pathname === '/api/audit') {
+    const taskId = url.searchParams.get('taskId') ?? undefined;
+    return json(res, 200, await harness.audit.list(ownerId, taskId));
+  }
+
   // --- Agent (multi-tool, tiered confirmation) ---
   if (method === 'POST' && pathname === '/api/agent') {
     const body = await readBody(req);
@@ -133,7 +139,12 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     if (!input) return json(res, 404, { error: 'unknown agent task' });
     res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
     const tools = await harness.agentToolsFor(ownerId);
-    const agent = new AgentOrchestrator({ router: harness.llmRouter, tools, prompts: harness.prompts });
+    const agent = new AgentOrchestrator({
+      router: harness.llmRouter,
+      tools,
+      prompts: harness.prompts,
+      audit: (entry) => harness.audit.record(entry),
+    });
     // Confirmation: pause until POST /api/agent/:id/confirm arrives (or 60s timeout → deny).
     const approve = (): Promise<boolean> =>
       new Promise((resolve) => {

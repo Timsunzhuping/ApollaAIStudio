@@ -1,4 +1,4 @@
-import type { Task, User, Project, Connector } from '@apolla/contracts';
+import type { Task, User, Project, Connector, AuditEntry } from '@apolla/contracts';
 
 /** Persistence boundary. Sprint 01 ships an in-memory impl; Postgres slots in behind this later. */
 export interface TaskRepository {
@@ -25,4 +25,9 @@ export interface ConnectorRepository {
   get(id: string): Promise<Connector | undefined>;
   list(ownerId: string): Promise<Connector[]>;
   delete(ownerId: string, id: string): Promise<void>;
+}
+
+export interface AuditRepository {
+  record(entry: AuditEntry): Promise<void>;
+  list(ownerId: string, taskId?: string): Promise<AuditEntry[]>;
 }

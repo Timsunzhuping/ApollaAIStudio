@@ -26,9 +26,11 @@ import {
   StubMCPClient,
   InMemoryMediaRepository,
   InMemoryConnectorRepository,
+  InMemoryAuditRepository,
   type MediaAdapter,
   type MediaRepository,
   type ConnectorRepository,
+  type AuditRepository,
   type MCPClient,
   type LLMAdapter,
   type TaskRepository,
@@ -57,6 +59,7 @@ import {
   PostgresSkillRepository,
   PostgresMediaRepository,
   PostgresConnectorRepository,
+  PostgresAuditRepository,
 } from '@apolla/db-postgres';
 import { DemoLLMAdapter } from './demo-adapter';
 
@@ -74,6 +77,7 @@ export interface Harness {
   mediaOrch: MediaOrchestrator;
   mediaRepo: MediaRepository;
   connectors: ConnectorRepository;
+  audit: AuditRepository;
   stubMcp: StubMCPClient;
   mcpClientFor: (transport: string) => MCPClient;
   llmRouter: ModelRouter;
@@ -125,6 +129,7 @@ export async function buildHarness(): Promise<Harness> {
   let skillRepo: SkillRepository;
   let mediaRepo: MediaRepository;
   let connectorRepo: ConnectorRepository;
+  let auditRepo: AuditRepository;
   let persistence: Harness['persistence'];
   let close = async (): Promise<void> => {};
 
@@ -138,6 +143,7 @@ export async function buildHarness(): Promise<Harness> {
     skillRepo = new PostgresSkillRepository(sql);
     mediaRepo = new PostgresMediaRepository(sql);
     connectorRepo = new PostgresConnectorRepository(sql);
+    auditRepo = new PostgresAuditRepository(sql);
     persistence = 'postgres';
     close = async () => {
       await sql.end();
@@ -150,6 +156,7 @@ export async function buildHarness(): Promise<Harness> {
     skillRepo = new InMemorySkillRepository();
     mediaRepo = new InMemoryMediaRepository();
     connectorRepo = new InMemoryConnectorRepository();
+    auditRepo = new InMemoryAuditRepository();
     persistence = 'memory';
   }
 
@@ -248,6 +255,7 @@ export async function buildHarness(): Promise<Harness> {
     mediaOrch,
     mediaRepo,
     connectors: connectorRepo,
+    audit: auditRepo,
     stubMcp,
     mcpClientFor,
     llmRouter: router,

@@ -1,5 +1,11 @@
-import type { Task, User, Project, SkillDef, MediaTask, Connector } from '@apolla/contracts';
-import type { TaskRepository, UserRepository, ProjectRepository, ConnectorRepository } from './types';
+import type { Task, User, Project, SkillDef, MediaTask, Connector, AuditEntry } from '@apolla/contracts';
+import type {
+  TaskRepository,
+  UserRepository,
+  ProjectRepository,
+  ConnectorRepository,
+  AuditRepository,
+} from './types';
 import type { SkillRepository, SkillSource } from '../skills/types';
 import type { MediaRepository } from '../media/types';
 
@@ -116,6 +122,20 @@ export class InMemoryConnectorRepository implements ConnectorRepository {
   async delete(ownerId: string, id: string): Promise<void> {
     const c = this.byId.get(id);
     if (c && c.ownerId === ownerId) this.byId.delete(id);
+  }
+}
+
+export class InMemoryAuditRepository implements AuditRepository {
+  private readonly entries: AuditEntry[] = [];
+
+  async record(entry: AuditEntry): Promise<void> {
+    this.entries.push(structuredClone(entry));
+  }
+
+  async list(ownerId: string, taskId?: string): Promise<AuditEntry[]> {
+    return this.entries
+      .filter((e) => e.ownerId === ownerId && (taskId ? e.taskId === taskId : true))
+      .map((e) => structuredClone(e));
   }
 }
 

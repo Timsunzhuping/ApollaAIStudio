@@ -1,3 +1,4 @@
+export * from './audit';
 export * from './common';
 export * from './connector';
 export * from './identity';

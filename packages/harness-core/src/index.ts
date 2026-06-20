@@ -46,6 +46,7 @@ export {
   CompositeSkillSource,
   InMemoryMediaRepository,
   InMemoryConnectorRepository,
+  InMemoryAuditRepository,
 } from './repo/memory';
 export { MediaRouter } from './media/router';
 export { StubMediaAdapter } from './media/stub';
@@ -64,7 +65,7 @@ export type {
   MediaRouteConfig,
 } from './media/types';
 export type { MediaRouterDeps, MediaGenerateResult } from './media/router';
-export type { TaskRepository, UserRepository, ProjectRepository, ConnectorRepository } from './repo/types';
+export type { TaskRepository, UserRepository, ProjectRepository, ConnectorRepository, AuditRepository } from './repo/types';
 export { encryptSecret, decryptSecret } from './security/secrets';
 export { SkillRuntime } from './skills/runtime';
 export { makeResearchExecutor, makeGenericExecutor, makeMediaExecutor } from './skills/executors';

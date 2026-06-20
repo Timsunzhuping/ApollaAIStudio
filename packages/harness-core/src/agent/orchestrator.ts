@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import type { ModelAlias, UntrustedContent } from '@apolla/contracts';
+import type { ModelAlias, UntrustedContent, AuditEntry } from '@apolla/contracts';
 import type { ModelRouter } from '../router/router';
 import type { ToolRuntime } from '../tools/runtime';
 import type { PromptRegistry } from '../prompts/registry';
@@ -46,6 +46,8 @@ export interface AgentDeps {
   alias?: ModelAlias;
   maxSteps?: number;
   idGen?: () => string;
+  /** Audit sink — every tool call + verdict + confirmation is recorded (S4-T5). */
+  audit?: (entry: AuditEntry) => Promise<void> | void;
 }
 
 /**
@@ -66,6 +68,16 @@ export class AgentOrchestrator {
 
     const evidence: UntrustedContent[] = [];
     const transcript: string[] = [];
+    const recordAudit = async (e: {
+      tool: string;
+      risk: string;
+      decision: AuditEntry['decision'];
+      confirmed?: boolean;
+      status: AuditEntry['status'];
+      summary?: string;
+    }) => {
+      await this.d.audit?.({ id: randomUUID(), ownerId: input.ownerId, taskId, ...e });
+    };
     const toolMenu = this.d.tools
       .list()
       .map((t) => `- ${t.name} [${t.risk}]`)
@@ -101,6 +113,7 @@ export class AgentOrchestrator {
         const verdict = safety.decide(risk as never);
         if (verdict === 'deny') {
           yield { type: 'denied', tool: decision.tool, reason: 'high_write not allowed' };
+          await recordAudit({ tool: decision.tool, risk, decision: 'deny', status: 'denied' });
           transcript.push(`DENIED ${decision.tool} (high_write)`);
           continue;
         }
@@ -109,6 +122,7 @@ export class AgentOrchestrator {
           const ok = await approve({ tool: decision.tool, args, risk });
           if (!ok) {
             yield { type: 'denied', tool: decision.tool, reason: 'not confirmed' };
+            await recordAudit({ tool: decision.tool, risk, decision: 'confirm', confirmed: false, status: 'denied' });
             transcript.push(`NOT CONFIRMED ${decision.tool}`);
             continue;
           }
@@ -118,6 +132,14 @@ export class AgentOrchestrator {
         const summary = result.ok
           ? result.data.map((dd) => dd.content).join('\n').slice(0, 300)
           : (result.error ?? 'error');
+        await recordAudit({
+          tool: decision.tool,
+          risk,
+          decision: verdict === 'allow' ? 'allow' : 'confirm',
+          confirmed: verdict === 'confirm' ? true : undefined,
+          status: result.ok ? 'executed' : 'error',
+          summary,
+        });
         yield { type: 'tool-result', tool: decision.tool, ok: result.ok, summary };
         for (const uc of result.data) evidence.push(uc);
         transcript.push(`${decision.tool}(${JSON.stringify(args)}) -> ${result.ok ? 'ok' : 'error'}`);

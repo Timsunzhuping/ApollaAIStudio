@@ -9,6 +9,7 @@ export { PostgresUserRepository, PostgresProjectRepository, PostgresSkillReposit
 export { PostgresMemory } from './memory';
 export { PostgresMediaRepository } from './media';
 export { PostgresConnectorRepository } from './connector';
+export { PostgresAuditRepository } from './audit';
 
 /** Open a connection pool. Reads DATABASE_URL by default. */
 export function createSql(url = process.env.DATABASE_URL): Sql {
@@ -87,6 +88,16 @@ CREATE TABLE IF NOT EXISTS connectors (
   created_at  timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS connectors_owner_idx ON connectors (owner_id);
+
+CREATE TABLE IF NOT EXISTS audit_log (
+  id          text PRIMARY KEY,
+  owner_id    text NOT NULL,
+  task_id     text NOT NULL,
+  data        jsonb NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS audit_owner_idx ON audit_log (owner_id);
+CREATE INDEX IF NOT EXISTS audit_task_idx ON audit_log (task_id);
 `;
 
 export async function migrate(sql: Sql): Promise<void> {

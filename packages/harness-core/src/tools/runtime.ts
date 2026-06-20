@@ -25,6 +25,10 @@ export class ToolRuntime {
     return this.tools.has(name);
   }
 
+  unregister(name: string): void {
+    this.tools.delete(name);
+  }
+
   list(filter: ToolFilter = {}): ToolDescriptor[] {
     return [...this.tools.values()]
       .filter((t) => (filter.risk ? t.risk === filter.risk : true))

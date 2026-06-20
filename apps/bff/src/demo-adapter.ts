@@ -16,10 +16,25 @@ export class DemoLLMAdapter implements LLMAdapter {
     return user?.content?.trim() || 'the topic';
   }
 
-  /** JSON calls: with data → claims extraction; without data → plan (ARCHITECTURE §3.5/S2-T9). */
+  /** JSON calls: agent step-decision, claims extraction (with data), or plan (without). */
   private buildJson(req: LLMRequest): string {
     const q = this.question(req);
     const data = req.data ?? [];
+
+    // Agent step (S4): system prompt lists available tools and expects a call_tool/finish decision.
+    const sys = req.messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n');
+    if (sys.includes('Available tools:')) {
+      if (!sys.includes('(none)')) {
+        return JSON.stringify({ action: 'finish', answer: `Done — completed "${q}" using the available tools. _(demo agent)_` });
+      }
+      const tools = [...sys.matchAll(/- (\S+) \[(\w+)\]/g)].map((m) => ({ name: m[1]!, risk: m[2]! }));
+      const writeTool = tools.find((t) => t.risk === 'low_write');
+      if (/save|note|保存|写入|记录/i.test(q) && writeTool) {
+        return JSON.stringify({ action: 'call_tool', tool: writeTool.name, args: { text: q } });
+      }
+      return JSON.stringify({ action: 'call_tool', tool: 'web_search', args: { query: q } });
+    }
+
     if (data.length === 0) {
       return JSON.stringify({
         subquestions: [

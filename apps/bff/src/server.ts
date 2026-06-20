@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { randomUUID } from 'node:crypto';
-import { exportArtifact, autoDraftSkill, embedMedia, encryptSecret, inferRisk } from '@apolla/harness-core';
+import { exportArtifact, autoDraftSkill, embedMedia, encryptSecret, inferRisk, AgentOrchestrator } from '@apolla/harness-core';
 import type { Connector } from '@apolla/contracts';
 import { buildHarness, type Harness } from './harness';
 import { readSession, setSession, clearSession } from './auth';
@@ -106,6 +106,55 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   if (method === 'DELETE' && pathname === '/api/memory') {
     await harness.memory.clear(ownerId);
     return json(res, 200, { ok: true });
+  }
+
+  // --- Agent (multi-tool, tiered confirmation) ---
+  if (method === 'POST' && pathname === '/api/agent') {
+    const body = await readBody(req);
+    const goal = String(body.goal ?? '').trim();
+    if (!goal) return json(res, 400, { error: 'goal required' });
+    const agentId = randomUUID();
+    harness.pendingAgents.set(agentId, { goal });
+    return json(res, 201, { agentId });
+  }
+  if (method === 'POST' && pathname.match(/^\/api\/agent\/[^/]+\/confirm$/)) {
+    const id = pathname.split('/')[3]!;
+    const body = await readBody(req);
+    const waiter = harness.confirmMailbox.get(id);
+    if (!waiter) return json(res, 404, { error: 'no pending confirmation' });
+    waiter(body.approved === true);
+    harness.confirmMailbox.delete(id);
+    return json(res, 200, { ok: true });
+  }
+  const agentEvents = pathname.match(/^\/api\/agent\/([^/]+)\/events$/);
+  if (method === 'GET' && agentEvents) {
+    const agentId = agentEvents[1]!;
+    const input = harness.pendingAgents.get(agentId);
+    if (!input) return json(res, 404, { error: 'unknown agent task' });
+    res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
+    const tools = await harness.agentToolsFor(ownerId);
+    const agent = new AgentOrchestrator({ router: harness.llmRouter, tools, prompts: harness.prompts });
+    // Confirmation: pause until POST /api/agent/:id/confirm arrives (or 60s timeout → deny).
+    const approve = (): Promise<boolean> =>
+      new Promise((resolve) => {
+        const t = setTimeout(() => {
+          harness.confirmMailbox.delete(agentId);
+          resolve(false);
+        }, 60_000);
+        harness.confirmMailbox.set(agentId, (ok) => {
+          clearTimeout(t);
+          resolve(ok);
+        });
+      });
+    try {
+      for await (const ev of agent.run({ ownerId, goal: input.goal, taskId: agentId, approve })) {
+        res.write(`data: ${JSON.stringify(ev)}\n\n`);
+      }
+    } catch (e) {
+      res.write(`data: ${JSON.stringify({ type: 'error', message: e instanceof Error ? e.message : String(e) })}\n\n`);
+    }
+    res.end();
+    return;
   }
 
   // --- Connectors (MCP) ---

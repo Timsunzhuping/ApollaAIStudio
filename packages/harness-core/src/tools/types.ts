@@ -23,8 +23,18 @@ export interface ToolFilter {
   source?: 'native' | 'mcp';
 }
 
-/** Placeholder for MCP server config — populated in a later sprint (ARCHITECTURE §3.4). */
+/** MCP server connection config (ARCHITECTURE §3.4). */
 export interface MCPServerConfig {
   name: string;
-  url: string;
+  transport: 'stdio' | 'http' | 'stub';
+  /** stdio: executable + args. */
+  command?: string;
+  args?: string[];
+  /** http: server URL. */
+  url?: string;
+  /**
+   * Tool names to treat as read-only. Everything else from an external server defaults to
+   * low_write (conservative — needs confirmation) unless the server annotates a tool read-only.
+   */
+  readOnlyTools?: string[];
 }

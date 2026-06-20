@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import type { ModelAlias, UntrustedContent, Source } from '@apolla/contracts';
+import type { ModelAlias, UntrustedContent, Source, AuditEntry } from '@apolla/contracts';
 import type { ModelRouter } from '../router/router';
 import type { PromptRegistry } from '../prompts/registry';
 import type { ToolRuntime } from '../tools/runtime';
 import { assembleRequest } from '../safety/untrusted';
 import type { ResearchOrchestrator } from '../orchestrator/research';
 import type { MediaOrchestrator } from '../media/orchestrator';
+import { AgentOrchestrator } from '../agent/orchestrator';
 import type { SkillExecutor } from './types';
 
 /** Research skills delegate to the full orchestrator state machine. */
@@ -17,6 +18,27 @@ export function makeResearchExecutor(orchestrator: ResearchOrchestrator): SkillE
       taskId: input.taskId,
       projectId: input.projectId,
     });
+}
+
+export interface AgentExecutorDeps {
+  router: ModelRouter;
+  prompts: PromptRegistry;
+  /** Build the owner's tool set (built-in + enabled MCP tools). */
+  toolsFor: (ownerId: string) => Promise<ToolRuntime>;
+  audit?: (entry: AuditEntry) => Promise<void> | void;
+}
+
+/**
+ * Agent skills run the multi-tool AgentOrchestrator. Via the skill path they are read-only by
+ * default (approve denies writes) — interactive low_write confirmation lives on the dedicated
+ * /api/agent path. Writes are therefore safely refused here rather than silently executed.
+ */
+export function makeAgentExecutor(deps: AgentExecutorDeps): SkillExecutor {
+  return async function* (_skill, input) {
+    const tools = await deps.toolsFor(input.ownerId);
+    const agent = new AgentOrchestrator({ router: deps.router, tools, prompts: deps.prompts, audit: deps.audit });
+    yield* agent.run({ ownerId: input.ownerId, goal: input.question, taskId: input.taskId, approve: async () => false });
+  };
 }
 
 /** Media skills drive the MediaOrchestrator using the skill's declared media alias. */

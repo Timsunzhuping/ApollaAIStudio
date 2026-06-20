@@ -1,4 +1,5 @@
 export * from './common';
+export * from './connector';
 export * from './identity';
 export * from './media';
 export * from './memory';

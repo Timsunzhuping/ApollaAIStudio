@@ -6,13 +6,14 @@
 
 ## 状态
 
-**Sprint 01 + 02 + 03 完成** —— 从研究→成品骨架，升级为持久化、多用户、有记忆、技能可复用、**支持多模态成品（文生图/视频）**的工作台。
+**Sprint 01–04 完成** —— 从研究→成品骨架，升级为持久化、多用户、有记忆、技能可复用、支持多模态成品（文生图/视频）、**并具备工具生态与低风险执行（MCP + 多工具 Agent + 分级确认 + 审计）**的工作台。
 - **Harness Core**：Model Router（failover/多密钥）、Prompt Registry、Tool Runtime（Web Search）、Safety & Policy（三级权限 + 防注入）、Cost Ledger、研究状态机（流式综合）、FeatureGate 运行时。
 - **持久化与账号**：Postgres（接口的 PG 实现）、最小 Auth、Projects。
 - **个人化**：Memory（FTS 检索 + 用户模型 + 注入研究流）。
 - **技能**：Skill Runtime + 闭环自动写 Skill + 复跑；配额/计费档。
 - **多模态（Sprint 03）**：**Media Adapter**（`image_*`/`video_*` 别名）+ 图像/Seedance 2.0 视频 provider（离线 stub 兜底）、异步媒体编排 + 对象存储、内容审核（生成前后）、媒体成本/视频二次确认、媒体 Skill、研究→媒体串联（一键封面/讲解短视频，内嵌报告）。
-- **Demo**：`apps/bff` —— 登录 → 项目 → 研究 → 记忆生效 → 存为 Skill → 复跑 → **一键生成封面图/视频** → 导出含媒体。
+- **工具生态与执行（Sprint 04）**：真实 **MCP 连接器**（`connectMCP`，stdio + 内置 stub）、连接器管理（持久化、单工具开关、**密钥加密**）、**多工具 Agent**（plan→工具循环→交付）、**分级执行**（只读自动 / 低风险写入需人类确认 / 高风险拒绝）、工具输出防注入、**审计日志**。
+- **Demo**：`apps/bff` —— 登录 → 项目 → 研究 → 记忆 → 存为 Skill → 复跑 → 一键封面图/视频 → **连接 MCP → 跑 Agent → 低风险写入弹确认 → 审计** → 导出。
 
 ## 快速开始
 
@@ -31,7 +32,7 @@ export DATABASE_URL=postgres://postgres:postgres@localhost:5432/apolla
 pnpm dev          # BFF 自动迁移 + 切到 Postgres，数据重启后仍在
 ```
 
-**接真实模型/搜索/媒体**：复制 `.env.example` 为 `.env`，填 `OPENAI_API_KEY` + `ANTHROPIC_API_KEY`（LLM，`OPENAI_API_KEY` 同时用于文生图）、`TAVILY_API_KEY`（搜索）、`SEEDANCE_API_KEY` + `SEEDANCE_BASE_URL`（文生视频）。会话签名 `SESSION_SECRET`；本地媒体存储目录 `MEDIA_DIR`。无对应 key 时该模态自动回退到确定性 stub。
+**接真实模型/搜索/媒体**：复制 `.env.example` 为 `.env`，填 `OPENAI_API_KEY` + `ANTHROPIC_API_KEY`（LLM，`OPENAI_API_KEY` 同时用于文生图）、`TAVILY_API_KEY`（搜索）、`SEEDANCE_API_KEY` + `SEEDANCE_BASE_URL`（文生视频）。会话签名 `SESSION_SECRET`；本地媒体存储目录 `MEDIA_DIR`；连接器密钥加密 `SECRETS_KEY`；本地 MCP server 经连接器的 stdio transport 接入。无对应 key 时该模态/工具自动回退到确定性 stub。
 
 ## 命令
 
@@ -42,7 +43,7 @@ pnpm dev          # BFF 自动迁移 + 切到 Postgres，数据重启后仍在
 | `pnpm lint` | ESLint |
 | `pnpm test` | vitest 单测（含离线端到端 demo 测试） |
 | `pnpm build` | 各包 tsc 产物 |
-| `pnpm eval` | LLM/媒体 eval：研究 golden + 引用 + 成本 + 记忆 + Skill + 个性化 + 媒体（contract/成本/审核/异步失败）|
+| `pnpm eval` | 15 项：研究(golden/引用/成本) + 记忆/Skill/个性化 + 媒体(contract/成本/审核/异步) + 执行(MCP契约/完成/确认门控/注入对抗/审计) |
 | `pnpm contract-test` | Provider 契约测试 |
 | `pnpm db:up` / `db:down` | 启停本地 Postgres（docker） |
 | `pnpm db:migrate` | 迁移 schema（读 `DATABASE_URL`） |

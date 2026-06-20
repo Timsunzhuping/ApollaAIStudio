@@ -143,17 +143,19 @@ S2-T11(配额) ── 依赖 T1/T2
 - **可并行**：T1 落地后，账号线（T2-T3）、记忆线（T4-T5）、技能线（T6-T8）三线并行；T9 完全独立。
 - **每完成一个任务**：跑该模块单测 + 相关 eval；一任务一 PR，CI 绿即合；提交说明写清「动了哪个注册点 + 加了哪个 eval」。
 
-## Sprint 02 Definition of Done（整体验收）
-- [ ] 数据持久化：重启服务后任务/项目/记忆/技能仍在（Postgres）。
-- [ ] 多用户：登录后数据按 owner 隔离，互不可见。
-- [ ] 项目：项目内研究注入项目背景与素材。
-- [ ] 记忆：用户偏好/风格影响后续研究输出；记忆可见/可编辑/可删除。
-- [ ] 技能：一次研究可「存为 Skill」，并在新问题上一键复跑。
-- [ ] 流式：报告逐 token 流式呈现，引用正确性不退化。
-- [ ] FeatureGate：至少一个特性按模型 caps 自动启用/降级（探针回写）。
-- [ ] 配额：Free 超额被拦截并提示；任务前显示预估成本。
-- [ ] `pnpm eval` 含记忆召回/Skill 质量/多 golden/个性化；Repo contract 同跑内存+Postgres；CI 全门禁绿。
-- [ ] README/命令/架构文档一致更新；Demo 端到端走通。
+## Sprint 02 Definition of Done（整体验收）— ✅ 全部达成
+- [x] 数据持久化：重启服务后任务/项目/记忆/技能仍在（Postgres）。
+- [x] 多用户：登录后数据按 owner 隔离，互不可见。
+- [x] 项目：项目内研究注入项目背景与素材（systemAddendum / extraEvidence）。
+- [x] 记忆：用户偏好/风格注入后续研究；记忆可见/可编辑/可删除。
+- [x] 技能：一次研究可「存为 Skill」，并在新问题上一键复跑。
+- [x] 流式：报告逐 token 流式呈现（127 delta），引用正确性不退化。
+- [x] FeatureGate：特性按模型 caps 自动启用/降级（探针校准 + scaffold 退役）。
+- [x] 配额：Free 超额返回 402 并提示；任务前返回预估成本。
+- [x] `pnpm eval` 含记忆召回/Skill 质量/个性化；Repo contract 同跑内存+Postgres；CI 全门禁绿（含 PG service）。
+- [x] README/命令/架构文档一致更新；Demo 端到端走通。
+
+> Sprint 02 完成。S2-T1–T13 全部合并到 `main`（PR #13–#18），CI 全门禁绿（含 Postgres service）。
 
 ## 风险与提示（给代理）
 - **Postgres in CI**：用 GitHub Actions `services: postgres`，集成测试读 `DATABASE_URL`；无 DB 时集成测试 `skipIf`，单测仍用内存实现保证离线可跑。

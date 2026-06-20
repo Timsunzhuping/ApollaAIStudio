@@ -87,7 +87,8 @@ LLM 测试四类：golden set 回归、citation correctness、cost regression、
 | `pnpm lint` | ESLint |
 | `pnpm test` | vitest 单测 |
 | `pnpm build` | 各包 tsc 产物 |
-| `pnpm eval` | 研究 golden + 引用正确性 + 成本回归 |
+| `pnpm eval` | 研究 golden + 引用 + 成本 + 记忆召回 + Skill 自动生成 + 个性化 |
 | `pnpm contract-test` | Provider 契约测试 |
+| `pnpm db:up` / `db:migrate` | 起本地 Postgres / 迁移 schema |
 
-每个能力落地后至少跑 `pnpm typecheck && pnpm test && pnpm eval`。CI 对每个 PR 跑全部门禁。真实模型/搜索：在 `.env` 配 `OPENAI_API_KEY`/`ANTHROPIC_API_KEY`/`TAVILY_API_KEY`。
+每个能力落地后至少跑 `pnpm typecheck && pnpm test && pnpm eval`。CI 对每个 PR 跑全部门禁（含 Postgres service）。真实模型/搜索：`.env` 配 `OPENAI_API_KEY`/`ANTHROPIC_API_KEY`/`TAVILY_API_KEY`；持久化配 `DATABASE_URL`；会话签名配 `SESSION_SECRET`。

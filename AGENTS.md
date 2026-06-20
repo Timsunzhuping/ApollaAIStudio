@@ -42,5 +42,5 @@ Apolla AI 是面向个人知识工作的 AI 工作台，**采用 harness 架构*
 统一适配器接入（无硬编码）｜golden eval + 五类回归无退化｜受 Safety & Policy 约束｜计入 Cost Ledger｜脚手架带退役开关｜contract test 通过。
 
 ## 命令
-`pnpm dev`（启动 Demo BFF → http://localhost:3000，离线模式无需密钥）｜ `pnpm typecheck` ｜ `pnpm lint` ｜ `pnpm test` ｜ `pnpm build` ｜ `pnpm eval`（研究 golden + 引用/成本回归）｜ `pnpm contract-test`。
-每个能力落地后至少跑 `pnpm typecheck && pnpm test && pnpm eval`；CI 对每个 PR 跑全部门禁。真实模型/搜索在 `.env` 配 `OPENAI_API_KEY`/`ANTHROPIC_API_KEY`/`TAVILY_API_KEY`。
+`pnpm dev`（Demo BFF → http://localhost:3000，离线无需密钥）｜ `pnpm typecheck` ｜ `pnpm lint` ｜ `pnpm test` ｜ `pnpm build` ｜ `pnpm eval`（golden + 引用/成本 + 记忆/Skill/个性化）｜ `pnpm contract-test` ｜ `pnpm db:up`/`db:migrate`（Postgres）。
+每个能力落地后至少跑 `pnpm typecheck && pnpm test && pnpm eval`；CI 对每个 PR 跑全部门禁（含 Postgres service）。env：`OPENAI_API_KEY`/`ANTHROPIC_API_KEY`/`TAVILY_API_KEY`（真实模型/搜索）、`DATABASE_URL`（持久化）、`SESSION_SECRET`（会话）。

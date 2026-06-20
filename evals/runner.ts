@@ -5,6 +5,7 @@ import {
   checkCostRegression,
   type CheckResult,
 } from './src/checks';
+import { runScenarios } from './src/scenarios';
 
 /** Baseline cost for the deterministic golden (mock pricing). Tighten as the loop evolves. */
 const BASELINE_USD = 0.001;
@@ -15,6 +16,7 @@ const results: CheckResult[] = [
   checkGoldenStructure(task),
   checkCitationCorrectness(task),
   checkCostRegression(totalUsd, BASELINE_USD),
+  ...(await runScenarios()),
 ];
 
 console.log('Apolla eval — research golden\n');

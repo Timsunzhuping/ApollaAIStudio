@@ -50,6 +50,8 @@ export const UI_HTML = `<!doctype html>
   <div class="bar">
     <select id="project"><option value="">No project</option></select>
     <button class="ghost" id="newProject">+ Project</button>
+    <select id="skill" title="Rerun a saved skill"><option value="">No skill</option></select>
+    <button class="ghost" id="prefs" title="Writing preferences">⚙</button>
     <input id="q" placeholder="Ask a research question, e.g. “State of the EV market in 2026”" />
     <button id="go">Research</button>
   </div>
@@ -59,7 +61,7 @@ export const UI_HTML = `<!doctype html>
     <div class="col">
       <h3>Sources</h3><div id="sources" class="muted">—</div>
       <h3 style="margin-top:1rem">Cost</h3><div class="cost" id="cost">$0.0000</div>
-      <div class="exp" id="exp" style="display:none"><button class="ghost" data-fmt="md">Export .md</button><button class="ghost" data-fmt="html">Export .html</button></div>
+      <div class="exp" id="exp" style="display:none"><button class="ghost" data-fmt="md">Export .md</button><button class="ghost" data-fmt="html">Export .html</button><button class="ghost" id="saveSkill">★ Save as skill</button></div>
     </div>
   </div>
 </div>
@@ -77,8 +79,24 @@ async function boot() {
 function showApp(u) {
   $('login').style.display='none'; $('app').style.display='block';
   $('who').textContent = u.email; $('logout').style.display='inline-block';
-  loadProjects();
+  loadProjects(); loadSkills();
 }
+async function loadSkills() {
+  const list = await fetch('/api/skills').then(r=>r.json());
+  $('skill').innerHTML = '<option value="">No skill</option>' + list.map(s=>'<option value="'+s.name+'">'+escapeHtml(s.name)+'</option>').join('');
+}
+$('prefs').onclick = async () => {
+  const language = prompt('Preferred language (e.g. English, Chinese)') || '';
+  const style = prompt('Preferred style (e.g. concise bullets)') || '';
+  await fetch('/api/memory/model',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({language,style})});
+  alert('Preferences saved — future research will reflect them.');
+};
+$('saveSkill').onclick = async () => {
+  if(!taskId) return;
+  const r = await fetch('/api/tasks/'+taskId+'/save-as-skill',{method:'POST'});
+  if(r.ok){ const s = await r.json(); await loadSkills(); $('skill').value=s.name; alert('Saved skill: '+s.name); }
+  else alert('Could not save skill');
+};
 $('loginBtn').onclick = async () => {
   const email = $('email').value.trim();
   const r = await fetch('/api/auth/login', {method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({email})});
@@ -109,8 +127,13 @@ async function run(){
   const q = $('q').value.trim(); if(!q) return;
   $('go').disabled = true; $('trace').innerHTML=''; $('plan').textContent='—';
   $('report').textContent=''; $('report').className=''; $('sources').textContent='—'; $('cost').textContent='$0.0000'; $('exp').style.display='none';
-  const res = await fetch('/api/tasks',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({question:q, projectId: $('project').value || undefined})});
-  taskId = (await res.json()).taskId;
+  const skillName = $('skill').value;
+  const res = skillName
+    ? await fetch('/api/skills/run',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:skillName, question:q})})
+    : await fetch('/api/tasks',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({question:q, projectId: $('project').value || undefined})});
+  const body = await res.json();
+  if(!res.ok){ $('go').disabled=false; $('report').textContent = body.error || 'request failed'; return; }
+  taskId = body.taskId;
   const es = new EventSource('/api/tasks/'+taskId+'/events');
   es.onmessage = (m) => {
     const ev = JSON.parse(m.data);

@@ -6,8 +6,12 @@
 
 ## 状态
 
-**Sprint 01 完成** — 空仓库 → Harness Core + 第一条「研究→成品」闭环 + 可演示 Demo。
-Harness Core：Model Router（OpenAI/Anthropic 适配、failover、多密钥）、Prompt Registry、Tool Runtime（Web Search）、Safety & Policy（三级权限 + 不可信输入防护）、Cost Ledger、Task Orchestrator（研究状态机）。Demo：`apps/bff` 提供研究→报告→导出的 API(SSE) + 三栏工作台。
+**Sprint 01 + Sprint 02 完成** —— 从研究→成品骨架升级为持久化、多用户、有记忆、技能可复用的工作台。
+- **Harness Core**：Model Router（failover/多密钥）、Prompt Registry、Tool Runtime（Web Search）、Safety & Policy（三级权限 + 防注入）、Cost Ledger、研究状态机（流式综合）、**FeatureGate 运行时**。
+- **持久化与账号**：Postgres（`TaskRepository` 等接口的 PG 实现）、最小 Auth、Projects。
+- **个人化**：Memory（FTS 检索 + 用户模型 + 注入研究流）。
+- **技能**：Skill Runtime + 闭环自动写 Skill + 复跑；配额/计费档。
+- **Demo**：`apps/bff` —— 登录 → 项目 → 研究 → 记忆生效 → 存为 Skill → 复跑 → 导出。
 
 ## 快速开始
 
@@ -16,11 +20,17 @@ pnpm install
 pnpm dev          # 启动 Demo（apps/bff）→ http://localhost:3000
 ```
 
-打开浏览器输入一个研究问题，即可看到分阶段进度、带引用的流式报告、来源与实时成本，并一键导出 `.md`/`.html`。
-**无需任何密钥** —— 默认离线 demo 模式（内置 DemoLLMAdapter + 确定性 stub 搜索）。
+无需任何密钥即可体验（离线 demo 模式 + 内存持久化）。打开浏览器：登录（任意邮箱）→ 可选建项目/设偏好 → 输入研究问题 → 看分阶段进度与**逐字流式**报告、来源、实时成本 → 「★ 存为 Skill」→ 用 Skill 下拉在新问题上复跑 → 导出 `.md`/`.html`。
 
-配了密钥则自动切换到真实模型/搜索：复制 `.env.example` 为 `.env` 并填入
-`OPENAI_API_KEY` + `ANTHROPIC_API_KEY`（真实 LLM）、`TAVILY_API_KEY`（真实 Web 搜索）。
+**开启持久化（Postgres）**：
+
+```bash
+pnpm db:up        # docker 起本地 Postgres
+export DATABASE_URL=postgres://postgres:postgres@localhost:5432/apolla
+pnpm dev          # BFF 自动迁移 + 切到 Postgres，数据重启后仍在
+```
+
+**接真实模型/搜索**：复制 `.env.example` 为 `.env`，填 `OPENAI_API_KEY` + `ANTHROPIC_API_KEY`（LLM）、`TAVILY_API_KEY`（搜索）。多用户会话签名用 `SESSION_SECRET`。
 
 ## 命令
 
@@ -31,8 +41,10 @@ pnpm dev          # 启动 Demo（apps/bff）→ http://localhost:3000
 | `pnpm lint` | ESLint |
 | `pnpm test` | vitest 单测（含离线端到端 demo 测试） |
 | `pnpm build` | 各包 tsc 产物 |
-| `pnpm eval` | LLM 产品 eval：研究 golden + 引用正确性 + 成本回归 |
+| `pnpm eval` | LLM 产品 eval：研究 golden + 引用 + 成本 + 记忆召回 + Skill 自动生成 + 个性化 |
 | `pnpm contract-test` | Provider 契约测试 |
+| `pnpm db:up` / `db:down` | 启停本地 Postgres（docker） |
+| `pnpm db:migrate` | 迁移 schema（读 `DATABASE_URL`） |
 
 要求：Node ≥ 20，pnpm 9。CI（`.github/workflows/ci.yml`）对每个 PR 跑 typecheck · lint · test · build · **eval** 全门禁。
 

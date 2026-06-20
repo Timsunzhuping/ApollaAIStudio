@@ -9,7 +9,7 @@ import { PromptRegistry } from '../prompts/registry';
 import { ToolRuntime } from '../tools/runtime';
 import { WebSearchTool, type SearchProvider, type SearchHit } from '../tools/search';
 import { CompositeSkillSource, InMemorySkillRepository } from '../repo/memory';
-import type { TaskEvent } from '../orchestrator/events';
+import type { SkillEvent } from './types';
 
 class FakeProvider implements SearchProvider {
   readonly name = 'fix';
@@ -45,8 +45,8 @@ function buildRuntime() {
   return { runtime, userSkills };
 }
 
-async function collect(it: AsyncIterable<TaskEvent>): Promise<TaskEvent[]> {
-  const out: TaskEvent[] = [];
+async function collect(it: AsyncIterable<SkillEvent>): Promise<SkillEvent[]> {
+  const out: SkillEvent[] = [];
   for await (const e of it) out.push(e);
   return out;
 }

@@ -5,6 +5,7 @@ import type { PromptRegistry } from '../prompts/registry';
 import type { ToolRuntime } from '../tools/runtime';
 import { assembleRequest } from '../safety/untrusted';
 import type { ResearchOrchestrator } from '../orchestrator/research';
+import type { MediaOrchestrator } from '../media/orchestrator';
 import type { SkillExecutor } from './types';
 
 /** Research skills delegate to the full orchestrator state machine. */
@@ -16,6 +17,22 @@ export function makeResearchExecutor(orchestrator: ResearchOrchestrator): SkillE
       taskId: input.taskId,
       projectId: input.projectId,
     });
+}
+
+/** Media skills drive the MediaOrchestrator using the skill's declared media alias. */
+export function makeMediaExecutor(orchestrator: MediaOrchestrator): SkillExecutor {
+  return (skill, input) => {
+    const alias = skill.mediaAlias;
+    if (!alias) throw new Error(`media skill "${skill.name}" has no mediaAlias`);
+    const kind = alias.startsWith('video') ? 'video' : 'image';
+    return orchestrator.run({
+      ownerId: input.ownerId,
+      alias,
+      job: { kind, prompt: input.question, params: {} },
+      taskId: input.taskId,
+      projectId: input.projectId,
+    });
+  };
 }
 
 export interface GenericExecutorDeps {

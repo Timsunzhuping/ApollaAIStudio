@@ -60,9 +60,9 @@ export type {
 export type { MediaRouterDeps, MediaGenerateResult } from './media/router';
 export type { TaskRepository, UserRepository, ProjectRepository } from './repo/types';
 export { SkillRuntime } from './skills/runtime';
-export { makeResearchExecutor, makeGenericExecutor } from './skills/executors';
+export { makeResearchExecutor, makeGenericExecutor, makeMediaExecutor } from './skills/executors';
 export { autoDraftSkill } from './skills/autodraft';
-export type { SkillExecutor, SkillRunInput, SkillSource, SkillRepository } from './skills/types';
+export type { SkillExecutor, SkillRunInput, SkillSource, SkillRepository, SkillEvent } from './skills/types';
 export { InMemoryMemory } from './memory/memory';
 export { userModelDirective } from './memory/types';
 export type { Memory } from './memory/types';

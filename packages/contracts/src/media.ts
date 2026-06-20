@@ -67,6 +67,8 @@ export const MediaTask = z.object({
   moderated: z.boolean().default(false),
   error: z.string().optional(),
   projectId: z.string().optional(),
+  /** The research task this media was generated for (research→media chaining, S3-T9). */
+  sourceTaskId: z.string().optional(),
   createdAt: z.string().optional(),
 });
 export type MediaTask = z.infer<typeof MediaTask>;

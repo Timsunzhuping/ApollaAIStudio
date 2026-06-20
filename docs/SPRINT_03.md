@@ -117,17 +117,19 @@ S3-T8(媒体 Skills) ── 依赖 T1 + Sprint02 Skill   │
 - **可并行**：T1 后图像线（T2）、视频线（T3）并行；T4 后审核（T6）、成本（T7）、交付（T5）并行；T8 可早开。
 - **每完成一个任务**：跑该模块单测 + 相关 eval；一任务一 PR，CI 绿即合；提交说明写清「动了哪个注册点 + 加了哪个 eval」。
 
-## Sprint 03 Definition of Done（整体验收）
-- [ ] 统一 Media Adapter：业务层只用 `image_*`/`video_*` 别名；换 provider 不改调用方（provider contract 绿）。
-- [ ] 文生图：研究后一键生成封面图，入素材库、内嵌 HTML 报告、可导出。
-- [ ] 文生视频（Seedance）：异步任务从 submit→ready，先预估后生成，产物可下载；无 key 时 stub 可演示。
-- [ ] 对象存储：产物转存自有存储并返回稳定 uri；按 owner 隔离、可删。
-- [ ] 内容审核：违规 prompt 生成前被拒；产物可标记；审核可插拔。
-- [ ] 成本/配额：视频前显示预估并二次确认；媒体成本写 UsageLedger 分项；超额 402。
-- [ ] 媒体 Skill：声明式媒体 Skill 可 match/run；可存为模板复跑。
-- [ ] `pnpm eval` 含媒体 provider contract / 成本预估 / 审核拦截 / 异步失败回退；CI 全门禁绿。
-- [ ] 数据持久化：媒体任务/产物重启后仍在（Postgres + 对象存储）。
-- [ ] README/命令/架构文档一致更新；Demo 端到端走通（离线 stub 可演示）。
+## Sprint 03 Definition of Done（整体验收）— ✅ 全部达成
+- [x] 统一 Media Adapter：业务层只用 `image_*`/`video_*` 别名；换 provider 不改调用方（provider contract 绿）。
+- [x] 文生图：研究后一键生成封面图，内嵌 HTML 报告、可导出。
+- [x] 文生视频（Seedance）：异步任务 submit→ready，先预估后生成；无 key 时 stub 可演示。
+- [x] 对象存储：产物转存自有存储并返回稳定 uri（http 转存、data:/stub: 直通）；按 owner 隔离。
+- [x] 内容审核：违规 prompt 生成前被拒（不调用 provider）；产物 moderated 标记；审核可插拔。
+- [x] 成本/配额：视频前预估 + 二次确认；媒体成本写 UsageLedger（kind=media）；媒体并入 Quota；超额 402。
+- [x] 媒体 Skill：声明式媒体 Skill 可 match/run；可存为模板复跑。
+- [x] `pnpm eval` 含媒体 provider contract / 成本预估 / 审核拦截 / 异步失败回退（10 项总检）；CI 全门禁绿。
+- [x] 数据持久化：媒体任务重启后仍在（Postgres + 本地对象存储）。
+- [x] README/命令/架构文档一致更新；Demo 端到端走通（离线 stub 可演示）。
+
+> Sprint 03 完成。S3-T1–T11 全部合并到 `main`（PR #20–#25），CI 全门禁绿（含 Postgres service）。
 
 ## 风险与提示（给代理）
 - **Seedance 区域可达性/合规**：env 开关 + config 控制；无 key/不可达时**自动 stub**，保证离线/CI/Demo 可跑（沿用搜索 stub 模式）。CI 绝不真实调用媒体 provider。

@@ -2,7 +2,7 @@
 
 本文件为 Claude Code 提供每次会话的标准上下文。开始任何开发前请先读本文件，再读 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)（Harness 架构总纲）、[docs/PRD.md](docs/PRD.md) 与 [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md)。Codex 等其他代理读同源的 [AGENTS.md](AGENTS.md)。
 
-**当前 Sprint**：[docs/SPRINT_03.md](docs/SPRINT_03.md)（多模态成品：文生图/视频 + Media Adapter + Seedance）。已完成：Sprint 01（[SPRINT_01](docs/SPRINT_01.md)，Harness Core + 研究→成品）、Sprint 02（[SPRINT_02](docs/SPRINT_02.md)，持久化/个人化/技能）。从 S3-T1 开始逐任务执行。
+**已完成 Sprint**：Sprint 01（[SPRINT_01](docs/SPRINT_01.md) Harness Core + 研究→成品）、Sprint 02（[SPRINT_02](docs/SPRINT_02.md) 持久化/个人化/技能）、Sprint 03（[SPRINT_03](docs/SPRINT_03.md) 多模态成品：文生图/视频 + Media Adapter + Seedance）。后续 Sprint 候选见 SPRINT_03 §0：文本产品面（翻译/Sheets/Meeting）、MCP、Browser Actions、Cowork。
 
 ## 产品是什么
 
@@ -87,8 +87,8 @@ LLM 测试四类：golden set 回归、citation correctness、cost regression、
 | `pnpm lint` | ESLint |
 | `pnpm test` | vitest 单测 |
 | `pnpm build` | 各包 tsc 产物 |
-| `pnpm eval` | 研究 golden + 引用 + 成本 + 记忆召回 + Skill 自动生成 + 个性化 |
+| `pnpm eval` | 研究(golden/引用/成本) + 记忆 + Skill + 个性化 + 媒体(contract/成本/审核/异步失败) |
 | `pnpm contract-test` | Provider 契约测试 |
 | `pnpm db:up` / `db:migrate` | 起本地 Postgres / 迁移 schema |
 
-每个能力落地后至少跑 `pnpm typecheck && pnpm test && pnpm eval`。CI 对每个 PR 跑全部门禁（含 Postgres service）。真实模型/搜索：`.env` 配 `OPENAI_API_KEY`/`ANTHROPIC_API_KEY`/`TAVILY_API_KEY`；持久化配 `DATABASE_URL`；会话签名配 `SESSION_SECRET`。
+每个能力落地后至少跑 `pnpm typecheck && pnpm test && pnpm eval`。CI 对每个 PR 跑全部门禁（含 Postgres service）。真实模型/搜索/媒体：`.env` 配 `OPENAI_API_KEY`/`ANTHROPIC_API_KEY`/`TAVILY_API_KEY`/`SEEDANCE_API_KEY`；持久化 `DATABASE_URL`；会话 `SESSION_SECRET`；媒体目录 `MEDIA_DIR`。无 key 的模态自动回退 stub。媒体走统一 Media Adapter（`image_*`/`video_*` 别名，禁止硬编码媒体模型名）。

@@ -6,6 +6,7 @@ import {
   type CheckResult,
 } from './src/checks';
 import { runScenarios } from './src/scenarios';
+import { runMediaScenarios } from './src/media-scenarios';
 
 /** Baseline cost for the deterministic golden (mock pricing). Tighten as the loop evolves. */
 const BASELINE_USD = 0.001;
@@ -17,6 +18,7 @@ const results: CheckResult[] = [
   checkCitationCorrectness(task),
   checkCostRegression(totalUsd, BASELINE_USD),
   ...(await runScenarios()),
+  ...(await runMediaScenarios()),
 ];
 
 console.log('Apolla eval — research golden\n');

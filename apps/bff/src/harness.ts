@@ -76,6 +76,11 @@ export interface Harness {
   connectors: ConnectorRepository;
   stubMcp: StubMCPClient;
   mcpClientFor: (transport: string) => MCPClient;
+  llmRouter: ModelRouter;
+  prompts: PromptRegistry;
+  agentToolsFor: (ownerId: string) => Promise<ToolRuntime>;
+  pendingAgents: Map<string, { goal: string }>;
+  confirmMailbox: Map<string, (approved: boolean) => void>;
   objectStore: LocalObjectStore;
   ledger: InMemoryCostLedger;
   pending: Map<string, { question: string; projectId?: string; skillName?: string }>;
@@ -204,6 +209,31 @@ export async function buildHarness(): Promise<Harness> {
   const stubMcp = new StubMCPClient();
   const mcpClientFor = (transport: string): MCPClient => (transport === 'stdio' ? new StdioMCPClient() : stubMcp);
 
+  // Build the agent's tool set for an owner: built-in web_search + enabled connector tools.
+  const agentToolsFor = async (ownerId: string): Promise<ToolRuntime> => {
+    const rt = new ToolRuntime();
+    rt.register(new WebSearchTool(search));
+    for (const c of await connectorRepo.list(ownerId)) {
+      if (!c.enabled) continue;
+      try {
+        const registered = await rt.connectMCP(mcpClientFor(c.transport), {
+          name: c.name,
+          transport: c.transport,
+          command: c.command,
+          args: c.args,
+          url: c.url,
+          readOnlyTools: c.readOnlyTools,
+        });
+        for (const t of registered) {
+          if (c.disabledTools.includes(t.name.slice(c.name.length + 1))) rt.unregister(t.name);
+        }
+      } catch {
+        // skip an unreachable connector rather than failing the whole agent run
+      }
+    }
+    return rt;
+  };
+
   return {
     orchestrator,
     repo,
@@ -220,6 +250,11 @@ export async function buildHarness(): Promise<Harness> {
     connectors: connectorRepo,
     stubMcp,
     mcpClientFor,
+    llmRouter: router,
+    prompts,
+    agentToolsFor,
+    pendingAgents: new Map(),
+    confirmMailbox: new Map(),
     objectStore,
     ledger,
     pending: new Map(),

@@ -26,6 +26,8 @@ export type { SearchProvider, SearchHit, SearchOpts, WebSearchArgs } from './too
 export { wrapMCPTool, inferRisk } from './tools/mcp';
 export type { MCPClient, MCPSession, MCPToolDef, MCPCallResult } from './tools/mcp';
 export { StubMCPClient } from './tools/mcp-stub';
+export { AgentOrchestrator } from './agent/orchestrator';
+export type { AgentRunInput, AgentEvent, AgentDeps, ToolCall } from './agent/orchestrator';
 export { SafetyPolicy, PolicyViolation } from './safety/policy';
 export type { Decision, PolicyOptions } from './safety/policy';
 export { wrapAsData, assembleRequest, assertNoUntrustedInMessages } from './safety/untrusted';

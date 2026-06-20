@@ -21,6 +21,7 @@ import {
   MediaRouter,
   MediaOrchestrator,
   StubMediaAdapter,
+  RuleModerator,
   InMemoryMediaRepository,
   type MediaAdapter,
   type MediaRepository,
@@ -62,6 +63,7 @@ export interface Harness {
   skillRepo: SkillRepository;
   features: FeatureGates;
   quota: Quota;
+  mediaRouter: MediaRouter;
   mediaOrch: MediaOrchestrator;
   mediaRepo: MediaRepository;
   objectStore: LocalObjectStore;
@@ -165,7 +167,10 @@ export async function buildHarness(): Promise<Harness> {
     agenticReliability: 0.8,
   };
   const features = new FeatureGates(loadFeatureGates(), caps);
-  const quota = new Quota((ownerId) => repo.list(ownerId).then((l) => l.length));
+  // Quota counts both research and media tasks (PRD §13 / S3-T7).
+  const quota = new Quota((ownerId) =>
+    Promise.all([repo.list(ownerId), mediaRepo.list(ownerId)]).then(([a, b]) => a.length + b.length),
+  );
 
   // Media: stub always registered (offline default); real providers when keyed.
   const mediaAdapters = new Map<string, MediaAdapter>([['stub', new StubMediaAdapter()]]);
@@ -173,7 +178,13 @@ export async function buildHarness(): Promise<Harness> {
   if (SeedanceVideoAdapter.isConfigured()) mediaAdapters.set('seedance', new SeedanceVideoAdapter());
   const objectStore = new LocalObjectStore();
   const mediaRouter = new MediaRouter({ adapters: mediaAdapters, env: process.env, routeFor: getMediaRoute });
-  const mediaOrch = new MediaOrchestrator({ router: mediaRouter, repo: mediaRepo, store: objectStore, ledger });
+  const mediaOrch = new MediaOrchestrator({
+    router: mediaRouter,
+    repo: mediaRepo,
+    store: objectStore,
+    ledger,
+    moderator: new RuleModerator(),
+  });
 
   return {
     orchestrator,
@@ -185,6 +196,7 @@ export async function buildHarness(): Promise<Harness> {
     skillRepo,
     features,
     quota,
+    mediaRouter,
     mediaOrch,
     mediaRepo,
     objectStore,

@@ -61,7 +61,8 @@ export const UI_HTML = `<!doctype html>
     <div class="col">
       <h3>Sources</h3><div id="sources" class="muted">—</div>
       <h3 style="margin-top:1rem">Cost</h3><div class="cost" id="cost">$0.0000</div>
-      <div class="exp" id="exp" style="display:none"><button class="ghost" data-fmt="md">Export .md</button><button class="ghost" data-fmt="html">Export .html</button><button class="ghost" id="saveSkill">★ Save as skill</button></div>
+      <div class="exp" id="exp" style="display:none"><button class="ghost" data-fmt="md">Export .md</button><button class="ghost" data-fmt="html">Export .html</button><button class="ghost" id="saveSkill">★ Save as skill</button><button class="ghost" id="genImage">🖼 Cover</button><button class="ghost" id="genVideo">🎬 Video</button></div>
+      <div id="media" style="margin-top:.6rem"></div>
     </div>
   </div>
 </div>
@@ -148,7 +149,27 @@ async function run(){
   };
   es.onerror = () => { es.close(); $('go').disabled=false; };
 }
-document.querySelectorAll('#exp button').forEach(b => b.onclick = () => { if(taskId) window.location='/api/tasks/'+taskId+'/export?fmt='+b.dataset.fmt; });
+document.querySelectorAll('#exp button[data-fmt]').forEach(b => b.onclick = () => { if(taskId) window.location='/api/tasks/'+taskId+'/export?fmt='+b.dataset.fmt; });
+$('genImage').onclick = () => genMedia('image_premium', false);
+$('genVideo').onclick = () => genMedia('video_standard', false);
+async function genMedia(alias, confirm){
+  if(!taskId) return;
+  const r = await fetch('/api/tasks/'+taskId+'/media',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({alias, confirm})});
+  const b = await r.json();
+  if(b.requiresConfirmation){ if(window.confirm('Estimated $'+b.estimateUsd.toFixed(2)+' — generate video?')) return genMedia(alias, true); return; }
+  if(!b.mediaId) return;
+  const box = document.createElement('div'); box.className='muted'; box.textContent='generating media…'; $('media').appendChild(box);
+  const es = new EventSource('/api/media/'+b.mediaId+'/events');
+  es.onmessage = (m) => { const ev = JSON.parse(m.data);
+    if(ev.type==='asset'){ box.innerHTML = ev.assets.map(a => a.kind==='image'
+      ? '<img src="'+a.uri+'" style="max-width:100%;border-radius:8px" />'
+      : (a.posterUri?'<img src="'+a.posterUri+'" style="max-width:100%;border-radius:8px" />':'')+'<div><a href="'+a.uri+'">▶ video</a></div>').join(''); }
+    else if(ev.type==='blocked'){ box.textContent='Blocked: '+ev.reason; es.close(); }
+    else if(ev.type==='done'){ es.close(); }
+    else if(ev.type==='error'){ box.textContent='Error: '+ev.message; es.close(); }
+  };
+  es.onerror = () => es.close();
+}
 function escapeHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 boot();
 </script>

@@ -5,7 +5,7 @@
 2. [docs/PRD.md](docs/PRD.md) —— 对应功能 §。
 3. [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md) —— 对应阶段 `[ ]` 任务。
 4. [CLAUDE.md](CLAUDE.md) —— 铁律全文。
-5. **当前 Sprint**：[docs/SPRINT_03.md](docs/SPRINT_03.md) —— 多模态成品：文生图/视频 + Media Adapter + Seedance（**从 S3-T1 开始**）。Sprint 01（[SPRINT_01](docs/SPRINT_01.md)）+ Sprint 02（[SPRINT_02](docs/SPRINT_02.md)）已完成。
+5. **已完成**：Sprint 01（[SPRINT_01](docs/SPRINT_01.md)）+ 02（[SPRINT_02](docs/SPRINT_02.md)）+ 03（[SPRINT_03](docs/SPRINT_03.md) 多模态：文生图/视频 + Media Adapter + Seedance）。媒体走统一 Media Adapter（`image_*`/`video_*` 别名，禁止硬编码媒体模型名）。后续候选见 SPRINT_03 §0。
 
 ## 平台是什么
 Apolla AI 是面向个人知识工作的 AI 工作台，**采用 harness 架构**：模型（GPT/Claude 及图像/视频/语音模型）是可替换、持续变强的能力提供者；平台只做路由、上下文、工具、记忆、安全、评测、交付。**模型变强 → 平台能力自动变强，无需重写产品代码。** 价值闭环：可信研究 → 一键成品 → 低风险执行。

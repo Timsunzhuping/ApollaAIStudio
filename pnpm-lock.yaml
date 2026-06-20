@@ -47,6 +47,12 @@ importers:
       '@apolla/harness-core':
         specifier: workspace:*
         version: link:../../packages/harness-core
+      '@apolla/media-openai':
+        specifier: workspace:*
+        version: link:../../packages/adapters/media/openai
+      '@apolla/media-seedance':
+        specifier: workspace:*
+        version: link:../../packages/adapters/media/seedance
       '@apolla/search-stub':
         specifier: workspace:*
         version: link:../../packages/adapters/search/stub

@@ -16,11 +16,25 @@ function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-/** Inline markdown: links [text](url) and bare URLs. Citations like [fake:1] are left as text. */
+/** Inline markdown: images ![alt](url), links [text](url), bare URLs. Citations [fake:1] stay text. */
 function inline(s: string): string {
   return s
+    .replace(
+      /!\[([^\]]*)\]\((https?:[^)]+|data:[^)]+)\)/g,
+      (_m, alt, u) => `<img src="${u}" alt="${alt}" style="max-width:100%;border-radius:8px" />`,
+    )
     .replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g, (_m, t, u) => `<a href="${u}">${t}</a>`)
     .replace(/(^|[^"=>])(https?:\/\/[^\s<]+)/g, (_m, p, u) => `${p}<a href="${u}">${u}</a>`);
+}
+
+/** Append generated media (images inline, videos as poster + link) to a report's Markdown. */
+export function embedMedia(markdown: string, assets: import('@apolla/contracts').MediaAsset[]): string {
+  const blocks = assets.map((a) =>
+    a.kind === 'image'
+      ? `\n\n![generated image](${a.uri})`
+      : `\n\n${a.posterUri ? `![poster](${a.posterUri})\n\n` : ''}[▶ watch video](${a.uri})`,
+  );
+  return markdown + blocks.join('');
 }
 
 /** Minimal, dependency-free Markdown → HTML for our report structure (headings, lists, paragraphs). */

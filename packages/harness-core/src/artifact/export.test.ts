@@ -37,6 +37,17 @@ describe('exportArtifact', () => {
     expect(f.content).toContain('[stub:1]');
   });
 
+  it('embeds images and renders them as <img> in HTML', () => {
+    const withImg: Artifact = {
+      id: 'r2',
+      type: 'report',
+      format: 'markdown',
+      content: 'Cover:\n\n![generated image](data:image/png;base64,iVBORw0KGgo=)',
+    };
+    const html = exportArtifact(withImg, 'html').content;
+    expect(html).toContain('<img src="data:image/png;base64,iVBORw0KGgo="');
+  });
+
   it('escapes HTML to prevent injection from report content', () => {
     const evil: Artifact = {
       id: 'x',

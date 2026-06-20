@@ -43,6 +43,10 @@ export {
 } from './repo/memory';
 export { MediaRouter } from './media/router';
 export { StubMediaAdapter } from './media/stub';
+export { MediaOrchestrator } from './media/orchestrator';
+export type { MediaRunInput, MediaEvent, MediaOrchestratorDeps } from './media/orchestrator';
+export { InMemoryObjectStore, rehostAsset } from './media/store';
+export type { ObjectStore } from './media/store';
 export type {
   MediaAdapter,
   MediaCost,
@@ -63,5 +67,5 @@ export type { Memory } from './memory/types';
 export { ResearchOrchestrator } from './orchestrator/research';
 export type { ResearchDeps, RunInput } from './orchestrator/research';
 export type { TaskEvent, PlanSketch, Estimate } from './orchestrator/events';
-export { exportArtifact } from './artifact/export';
+export { exportArtifact, embedMedia } from './artifact/export';
 export type { ExportFormat, ExportedFile } from './artifact/export';

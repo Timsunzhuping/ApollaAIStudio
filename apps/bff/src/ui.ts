@@ -65,6 +65,17 @@ export const UI_HTML = `<!doctype html>
       <div id="media" style="margin-top:.6rem"></div>
     </div>
   </div>
+  <div class="bar" style="border-top:1px solid var(--bd)">
+    <button class="ghost" id="addConnector">+ MCP connector</button>
+    <span id="connList" class="muted">no connectors</span>
+    <input id="agentGoal" placeholder="Agent goal, e.g. “save a note about EVs”" />
+    <button id="runAgent">Run agent</button>
+  </div>
+  <div class="col" style="border:0">
+    <h3>Agent trace</h3><div id="agentTrace" class="muted">—</div>
+    <div id="agentConfirm" style="margin-top:.4rem"></div>
+    <h3 style="margin-top:1rem">Audit</h3><div id="agentAudit" class="muted">—</div>
+  </div>
 </div>
 
 <script>
@@ -80,8 +91,49 @@ async function boot() {
 function showApp(u) {
   $('login').style.display='none'; $('app').style.display='block';
   $('who').textContent = u.email; $('logout').style.display='inline-block';
-  loadProjects(); loadSkills();
+  loadProjects(); loadSkills(); loadConnectors();
 }
+let agentId = null;
+async function loadConnectors(){
+  const l = await fetch('/api/connectors').then(r=>r.json());
+  $('connList').textContent = l.length ? l.map(c=>c.name+' ('+c.tools.length+' tools)').join(', ') : 'no connectors';
+}
+$('addConnector').onclick = async () => {
+  await fetch('/api/connectors',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:'demo',transport:'stub',readOnlyTools:['echo']})});
+  loadConnectors();
+};
+async function loadAudit(){
+  if(!agentId) return;
+  const a = await fetch('/api/audit?taskId='+agentId).then(r=>r.json());
+  $('agentAudit').innerHTML = a.length ? a.map(e=>escapeHtml(e.tool)+': '+e.decision+(e.confirmed!==undefined?'/'+(e.confirmed?'approved':'denied'):'')+' → '+e.status).join('<br>') : 'no actions';
+}
+$('runAgent').onclick = async () => {
+  const goal = $('agentGoal').value.trim(); if(!goal) return;
+  $('agentTrace').innerHTML=''; $('agentConfirm').innerHTML=''; $('agentAudit').textContent='—';
+  const r = await fetch('/api/agent',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({goal})});
+  agentId = (await r.json()).agentId;
+  const es = new EventSource('/api/agent/'+agentId+'/events');
+  es.onmessage = (m) => {
+    const ev = JSON.parse(m.data); const line = document.createElement('div'); line.className='step';
+    if(ev.type==='plan') line.textContent='📋 planning…';
+    else if(ev.type==='tool-call') line.textContent='🔧 '+ev.tool+' ['+ev.risk+']';
+    else if(ev.type==='tool-result') line.textContent='✓ '+ev.tool+': '+(ev.summary||'').slice(0,80);
+    else if(ev.type==='denied') line.textContent='⛔ '+ev.tool+' — '+ev.reason;
+    else if(ev.type==='delta') line.textContent='💬 '+ev.text;
+    else if(ev.type==='confirm'){
+      line.textContent='⏸ confirm '+ev.tool+' ['+ev.risk+']?';
+      const yes=document.createElement('button'); yes.textContent='Approve';
+      yes.onclick=()=>{ fetch('/api/agent/'+agentId+'/confirm',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({approved:true})}); $('agentConfirm').innerHTML=''; };
+      const no=document.createElement('button'); no.className='ghost'; no.textContent='Deny';
+      no.onclick=()=>{ fetch('/api/agent/'+agentId+'/confirm',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({approved:false})}); $('agentConfirm').innerHTML=''; };
+      $('agentConfirm').innerHTML=''; $('agentConfirm').append(yes,no);
+    }
+    else if(ev.type==='done'){ es.close(); loadAudit(); }
+    else if(ev.type==='error'){ line.textContent='error: '+ev.message; es.close(); }
+    $('agentTrace').appendChild(line);
+  };
+  es.onerror = () => es.close();
+};
 async function loadSkills() {
   const list = await fetch('/api/skills').then(r=>r.json());
   $('skill').innerHTML = '<option value="">No skill</option>' + list.map(s=>'<option value="'+s.name+'">'+escapeHtml(s.name)+'</option>').join('');

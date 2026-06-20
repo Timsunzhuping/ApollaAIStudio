@@ -16,6 +16,7 @@ import {
   makeResearchExecutor,
   makeGenericExecutor,
   makeMediaExecutor,
+  makeAgentExecutor,
   FeatureGates,
   Quota,
   PricingBook,
@@ -240,6 +241,11 @@ export async function buildHarness(): Promise<Harness> {
     }
     return rt;
   };
+
+  skills.registerExecutor(
+    'agent',
+    makeAgentExecutor({ router, prompts, toolsFor: agentToolsFor, audit: (e) => auditRepo.record(e) }),
+  );
 
   return {
     orchestrator,

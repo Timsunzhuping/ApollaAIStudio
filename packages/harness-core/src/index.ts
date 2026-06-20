@@ -68,7 +68,7 @@ export type { MediaRouterDeps, MediaGenerateResult } from './media/router';
 export type { TaskRepository, UserRepository, ProjectRepository, ConnectorRepository, AuditRepository } from './repo/types';
 export { encryptSecret, decryptSecret } from './security/secrets';
 export { SkillRuntime } from './skills/runtime';
-export { makeResearchExecutor, makeGenericExecutor, makeMediaExecutor } from './skills/executors';
+export { makeResearchExecutor, makeGenericExecutor, makeMediaExecutor, makeAgentExecutor } from './skills/executors';
 export { autoDraftSkill } from './skills/autodraft';
 export type { SkillExecutor, SkillRunInput, SkillSource, SkillRepository, SkillEvent } from './skills/types';
 export { InMemoryMemory } from './memory/memory';

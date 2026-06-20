@@ -1,5 +1,6 @@
 import type { ToolResult, ToolDescriptor } from '@apolla/contracts';
 import type { Tool, ToolContext, ToolFilter, MCPServerConfig } from './types';
+import { wrapMCPTool, type MCPClient } from './mcp';
 
 /**
  * Tool Runtime (ARCHITECTURE §3.4). Tools register here; external tools/data sources are
@@ -35,8 +36,16 @@ export class ToolRuntime {
     return this.get(name).invoke(args, ctx);
   }
 
-  /** Connect an MCP server and register its tools. Stubbed in Sprint 01 (ARCHITECTURE §3.4). */
-  async connectMCP(_server: MCPServerConfig): Promise<Tool[]> {
-    throw new Error('connectMCP is not implemented yet (Sprint 01 reserves the interface)');
+  /**
+   * Connect an MCP server (via an injected client) and register its tools. Tools are namespaced
+   * `<server>/<tool>` and risk-inferred conservatively (external write tools → low_write).
+   * Re-registers on reconnect (replace, not throw). Returns the registered tools.
+   */
+  async connectMCP(client: MCPClient, server: MCPServerConfig): Promise<Tool[]> {
+    const session = await client.connect(server);
+    const defs = await session.listTools();
+    const tools = defs.map((d) => wrapMCPTool(session, d, server));
+    for (const t of tools) this.tools.set(t.name, t);
+    return tools;
   }
 }

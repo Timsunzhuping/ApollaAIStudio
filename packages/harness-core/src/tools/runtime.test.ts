@@ -35,9 +35,6 @@ describe('ToolRuntime', () => {
     expect(() => rt.get('nope')).toThrow(/Unknown tool/);
   });
 
-  it('connectMCP is reserved (throws) this sprint', async () => {
-    await expect(new ToolRuntime().connectMCP({ name: 'x', url: 'y' })).rejects.toThrow();
-  });
 });
 
 describe('WebSearchTool', () => {

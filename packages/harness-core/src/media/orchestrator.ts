@@ -12,6 +12,7 @@ export interface MediaRunInput {
   job: MediaJob;
   taskId?: string;
   projectId?: string;
+  sourceTaskId?: string;
 }
 
 export type MediaEvent =
@@ -67,6 +68,7 @@ export class MediaOrchestrator {
       costUsd: 0,
       moderated: false,
       projectId: input.projectId,
+      sourceTaskId: input.sourceTaskId,
     };
 
     try {

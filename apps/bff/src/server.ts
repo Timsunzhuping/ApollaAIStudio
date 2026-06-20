@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { randomUUID } from 'node:crypto';
-import { exportArtifact, autoDraftSkill } from '@apolla/harness-core';
+import { exportArtifact, autoDraftSkill, embedMedia } from '@apolla/harness-core';
 import { buildHarness, type Harness } from './harness';
 import { readSession, setSession, clearSession } from './auth';
 import { UI_HTML } from './ui';
@@ -144,6 +144,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
         job: { kind: input.kind as never, prompt: input.prompt, params: {} },
         taskId: mediaId,
         projectId: input.projectId,
+        sourceTaskId: input.sourceTaskId,
       })) {
         res.write(`data: ${JSON.stringify(ev)}\n\n`);
       }
@@ -173,6 +174,24 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     const taskId = randomUUID();
     harness.pending.set(taskId, { question, skillName: skill.name });
     return json(res, 201, { taskId });
+  }
+
+  // Research → media chaining (S3-T9): stage a media task using the research question as the prompt.
+  const taskMedia = pathname.match(/^\/api\/tasks\/([^/]+)\/media$/);
+  if (method === 'POST' && taskMedia) {
+    const task = await harness.repo.get(taskMedia[1]!);
+    if (!task || task.ownerId !== ownerId) return json(res, 404, { error: 'unknown task' });
+    const body = await readBody(req);
+    const alias = String(body.alias ?? 'image_premium');
+    const kind = alias.startsWith('video') ? 'video' : 'image';
+    const q = await harness.quota.check(ownerId);
+    if (!q.ok) return json(res, 402, { error: 'quota reached — upgrade your plan', ...q });
+    const estimateUsd = harness.mediaRouter.estimateCost(alias as never, { kind: kind as never, prompt: '', params: {} }).usd;
+    if (kind === 'video' && !body.confirm) return json(res, 200, { requiresConfirmation: true, estimateUsd });
+    const mediaId = randomUUID();
+    const prompt = `${kind === 'video' ? 'A short explainer video' : 'A cover image'} for: ${task.question ?? 'the research report'}`;
+    harness.pendingMedia.set(mediaId, { alias, kind, prompt, projectId: task.projectId, sourceTaskId: task.id });
+    return json(res, 201, { mediaId, estimateUsd });
   }
 
   const saveSkill = pathname.match(/^\/api\/tasks\/([^/]+)\/save-as-skill$/);
@@ -237,8 +256,12 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       if (!task || task.ownerId !== ownerId) return json(res, 404, { error: 'no artifact' });
       const artifact = task.artifacts[0];
       if (!artifact) return json(res, 404, { error: 'no artifact' });
+      // Embed any media generated for this research task (research→media, S3-T9).
+      const media = (await harness.mediaRepo.list(ownerId)).filter((m) => m.sourceTaskId === taskId && m.status === 'ready');
+      const assets = media.flatMap((m) => m.assets);
+      const embedded = assets.length ? { ...artifact, content: embedMedia(artifact.content ?? '', assets) } : artifact;
       const fmt = url.searchParams.get('fmt') === 'html' ? 'html' : 'markdown';
-      const file = exportArtifact(artifact, fmt);
+      const file = exportArtifact(embedded, fmt);
       res.writeHead(200, {
         'content-type': file.mime,
         'content-disposition': `attachment; filename="${file.filename}"`,

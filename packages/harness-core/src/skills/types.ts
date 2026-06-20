@@ -1,5 +1,6 @@
 import type { SkillDef } from '@apolla/contracts';
 import type { TaskEvent } from '../orchestrator/events';
+import type { MediaEvent } from '../media/orchestrator';
 
 export interface SkillRunInput {
   ownerId: string;
@@ -8,8 +9,11 @@ export interface SkillRunInput {
   projectId?: string;
 }
 
-/** Runs a skill, emitting the same TaskEvent stream the orchestrator does. */
-export type SkillExecutor = (skill: SkillDef, input: SkillRunInput) => AsyncIterable<TaskEvent>;
+/** A skill run emits research TaskEvents or media MediaEvents depending on the executor. */
+export type SkillEvent = TaskEvent | MediaEvent;
+
+/** Runs a skill, emitting an event stream (research or media). */
+export type SkillExecutor = (skill: SkillDef, input: SkillRunInput) => AsyncIterable<SkillEvent>;
 
 /** Where skills come from: config (built-in) + a user's saved skills. */
 export interface SkillSource {

@@ -15,6 +15,7 @@ import {
   ModelRouter,
   makeResearchExecutor,
   makeGenericExecutor,
+  makeMediaExecutor,
   FeatureGates,
   Quota,
   PricingBook,
@@ -69,7 +70,7 @@ export interface Harness {
   objectStore: LocalObjectStore;
   ledger: InMemoryCostLedger;
   pending: Map<string, { question: string; projectId?: string; skillName?: string }>;
-  pendingMedia: Map<string, { alias: string; kind: string; prompt: string; projectId?: string }>;
+  pendingMedia: Map<string, { alias: string; kind: string; prompt: string; projectId?: string; sourceTaskId?: string }>;
   mode: 'real' | 'demo';
   persistence: 'postgres' | 'memory';
   close: () => Promise<void>;
@@ -185,6 +186,7 @@ export async function buildHarness(): Promise<Harness> {
     ledger,
     moderator: new RuleModerator(),
   });
+  skills.registerExecutor('media', makeMediaExecutor(mediaOrch));
 
   return {
     orchestrator,

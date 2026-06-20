@@ -1,6 +1,5 @@
 import type { SkillDef } from '@apolla/contracts';
-import type { TaskEvent } from '../orchestrator/events';
-import type { SkillExecutor, SkillRunInput, SkillSource } from './types';
+import type { SkillExecutor, SkillRunInput, SkillSource, SkillEvent } from './types';
 
 /**
  * Skill Runtime (PRD §12.A). Loads declarative skills (config + user), matches by trigger,
@@ -34,7 +33,7 @@ export class SkillRuntime {
     return (await this.list(ownerId)).find((s) => s.name === name);
   }
 
-  run(skill: SkillDef, input: SkillRunInput): AsyncIterable<TaskEvent> {
+  run(skill: SkillDef, input: SkillRunInput): AsyncIterable<SkillEvent> {
     const executor = this.executors.get(skill.executor ?? '') ?? this.fallback;
     return executor(skill, input);
   }

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { RiskLevel } from './common';
+import { MediaAlias } from './media';
 
 /**
  * A Skill = declarative Markdown (frontmatter) compatible with the agentskills.io standard.
@@ -18,7 +19,9 @@ export const SkillDef = z.object({
     .default({}),
   risk: RiskLevel.default('read'),
   promptRef: z.string(),
-  /** Executor key the SkillRuntime dispatches on (e.g. 'research' | 'generic'). Defaults to generic. */
+  /** Executor key the SkillRuntime dispatches on (e.g. 'research' | 'generic' | 'media'). */
   executor: z.string().optional(),
+  /** For media skills (executor='media'): which media alias to drive. */
+  mediaAlias: MediaAlias.optional(),
 });
 export type SkillDef = z.infer<typeof SkillDef>;

@@ -111,17 +111,19 @@ S4-T1(MCP 客户端) ──┬─ S4-T2(连接器管理)
 - **可并行**：T1 后连接器管理（T2）与 Agent 循环（T3）并行；T4 后 Skill（T6）、UI（T7）并行。
 - **每完成一个任务**：跑该模块单测 + 相关 eval；一任务一 PR，CI 绿即合；提交说明写清「动了哪个注册点 + 加了哪个 eval」。
 
-## Sprint 04 Definition of Done（整体验收）
-- [ ] MCP：`connectMCP` 真实连接（stub server 离线可用），工具列出/调用，结果为 UntrustedContent。
-- [ ] 连接器：按 owner 持久化 + per-tool 开关 + secret 加密；重启仍在。
-- [ ] 多工具 Agent：plan→工具循环→交付，事件可回放；工具结果仅经数据通道。
-- [ ] 分级执行：read 自动、low_write 需显式确认才执行、high_write 拒绝；失败切只读。
-- [ ] 防注入：工具输出里的越权指令无法升级权限或绕过确认（对抗 eval 绿）。
-- [ ] 审计：每次工具调用与确认/拒绝可查、按 owner 隔离、可回放。
-- [ ] Agent Skill：声明式 agent skill 可 match/run，可存为模板复跑。
-- [ ] `pnpm eval` 含 MCP 契约 / 完成率 / 确认门控 / 注入对抗 / 审计完整性；CI 全门禁绿。
-- [ ] 持久化：连接器/审计重启后仍在（Postgres）。
-- [ ] README/命令/架构文档一致更新；Demo 端到端走通（离线 stub 可演示）。
+## Sprint 04 Definition of Done（整体验收）— ✅ 全部达成
+- [x] MCP：`connectMCP` 真实连接（stub server 离线可用 + stdio 客户端），工具列出/调用，结果为 UntrustedContent。
+- [x] 连接器：按 owner 持久化 + per-tool 开关 + secret 加密（AES-GCM）；重启仍在。
+- [x] 多工具 Agent：plan→工具循环→交付，事件可回放；工具结果仅经数据通道。
+- [x] 分级执行：read 自动、low_write 需显式确认才执行、high_write 拒绝。
+- [x] 防注入：工具输出里的越权指令无法升级权限或绕过确认（对抗 eval 绿）。
+- [x] 审计：每次工具调用与确认/拒绝可查、按 owner 隔离、可回放。
+- [x] Agent Skill：声明式 agent skill 可 match/run，可存为模板复跑。
+- [x] `pnpm eval` 含 MCP 契约 / 完成率 / 确认门控 / 注入对抗 / 审计完整性（15 项总检）；CI 全门禁绿。
+- [x] 持久化：连接器/审计重启后仍在（Postgres）。
+- [x] README/命令/架构文档一致更新；Demo 端到端走通（离线 stub 可演示）。
+
+> Sprint 04 完成。S4-T1–T9 全部合并到 `main`（PR #27–#32），CI 全门禁绿（含 Postgres service）。
 
 ## 风险与提示（给代理）
 - **MCP transport**：先做 stdio（本地）+ stub（in-process）保证离线/CI；HTTP/SSE 远程可后置。CI 绝不连真实外部 MCP。

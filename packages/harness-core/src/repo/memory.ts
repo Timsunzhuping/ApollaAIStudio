@@ -1,5 +1,5 @@
-import type { Task, User, Project, SkillDef, MediaTask } from '@apolla/contracts';
-import type { TaskRepository, UserRepository, ProjectRepository } from './types';
+import type { Task, User, Project, SkillDef, MediaTask, Connector } from '@apolla/contracts';
+import type { TaskRepository, UserRepository, ProjectRepository, ConnectorRepository } from './types';
 import type { SkillRepository, SkillSource } from '../skills/types';
 import type { MediaRepository } from '../media/types';
 
@@ -93,6 +93,29 @@ export class InMemorySkillRepository implements SkillRepository {
 
   async delete(ownerId: string, name: string): Promise<void> {
     this.byOwner.get(ownerId)?.delete(name);
+  }
+}
+
+export class InMemoryConnectorRepository implements ConnectorRepository {
+  private readonly byId = new Map<string, Connector>();
+
+  async save(connector: Connector): Promise<Connector> {
+    this.byId.set(connector.id, structuredClone(connector));
+    return structuredClone(connector);
+  }
+
+  async get(id: string): Promise<Connector | undefined> {
+    const c = this.byId.get(id);
+    return c ? structuredClone(c) : undefined;
+  }
+
+  async list(ownerId: string): Promise<Connector[]> {
+    return [...this.byId.values()].filter((c) => c.ownerId === ownerId).map((c) => structuredClone(c));
+  }
+
+  async delete(ownerId: string, id: string): Promise<void> {
+    const c = this.byId.get(id);
+    if (c && c.ownerId === ownerId) this.byId.delete(id);
   }
 }
 

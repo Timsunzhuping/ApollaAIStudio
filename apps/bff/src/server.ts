@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { randomUUID } from 'node:crypto';
-import { exportArtifact, autoDraftSkill, embedMedia } from '@apolla/harness-core';
+import { exportArtifact, autoDraftSkill, embedMedia, encryptSecret, inferRisk } from '@apolla/harness-core';
+import type { Connector } from '@apolla/contracts';
 import { buildHarness, type Harness } from './harness';
 import { readSession, setSession, clearSession } from './auth';
 import { UI_HTML } from './ui';
@@ -104,6 +105,70 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   }
   if (method === 'DELETE' && pathname === '/api/memory') {
     await harness.memory.clear(ownerId);
+    return json(res, 200, { ok: true });
+  }
+
+  // --- Connectors (MCP) ---
+  if (method === 'POST' && pathname === '/api/connectors') {
+    const body = await readBody(req);
+    const transport = String(body.transport ?? 'stub');
+    const server = {
+      name: String(body.name ?? '').trim() || 'connector',
+      transport: transport as 'stub' | 'stdio' | 'http',
+      command: body.command,
+      args: Array.isArray(body.args) ? body.args : [],
+      url: body.url,
+      readOnlyTools: Array.isArray(body.readOnlyTools) ? body.readOnlyTools : [],
+    };
+    // Connect once to enumerate the server's tools + infer risk.
+    let tools: Connector['tools'] = [];
+    try {
+      const session = await harness.mcpClientFor(transport).connect(server as never);
+      const defs = await session.listTools();
+      tools = defs.map((d) => ({ name: d.name, risk: inferRisk(d, server as never) }));
+      await session.close();
+    } catch (e) {
+      return json(res, 400, { error: `could not connect: ${e instanceof Error ? e.message : String(e)}` });
+    }
+    const secrets: Record<string, string> = {};
+    for (const [k, v] of Object.entries(body.secrets ?? {})) secrets[k] = encryptSecret(String(v));
+    const connector: Connector = {
+      id: randomUUID(),
+      ownerId,
+      name: server.name,
+      transport: server.transport,
+      command: server.command,
+      args: server.args,
+      url: server.url,
+      readOnlyTools: server.readOnlyTools,
+      disabledTools: [],
+      enabled: true,
+      tools,
+      secrets,
+    };
+    await harness.connectors.save(connector);
+    return json(res, 201, { ...connector, secrets: Object.keys(secrets) });
+  }
+  if (method === 'GET' && pathname === '/api/connectors') {
+    const list = await harness.connectors.list(ownerId);
+    return json(res, 200, list.map((c) => ({ ...c, secrets: Object.keys(c.secrets) })));
+  }
+  const connToggle = pathname.match(/^\/api\/connectors\/([^/]+)\/tool$/);
+  if (method === 'POST' && connToggle) {
+    const c = await harness.connectors.get(connToggle[1]!);
+    if (!c || c.ownerId !== ownerId) return json(res, 404, { error: 'unknown connector' });
+    const body = await readBody(req);
+    const tool = String(body.tool ?? '');
+    const enabled = body.enabled !== false;
+    const disabled = new Set(c.disabledTools);
+    if (enabled) disabled.delete(tool);
+    else disabled.add(tool);
+    await harness.connectors.save({ ...c, disabledTools: [...disabled] });
+    return json(res, 200, { ok: true, disabledTools: [...disabled] });
+  }
+  const connDelete = pathname.match(/^\/api\/connectors\/([^/]+)$/);
+  if (method === 'DELETE' && connDelete) {
+    await harness.connectors.delete(ownerId, connDelete[1]!);
     return json(res, 200, { ok: true });
   }
 

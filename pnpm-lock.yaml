@@ -47,6 +47,9 @@ importers:
       '@apolla/harness-core':
         specifier: workspace:*
         version: link:../../packages/harness-core
+      '@apolla/mcp-stdio':
+        specifier: workspace:*
+        version: link:../../packages/adapters/mcp
       '@apolla/media-openai':
         specifier: workspace:*
         version: link:../../packages/adapters/media/openai

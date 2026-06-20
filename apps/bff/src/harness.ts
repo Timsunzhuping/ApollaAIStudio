@@ -23,9 +23,13 @@ import {
   MediaOrchestrator,
   StubMediaAdapter,
   RuleModerator,
+  StubMCPClient,
   InMemoryMediaRepository,
+  InMemoryConnectorRepository,
   type MediaAdapter,
   type MediaRepository,
+  type ConnectorRepository,
+  type MCPClient,
   type LLMAdapter,
   type TaskRepository,
   type UserRepository,
@@ -37,6 +41,7 @@ import { getRoute, loadSkills, loadFeatureGates, getMediaRoute } from '@apolla/c
 import type { ModelCaps } from '@apolla/contracts';
 import { OpenAIImageAdapter } from '@apolla/media-openai';
 import { SeedanceVideoAdapter } from '@apolla/media-seedance';
+import { StdioMCPClient } from '@apolla/mcp-stdio';
 import { LocalObjectStore } from './object-store';
 import { OpenAIAdapter } from '@apolla/adapter-openai';
 import { AnthropicAdapter } from '@apolla/adapter-anthropic';
@@ -51,6 +56,7 @@ import {
   PostgresMemory,
   PostgresSkillRepository,
   PostgresMediaRepository,
+  PostgresConnectorRepository,
 } from '@apolla/db-postgres';
 import { DemoLLMAdapter } from './demo-adapter';
 
@@ -67,6 +73,9 @@ export interface Harness {
   mediaRouter: MediaRouter;
   mediaOrch: MediaOrchestrator;
   mediaRepo: MediaRepository;
+  connectors: ConnectorRepository;
+  stubMcp: StubMCPClient;
+  mcpClientFor: (transport: string) => MCPClient;
   objectStore: LocalObjectStore;
   ledger: InMemoryCostLedger;
   pending: Map<string, { question: string; projectId?: string; skillName?: string }>;
@@ -110,6 +119,7 @@ export async function buildHarness(): Promise<Harness> {
   let memory: Memory;
   let skillRepo: SkillRepository;
   let mediaRepo: MediaRepository;
+  let connectorRepo: ConnectorRepository;
   let persistence: Harness['persistence'];
   let close = async (): Promise<void> => {};
 
@@ -122,6 +132,7 @@ export async function buildHarness(): Promise<Harness> {
     memory = new PostgresMemory(sql);
     skillRepo = new PostgresSkillRepository(sql);
     mediaRepo = new PostgresMediaRepository(sql);
+    connectorRepo = new PostgresConnectorRepository(sql);
     persistence = 'postgres';
     close = async () => {
       await sql.end();
@@ -133,6 +144,7 @@ export async function buildHarness(): Promise<Harness> {
     memory = new InMemoryMemory();
     skillRepo = new InMemorySkillRepository();
     mediaRepo = new InMemoryMediaRepository();
+    connectorRepo = new InMemoryConnectorRepository();
     persistence = 'memory';
   }
 
@@ -188,6 +200,10 @@ export async function buildHarness(): Promise<Harness> {
   });
   skills.registerExecutor('media', makeMediaExecutor(mediaOrch));
 
+  // MCP: a shared in-process stub client (offline default) + a stdio client for local servers.
+  const stubMcp = new StubMCPClient();
+  const mcpClientFor = (transport: string): MCPClient => (transport === 'stdio' ? new StdioMCPClient() : stubMcp);
+
   return {
     orchestrator,
     repo,
@@ -201,6 +217,9 @@ export async function buildHarness(): Promise<Harness> {
     mediaRouter,
     mediaOrch,
     mediaRepo,
+    connectors: connectorRepo,
+    stubMcp,
+    mcpClientFor,
     objectStore,
     ledger,
     pending: new Map(),

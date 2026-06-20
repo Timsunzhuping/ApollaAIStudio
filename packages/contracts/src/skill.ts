@@ -18,5 +18,7 @@ export const SkillDef = z.object({
     .default({}),
   risk: RiskLevel.default('read'),
   promptRef: z.string(),
+  /** Executor key the SkillRuntime dispatches on (e.g. 'research' | 'generic'). Defaults to generic. */
+  executor: z.string().optional(),
 });
 export type SkillDef = z.infer<typeof SkillDef>;

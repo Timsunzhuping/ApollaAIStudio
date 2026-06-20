@@ -5,7 +5,7 @@ import type { TaskRepository } from '@apolla/harness-core';
 
 export type Sql = postgres.Sql;
 
-export { PostgresUserRepository, PostgresProjectRepository } from './repos';
+export { PostgresUserRepository, PostgresProjectRepository, PostgresSkillRepository } from './repos';
 export { PostgresMemory } from './memory';
 
 /** Open a connection pool. Reads DATABASE_URL by default. */
@@ -58,6 +58,14 @@ CREATE INDEX IF NOT EXISTS memory_fts_idx ON memory_items USING gin (fts);
 CREATE TABLE IF NOT EXISTS user_model (
   owner_id    text PRIMARY KEY,
   data        jsonb NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS skills (
+  owner_id    text NOT NULL,
+  name        text NOT NULL,
+  data        jsonb NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (owner_id, name)
 );
 `;
 

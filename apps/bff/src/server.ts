@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { randomUUID } from 'node:crypto';
-import { exportArtifact } from '@apolla/harness-core';
+import { exportArtifact, autoDraftSkill } from '@apolla/harness-core';
 import { buildHarness, type Harness } from './harness';
 import { readSession, setSession, clearSession } from './auth';
 import { UI_HTML } from './ui';
@@ -93,6 +93,37 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     return json(res, 200, { ok: true });
   }
 
+  // --- Skills ---
+  if (method === 'GET' && pathname === '/api/skills') {
+    return json(res, 200, await harness.skills.list(ownerId));
+  }
+  if (method === 'DELETE' && pathname.startsWith('/api/skills/')) {
+    const name = decodeURIComponent(pathname.slice('/api/skills/'.length));
+    await harness.skillRepo.delete(ownerId, name);
+    return json(res, 200, { ok: true });
+  }
+  if (method === 'POST' && pathname === '/api/skills/run') {
+    // Stage a skill rerun as a task (streamed via /api/tasks/:id/events).
+    const body = await readBody(req);
+    const skill = await harness.skills.get(String(body.name ?? ''), ownerId);
+    if (!skill) return json(res, 404, { error: 'unknown skill' });
+    const question = String(body.question ?? '').trim();
+    if (!question) return json(res, 400, { error: 'question required' });
+    const taskId = randomUUID();
+    harness.pending.set(taskId, { question, skillName: skill.name });
+    return json(res, 201, { taskId });
+  }
+
+  const saveSkill = pathname.match(/^\/api\/tasks\/([^/]+)\/save-as-skill$/);
+  if (method === 'POST' && saveSkill) {
+    const task = await harness.repo.get(saveSkill[1]!);
+    if (!task || task.ownerId !== ownerId) return json(res, 404, { error: 'unknown task' });
+    const draft = autoDraftSkill(task);
+    if (!draft) return json(res, 400, { error: 'task is not a completed research task' });
+    const saved = await harness.skillRepo.save(ownerId, draft);
+    return json(res, 201, saved);
+  }
+
   // --- Tasks ---
   if (method === 'POST' && pathname === '/api/tasks') {
     const body = await readBody(req);
@@ -118,13 +149,11 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       });
       try {
         const systemAddendum = await projectContext(input.projectId, ownerId);
-        for await (const ev of harness.orchestrator.run({
-          ownerId,
-          question: input.question,
-          taskId,
-          projectId: input.projectId,
-          systemAddendum,
-        })) {
+        const skill = input.skillName ? await harness.skills.get(input.skillName, ownerId) : undefined;
+        const stream = skill
+          ? harness.skills.run(skill, { ownerId, question: input.question, taskId, projectId: input.projectId })
+          : harness.orchestrator.run({ ownerId, question: input.question, taskId, projectId: input.projectId, systemAddendum });
+        for await (const ev of stream) {
           res.write(`data: ${JSON.stringify(ev)}\n\n`);
         }
       } catch (e) {

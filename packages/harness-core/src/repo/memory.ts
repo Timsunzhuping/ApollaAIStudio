@@ -1,5 +1,6 @@
-import type { Task, User, Project } from '@apolla/contracts';
+import type { Task, User, Project, SkillDef } from '@apolla/contracts';
 import type { TaskRepository, UserRepository, ProjectRepository } from './types';
+import type { SkillRepository, SkillSource } from '../skills/types';
 
 /** In-memory TaskRepository. Stores deep clones so callers can't mutate persisted state. */
 export class InMemoryTaskRepository implements TaskRepository {
@@ -72,5 +73,37 @@ export class InMemoryProjectRepository implements ProjectRepository {
     return [...this.projects.values()]
       .filter((p) => p.ownerId === ownerId)
       .map((p) => structuredClone(p));
+  }
+}
+
+export class InMemorySkillRepository implements SkillRepository {
+  private readonly byOwner = new Map<string, Map<string, SkillDef>>();
+
+  async save(ownerId: string, def: SkillDef): Promise<SkillDef> {
+    const map = this.byOwner.get(ownerId) ?? new Map();
+    map.set(def.name, structuredClone(def));
+    this.byOwner.set(ownerId, map);
+    return structuredClone(def);
+  }
+
+  async list(ownerId: string): Promise<SkillDef[]> {
+    return [...(this.byOwner.get(ownerId)?.values() ?? [])].map((d) => structuredClone(d));
+  }
+
+  async delete(ownerId: string, name: string): Promise<void> {
+    this.byOwner.get(ownerId)?.delete(name);
+  }
+}
+
+/** Combines built-in config skills with a user's saved skills into one source for the runtime. */
+export class CompositeSkillSource implements SkillSource {
+  constructor(
+    private readonly builtIns: SkillDef[],
+    private readonly userSkills: SkillRepository,
+  ) {}
+
+  async list(ownerId?: string): Promise<SkillDef[]> {
+    const user = ownerId ? await this.userSkills.list(ownerId) : [];
+    return [...this.builtIns, ...user];
   }
 }

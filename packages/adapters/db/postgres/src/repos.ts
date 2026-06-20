@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { User, Project, type User as UserT, type Project as ProjectT } from '@apolla/contracts';
-import type { UserRepository, ProjectRepository } from '@apolla/harness-core';
+import { User, Project, SkillDef, type User as UserT, type Project as ProjectT, type SkillDef as SkillDefT } from '@apolla/contracts';
+import type { UserRepository, ProjectRepository, SkillRepository } from '@apolla/harness-core';
 import type { Sql } from './index';
 
 export class PostgresUserRepository implements UserRepository {
@@ -46,5 +46,26 @@ export class PostgresProjectRepository implements ProjectRepository {
       { id: string; owner_id: string; name: string; description: string }[]
     >`SELECT id, owner_id, name, description FROM projects WHERE owner_id = ${ownerId} ORDER BY created_at`;
     return rows.map((r) => Project.parse({ id: r.id, ownerId: r.owner_id, name: r.name, description: r.description }));
+  }
+}
+
+export class PostgresSkillRepository implements SkillRepository {
+  constructor(private readonly sql: Sql) {}
+
+  async save(ownerId: string, def: SkillDefT): Promise<SkillDefT> {
+    await this.sql`
+      INSERT INTO skills (owner_id, name, data) VALUES (${ownerId}, ${def.name}, ${this.sql.json(def)})
+      ON CONFLICT (owner_id, name) DO UPDATE SET data = EXCLUDED.data
+    `;
+    return SkillDef.parse(def);
+  }
+
+  async list(ownerId: string): Promise<SkillDefT[]> {
+    const rows = await this.sql<{ data: unknown }[]>`SELECT data FROM skills WHERE owner_id = ${ownerId} ORDER BY created_at`;
+    return rows.map((r) => SkillDef.parse(r.data));
+  }
+
+  async delete(ownerId: string, name: string): Promise<void> {
+    await this.sql`DELETE FROM skills WHERE owner_id = ${ownerId} AND name = ${name}`;
   }
 }

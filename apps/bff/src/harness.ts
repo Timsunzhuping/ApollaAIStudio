@@ -9,14 +9,21 @@ import {
   InMemoryUserRepository,
   InMemoryProjectRepository,
   InMemoryMemory,
+  InMemorySkillRepository,
+  CompositeSkillSource,
+  SkillRuntime,
+  ModelRouter,
+  makeResearchExecutor,
+  makeGenericExecutor,
   PricingBook,
   type LLMAdapter,
   type TaskRepository,
   type UserRepository,
   type ProjectRepository,
   type Memory,
+  type SkillRepository,
 } from '@apolla/harness-core';
-import { getRoute } from '@apolla/config';
+import { getRoute, loadSkills } from '@apolla/config';
 import { OpenAIAdapter } from '@apolla/adapter-openai';
 import { AnthropicAdapter } from '@apolla/adapter-anthropic';
 import { StubSearchProvider } from '@apolla/search-stub';
@@ -28,6 +35,7 @@ import {
   PostgresUserRepository,
   PostgresProjectRepository,
   PostgresMemory,
+  PostgresSkillRepository,
 } from '@apolla/db-postgres';
 import { DemoLLMAdapter } from './demo-adapter';
 
@@ -37,8 +45,10 @@ export interface Harness {
   users: UserRepository;
   projects: ProjectRepository;
   memory: Memory;
+  skills: SkillRuntime;
+  skillRepo: SkillRepository;
   ledger: InMemoryCostLedger;
-  pending: Map<string, { question: string; projectId?: string }>;
+  pending: Map<string, { question: string; projectId?: string; skillName?: string }>;
   mode: 'real' | 'demo';
   persistence: 'postgres' | 'memory';
   close: () => Promise<void>;
@@ -76,6 +86,7 @@ export async function buildHarness(): Promise<Harness> {
   let users: UserRepository;
   let projects: ProjectRepository;
   let memory: Memory;
+  let skillRepo: SkillRepository;
   let persistence: Harness['persistence'];
   let close = async (): Promise<void> => {};
 
@@ -86,6 +97,7 @@ export async function buildHarness(): Promise<Harness> {
     users = new PostgresUserRepository(sql);
     projects = new PostgresProjectRepository(sql);
     memory = new PostgresMemory(sql);
+    skillRepo = new PostgresSkillRepository(sql);
     persistence = 'postgres';
     close = async () => {
       await sql.end();
@@ -95,13 +107,15 @@ export async function buildHarness(): Promise<Harness> {
     users = new InMemoryUserRepository();
     projects = new InMemoryProjectRepository();
     memory = new InMemoryMemory();
+    skillRepo = new InMemorySkillRepository();
     persistence = 'memory';
   }
 
   const ledger = new InMemoryCostLedger(pricing);
+  const prompts = new PromptRegistry();
   const orchestrator = new ResearchOrchestrator({
     adapters,
-    prompts: new PromptRegistry(),
+    prompts,
     tools,
     ledger,
     repo,
@@ -110,12 +124,22 @@ export async function buildHarness(): Promise<Harness> {
     env: { ...process.env, DEMO_KEY: 'demo' },
   });
 
+  // Skill Runtime: built-in config skills + user skills; research → orchestrator, else generic.
+  const router = new ModelRouter({ adapters, routeFor, env: { ...process.env, DEMO_KEY: 'demo' }, onUsage: (e) => ledger.recordLLM(e) });
+  const skills = new SkillRuntime(
+    new CompositeSkillSource(loadSkills(), skillRepo),
+    makeGenericExecutor({ router, prompts, tools }),
+  );
+  skills.registerExecutor('research', makeResearchExecutor(orchestrator));
+
   return {
     orchestrator,
     repo,
     users,
     projects,
     memory,
+    skills,
+    skillRepo,
     ledger,
     pending: new Map(),
     mode: useReal ? 'real' : 'demo',

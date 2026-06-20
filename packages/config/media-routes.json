@@ -1,9 +1,9 @@
 {
   "$comment": "Media alias → concrete provider/model mapping. The ONLY place media model ids appear. Business code uses aliases only. *-PLACEHOLDER ids are replaced at provisioning. Real providers register in S3-T2 (image) / S3-T3 (Seedance); until then aliases resolve to the built-in 'stub' provider. keyPool values are env-var NAMES.",
   "routes": [
-    { "alias": "image_fast", "primary": "stub/image-fast", "fallbackChain": [], "keyPool": [] },
-    { "alias": "image_premium", "primary": "stub/image-premium", "fallbackChain": [], "keyPool": ["OPENAI_API_KEY"] },
-    { "alias": "video_standard", "primary": "stub/video-standard", "fallbackChain": [], "keyPool": [] },
+    { "alias": "image_fast", "primary": "openai/gpt-image-1-PLACEHOLDER", "fallbackChain": ["stub/image-fast"], "keyPool": ["OPENAI_API_KEY"] },
+    { "alias": "image_premium", "primary": "openai/gpt-image-1-PLACEHOLDER", "fallbackChain": ["stub/image-premium"], "keyPool": ["OPENAI_API_KEY"] },
+    { "alias": "video_standard", "primary": "seedance/seedance-2-PLACEHOLDER", "fallbackChain": ["stub/video-standard"], "keyPool": ["SEEDANCE_API_KEY"] },
     { "alias": "video_premium", "primary": "seedance/seedance-2-PLACEHOLDER", "fallbackChain": ["stub/video-standard"], "keyPool": ["SEEDANCE_API_KEY"] }
   ]
 }

@@ -1,0 +1,20 @@
+{
+  "name": "@apolla/media-seedance",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Seedance 2.0 video MediaAdapter (fetch-based, env-keyed, async submit/poll).",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@apolla/contracts": "workspace:*",
+    "@apolla/harness-core": "workspace:*"
+  }
+}

@@ -1,6 +1,7 @@
-import type { Task, User, Project, SkillDef } from '@apolla/contracts';
+import type { Task, User, Project, SkillDef, MediaTask } from '@apolla/contracts';
 import type { TaskRepository, UserRepository, ProjectRepository } from './types';
 import type { SkillRepository, SkillSource } from '../skills/types';
+import type { MediaRepository } from '../media/types';
 
 /** In-memory TaskRepository. Stores deep clones so callers can't mutate persisted state. */
 export class InMemoryTaskRepository implements TaskRepository {
@@ -92,6 +93,28 @@ export class InMemorySkillRepository implements SkillRepository {
 
   async delete(ownerId: string, name: string): Promise<void> {
     this.byOwner.get(ownerId)?.delete(name);
+  }
+}
+
+export class InMemoryMediaRepository implements MediaRepository {
+  private readonly tasks = new Map<string, MediaTask>();
+
+  async create(task: MediaTask): Promise<MediaTask> {
+    this.tasks.set(task.id, structuredClone(task));
+    return structuredClone(task);
+  }
+
+  async get(id: string): Promise<MediaTask | undefined> {
+    const t = this.tasks.get(id);
+    return t ? structuredClone(t) : undefined;
+  }
+
+  async save(task: MediaTask): Promise<void> {
+    this.tasks.set(task.id, structuredClone(task));
+  }
+
+  async list(ownerId: string): Promise<MediaTask[]> {
+    return [...this.tasks.values()].filter((t) => t.ownerId === ownerId).map((t) => structuredClone(t));
   }
 }
 

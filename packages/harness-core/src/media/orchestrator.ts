@@ -3,6 +3,7 @@ import type { MediaAlias, MediaJob, MediaTask, MediaAsset, MediaJobStatus } from
 import type { MediaRouter } from './router';
 import type { MediaRepository } from './types';
 import { rehostAsset, type ObjectStore } from './store';
+import type { ContentModerator } from './moderation';
 import type { InMemoryCostLedger } from '../cost/ledger';
 
 export interface MediaRunInput {
@@ -15,6 +16,7 @@ export interface MediaRunInput {
 
 export type MediaEvent =
   | { type: 'submitted'; taskId: string; estimateUsd: number }
+  | { type: 'blocked'; reason: string }
   | { type: 'progress'; status: MediaJobStatus }
   | { type: 'asset'; assets: MediaAsset[] }
   | { type: 'cost'; usd: number }
@@ -26,6 +28,8 @@ export interface MediaOrchestratorDeps {
   repo: MediaRepository;
   store: ObjectStore;
   ledger?: InMemoryCostLedger;
+  /** Optional content moderation — pre-generation prompt screen + post-generation asset screen. */
+  moderator?: ContentModerator;
   idGen?: () => string;
   pollIntervalMs?: number;
   maxPolls?: number;
@@ -70,6 +74,18 @@ export class MediaOrchestrator {
       await this.d.repo.create(task);
       yield { type: 'submitted', taskId, estimateUsd: estimate.usd };
 
+      // Pre-generation moderation — refuse before spending on the provider (PRD §13.3).
+      if (this.d.moderator) {
+        const verdict = await this.d.moderator.screenPrompt(input.job.prompt);
+        if (!verdict.allowed) {
+          task.status = 'failed';
+          task.error = `blocked: ${verdict.reason ?? 'content policy'}`;
+          await this.d.repo.save(task);
+          yield { type: 'blocked', reason: verdict.reason ?? 'content policy' };
+          return;
+        }
+      }
+
       const { provider, jobId } = await this.d.router.submit(input.alias, input.job);
       task.status = 'processing';
       await this.d.repo.save(task);
@@ -83,8 +99,13 @@ export class MediaOrchestrator {
 
       if (last.status === 'ready') {
         const assets = await Promise.all((last.assets ?? []).map((a) => rehostAsset(this.d.store, a)));
+        // Post-generation moderation screen (asset-level).
+        if (this.d.moderator) {
+          for (const a of assets) await this.d.moderator.screenAsset(a);
+        }
         task.assets = assets;
         task.status = 'ready';
+        task.moderated = true;
         task.costUsd = estimate.usd;
         this.d.ledger?.record({
           kind: 'media',

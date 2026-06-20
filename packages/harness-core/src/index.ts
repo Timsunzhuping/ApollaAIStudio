@@ -47,6 +47,8 @@ export { MediaOrchestrator } from './media/orchestrator';
 export type { MediaRunInput, MediaEvent, MediaOrchestratorDeps } from './media/orchestrator';
 export { InMemoryObjectStore, rehostAsset } from './media/store';
 export type { ObjectStore } from './media/store';
+export { RuleModerator } from './media/moderation';
+export type { ContentModerator, PromptVerdict, AssetVerdict } from './media/moderation';
 export type {
   MediaAdapter,
   MediaCost,

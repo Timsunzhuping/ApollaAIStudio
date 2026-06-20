@@ -119,9 +119,14 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     }
     const q = await harness.quota.check(ownerId);
     if (!q.ok) return json(res, 402, { error: 'quota reached — upgrade your plan', ...q });
+    const estimateUsd = harness.mediaRouter.estimateCost(alias as never, { kind: kind as never, prompt, params: {} }).usd;
+    // High-cost (video) requires explicit confirmation before we stage the run (PRD §13 / S3-T7).
+    if (kind === 'video' && !body.confirm) {
+      return json(res, 200, { requiresConfirmation: true, estimateUsd });
+    }
     const mediaId = randomUUID();
     harness.pendingMedia.set(mediaId, { alias, kind, prompt, projectId: body.projectId });
-    return json(res, 201, { mediaId });
+    return json(res, 201, { mediaId, estimateUsd });
   }
   if (method === 'GET' && pathname === '/api/media') {
     return json(res, 200, await harness.mediaRepo.list(ownerId));

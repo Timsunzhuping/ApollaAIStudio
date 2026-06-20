@@ -19,6 +19,8 @@ import { InMemoryCostLedger } from '../cost/ledger';
 import { assembleRequest } from '../safety/untrusted';
 import { NoopTracer, type Tracer } from '../obs/tracer';
 import type { TaskRepository } from '../repo/types';
+import type { Memory } from '../memory/types';
+import { userModelDirective } from '../memory/types';
 import type { TaskEvent } from './events';
 
 const PlanResult = z.object({
@@ -40,6 +42,8 @@ export interface ResearchDeps {
   tools: ToolRuntime;
   ledger: InMemoryCostLedger;
   repo: TaskRepository;
+  /** Optional persistent memory — when present, recalled + user-model context personalizes the run. */
+  memory?: Memory;
   routeFor?: (alias: ModelAlias) => RouteConfig;
   env?: NodeJS.ProcessEnv;
   tracer?: Tracer;
@@ -92,8 +96,26 @@ export class ResearchOrchestrator {
       onUsage: (e) => this.d.ledger.recordLLM(e, { taskId, stepId: ctx.stepId }),
     });
 
-    const sys = (base: string) =>
-      input.systemAddendum ? `${base}\n\n${input.systemAddendum}` : base;
+    // Personalization: recalled memory (untrusted → data channel) + user model (trusted → system).
+    let memEvidence: UntrustedContent[] = [];
+    const addenda: string[] = [];
+    if (input.systemAddendum) addenda.push(input.systemAddendum);
+    if (this.d.memory) {
+      const model = await this.d.memory.getUserModel(input.ownerId);
+      const directive = userModelDirective(model);
+      if (directive) addenda.push(directive);
+      const recalled = await this.d.memory.recall(input.ownerId, input.question);
+      memEvidence = recalled.map((m) => ({
+        kind: 'untrusted' as const,
+        sourceId: `mem:${m.id}`,
+        origin: 'memory',
+        content: m.content,
+      }));
+    }
+    const effectiveAddendum = addenda.join('\n\n') || undefined;
+    const effectiveExtra = [...(input.extraEvidence ?? []), ...memEvidence];
+
+    const sys = (base: string) => (effectiveAddendum ? `${base}\n\n${effectiveAddendum}` : base);
 
     const task: Task = {
       id: taskId,
@@ -140,7 +162,7 @@ export class ResearchOrchestrator {
       yield { type: 'step-start', state: 'search', stepId: step.id };
       const evidence: UntrustedContent[] = [];
       const seen = new Set<string>();
-      for (const uc of input.extraEvidence ?? []) {
+      for (const uc of effectiveExtra) {
         if (seen.has(uc.sourceId)) continue;
         seen.add(uc.sourceId);
         evidence.push(uc);
@@ -198,6 +220,12 @@ export class ResearchOrchestrator {
       task.state = 'done';
       task.totalCostUsd = this.d.ledger.totalUsd(taskId);
       await this.d.repo.save(task);
+      if (this.d.memory) {
+        await this.d.memory.note({
+          ownerId: input.ownerId,
+          content: `Researched "${input.question}": ${synth.report.slice(0, 240)}`,
+        });
+      }
       yield { type: 'cost', totalUsd: task.totalCostUsd };
       yield { type: 'done', taskId };
     } catch (e) {

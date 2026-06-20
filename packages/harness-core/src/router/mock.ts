@@ -20,6 +20,8 @@ export class MockAdapter implements LLMAdapter {
   private jsonCall = 0;
   /** Records every (modelId, apiKey) the router invoked, for assertions. */
   readonly calls: Array<{ modelId: string; apiKey: string }> = [];
+  /** Records every request passed in, for assertions on prompt assembly. */
+  readonly reqs: LLMRequest[] = [];
 
   constructor(
     readonly provider: string,
@@ -36,7 +38,8 @@ export class MockAdapter implements LLMAdapter {
     }
   }
 
-  stream(modelId: string, _req: LLMRequest, opts: CallOpts): LLMStream {
+  stream(modelId: string, req: LLMRequest, opts: CallOpts): LLMStream {
+    this.reqs.push(req);
     this.maybeFail(modelId, opts);
     const text = this.behavior.text ?? 'ok';
     async function* gen() {
@@ -46,7 +49,8 @@ export class MockAdapter implements LLMAdapter {
     return { stream: gen(), usage: Promise.resolve(USAGE) };
   }
 
-  async json(modelId: string, _req: LLMRequest, _schema: object, opts: CallOpts): Promise<JsonResult> {
+  async json(modelId: string, req: LLMRequest, _schema: object, opts: CallOpts): Promise<JsonResult> {
+    this.reqs.push(req);
     this.maybeFail(modelId, opts);
     const seq = this.behavior.jsonSequence;
     const text = seq ? (seq[Math.min(this.jsonCall, seq.length - 1)] ?? '{}') : (this.behavior.text ?? '{}');

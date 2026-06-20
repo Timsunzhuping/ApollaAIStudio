@@ -80,6 +80,19 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     return json(res, 200, await harness.projects.list(ownerId));
   }
 
+  // --- Memory / preferences ---
+  if (method === 'GET' && pathname === '/api/memory/model') {
+    return json(res, 200, (await harness.memory.getUserModel(ownerId)) ?? { ownerId, formats: [] });
+  }
+  if (method === 'POST' && pathname === '/api/memory/model') {
+    const body = await readBody(req);
+    return json(res, 200, await harness.memory.setUserModel(ownerId, body));
+  }
+  if (method === 'DELETE' && pathname === '/api/memory') {
+    await harness.memory.clear(ownerId);
+    return json(res, 200, { ok: true });
+  }
+
   // --- Tasks ---
   if (method === 'POST' && pathname === '/api/tasks') {
     const body = await readBody(req);

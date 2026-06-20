@@ -18,6 +18,12 @@ import {
   FeatureGates,
   Quota,
   PricingBook,
+  MediaRouter,
+  MediaOrchestrator,
+  StubMediaAdapter,
+  InMemoryMediaRepository,
+  type MediaAdapter,
+  type MediaRepository,
   type LLMAdapter,
   type TaskRepository,
   type UserRepository,
@@ -25,8 +31,11 @@ import {
   type Memory,
   type SkillRepository,
 } from '@apolla/harness-core';
-import { getRoute, loadSkills, loadFeatureGates } from '@apolla/config';
+import { getRoute, loadSkills, loadFeatureGates, getMediaRoute } from '@apolla/config';
 import type { ModelCaps } from '@apolla/contracts';
+import { OpenAIImageAdapter } from '@apolla/media-openai';
+import { SeedanceVideoAdapter } from '@apolla/media-seedance';
+import { LocalObjectStore } from './object-store';
 import { OpenAIAdapter } from '@apolla/adapter-openai';
 import { AnthropicAdapter } from '@apolla/adapter-anthropic';
 import { StubSearchProvider } from '@apolla/search-stub';
@@ -39,6 +48,7 @@ import {
   PostgresProjectRepository,
   PostgresMemory,
   PostgresSkillRepository,
+  PostgresMediaRepository,
 } from '@apolla/db-postgres';
 import { DemoLLMAdapter } from './demo-adapter';
 
@@ -52,8 +62,12 @@ export interface Harness {
   skillRepo: SkillRepository;
   features: FeatureGates;
   quota: Quota;
+  mediaOrch: MediaOrchestrator;
+  mediaRepo: MediaRepository;
+  objectStore: LocalObjectStore;
   ledger: InMemoryCostLedger;
   pending: Map<string, { question: string; projectId?: string; skillName?: string }>;
+  pendingMedia: Map<string, { alias: string; kind: string; prompt: string; projectId?: string }>;
   mode: 'real' | 'demo';
   persistence: 'postgres' | 'memory';
   close: () => Promise<void>;
@@ -92,6 +106,7 @@ export async function buildHarness(): Promise<Harness> {
   let projects: ProjectRepository;
   let memory: Memory;
   let skillRepo: SkillRepository;
+  let mediaRepo: MediaRepository;
   let persistence: Harness['persistence'];
   let close = async (): Promise<void> => {};
 
@@ -103,6 +118,7 @@ export async function buildHarness(): Promise<Harness> {
     projects = new PostgresProjectRepository(sql);
     memory = new PostgresMemory(sql);
     skillRepo = new PostgresSkillRepository(sql);
+    mediaRepo = new PostgresMediaRepository(sql);
     persistence = 'postgres';
     close = async () => {
       await sql.end();
@@ -113,6 +129,7 @@ export async function buildHarness(): Promise<Harness> {
     projects = new InMemoryProjectRepository();
     memory = new InMemoryMemory();
     skillRepo = new InMemorySkillRepository();
+    mediaRepo = new InMemoryMediaRepository();
     persistence = 'memory';
   }
 
@@ -150,6 +167,14 @@ export async function buildHarness(): Promise<Harness> {
   const features = new FeatureGates(loadFeatureGates(), caps);
   const quota = new Quota((ownerId) => repo.list(ownerId).then((l) => l.length));
 
+  // Media: stub always registered (offline default); real providers when keyed.
+  const mediaAdapters = new Map<string, MediaAdapter>([['stub', new StubMediaAdapter()]]);
+  if (OpenAIImageAdapter.isConfigured()) mediaAdapters.set('openai', new OpenAIImageAdapter());
+  if (SeedanceVideoAdapter.isConfigured()) mediaAdapters.set('seedance', new SeedanceVideoAdapter());
+  const objectStore = new LocalObjectStore();
+  const mediaRouter = new MediaRouter({ adapters: mediaAdapters, env: process.env, routeFor: getMediaRoute });
+  const mediaOrch = new MediaOrchestrator({ router: mediaRouter, repo: mediaRepo, store: objectStore, ledger });
+
   return {
     orchestrator,
     repo,
@@ -160,8 +185,12 @@ export async function buildHarness(): Promise<Harness> {
     skillRepo,
     features,
     quota,
+    mediaOrch,
+    mediaRepo,
+    objectStore,
     ledger,
     pending: new Map(),
+    pendingMedia: new Map(),
     mode: useReal ? 'real' : 'demo',
     persistence,
     close,

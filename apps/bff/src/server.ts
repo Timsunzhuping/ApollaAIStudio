@@ -36,6 +36,15 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     res.end(UI_HTML);
     return;
   }
+  // GET /media/:key — serve re-hosted media (public; uris are unguessable enough for the demo).
+  if (method === 'GET' && pathname.startsWith('/media/')) {
+    const obj = harness.objectStore.read(pathname.slice('/media/'.length));
+    if (!obj) return json(res, 404, { error: 'not found' });
+    res.writeHead(200, { 'content-type': obj.mime });
+    res.end(obj.bytes);
+    return;
+  }
+
   if (method === 'GET' && pathname === '/api/health') {
     return json(res, 200, {
       ok: true,
@@ -96,6 +105,48 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   if (method === 'DELETE' && pathname === '/api/memory') {
     await harness.memory.clear(ownerId);
     return json(res, 200, { ok: true });
+  }
+
+  // --- Media ---
+  if (method === 'POST' && pathname === '/api/media') {
+    const body = await readBody(req);
+    const alias = String(body.alias ?? '');
+    const prompt = String(body.prompt ?? '').trim();
+    const kind = alias.startsWith('video') ? 'video' : 'image';
+    if (!prompt) return json(res, 400, { error: 'prompt required' });
+    if (!['image_fast', 'image_premium', 'video_standard', 'video_premium'].includes(alias)) {
+      return json(res, 400, { error: 'invalid media alias' });
+    }
+    const q = await harness.quota.check(ownerId);
+    if (!q.ok) return json(res, 402, { error: 'quota reached — upgrade your plan', ...q });
+    const mediaId = randomUUID();
+    harness.pendingMedia.set(mediaId, { alias, kind, prompt, projectId: body.projectId });
+    return json(res, 201, { mediaId });
+  }
+  if (method === 'GET' && pathname === '/api/media') {
+    return json(res, 200, await harness.mediaRepo.list(ownerId));
+  }
+  const mediaEvents = pathname.match(/^\/api\/media\/([^/]+)\/events$/);
+  if (method === 'GET' && mediaEvents) {
+    const mediaId = mediaEvents[1]!;
+    const input = harness.pendingMedia.get(mediaId);
+    if (!input) return json(res, 404, { error: 'unknown media task' });
+    res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
+    try {
+      for await (const ev of harness.mediaOrch.run({
+        ownerId,
+        alias: input.alias as never,
+        job: { kind: input.kind as never, prompt: input.prompt, params: {} },
+        taskId: mediaId,
+        projectId: input.projectId,
+      })) {
+        res.write(`data: ${JSON.stringify(ev)}\n\n`);
+      }
+    } catch (e) {
+      res.write(`data: ${JSON.stringify({ type: 'error', message: e instanceof Error ? e.message : String(e) })}\n\n`);
+    }
+    res.end();
+    return;
   }
 
   // --- Skills ---

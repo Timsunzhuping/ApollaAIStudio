@@ -16,6 +16,8 @@
     "@apolla/contracts": "workspace:*",
     "@apolla/db-postgres": "workspace:*",
     "@apolla/harness-core": "workspace:*",
+    "@apolla/media-openai": "workspace:*",
+    "@apolla/media-seedance": "workspace:*",
     "@apolla/search-stub": "workspace:*",
     "@apolla/search-tavily": "workspace:*"
   },

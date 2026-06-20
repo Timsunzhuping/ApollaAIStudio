@@ -7,6 +7,7 @@ export type Sql = postgres.Sql;
 
 export { PostgresUserRepository, PostgresProjectRepository, PostgresSkillRepository } from './repos';
 export { PostgresMemory } from './memory';
+export { PostgresMediaRepository } from './media';
 
 /** Open a connection pool. Reads DATABASE_URL by default. */
 export function createSql(url = process.env.DATABASE_URL): Sql {
@@ -67,10 +68,27 @@ CREATE TABLE IF NOT EXISTS skills (
   created_at  timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (owner_id, name)
 );
+
+CREATE TABLE IF NOT EXISTS media_tasks (
+  id          text PRIMARY KEY,
+  owner_id    text NOT NULL,
+  project_id  text,
+  status      text NOT NULL,
+  data        jsonb NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS media_owner_idx ON media_tasks (owner_id);
 `;
 
 export async function migrate(sql: Sql): Promise<void> {
-  await sql.unsafe(MIGRATION);
+  // Advisory lock serializes concurrent migrators (parallel test workers) — CREATE TABLE
+  // IF NOT EXISTS races on the type catalog otherwise.
+  await sql`SELECT pg_advisory_lock(727274)`;
+  try {
+    await sql.unsafe(MIGRATION);
+  } finally {
+    await sql`SELECT pg_advisory_unlock(727274)`;
+  }
 }
 
 /**

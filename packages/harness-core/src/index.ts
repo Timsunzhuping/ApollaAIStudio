@@ -11,6 +11,10 @@ export type {
 export { ModelRouterError } from './router/types';
 export { resolveKeyNames, resolveKeyPairs } from './router/keys';
 export type { ApiKey } from './router/keys';
+export { FeatureGates, isEnabled } from './router/featuregate';
+export { probeStructuredReliability, probeCaps } from './router/probes';
+export { Quota, PLANS } from './cost/quota';
+export type { Plan, QuotaStatus } from './cost/quota';
 export { MockAdapter } from './router/mock';
 export type { MockBehavior } from './router/mock';
 export { PromptRegistry } from './prompts/registry';

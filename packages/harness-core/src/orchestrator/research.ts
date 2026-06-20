@@ -28,11 +28,8 @@ const PlanResult = z.object({
   estimateSeconds: z.number().int().positive().optional(),
 });
 
-const SynthResult = z.object({
-  report: z.string().min(1),
-  claims: z
-    .array(z.object({ claim: z.string(), sourceIds: z.array(z.string()) }))
-    .default([]),
+const ClaimsResult = z.object({
+  claims: z.array(z.object({ claim: z.string(), sourceIds: z.array(z.string()) })).default([]),
 });
 
 export interface ResearchDeps {
@@ -188,30 +185,39 @@ export class ResearchOrchestrator {
       step.summary = `${evidence.length} evidence chunks`;
       yield { type: 'step-end', state: 'extract', stepId: step.id, summary: step.summary };
 
-      // 4) GENERATE (cited synthesis)
+      // 4) GENERATE — stream the prose report, then extract citations (two-phase streaming, S2-T9).
       step = begin('generate');
       const span4 = this.tracer.startSpan('generate');
       yield { type: 'step-start', state: 'generate', stepId: step.id };
-      const synthReq = assembleRequest({
+      const proseReq = assembleRequest({
         system: sys(this.d.prompts.render('research.synthesize').text),
         user: input.question,
         data: evidence,
       });
-      const synth = await router.json(this.synthAlias, synthReq, SynthResult);
+      let report = '';
+      for await (const chunk of router.complete(this.synthAlias, proseReq)) {
+        report += chunk.delta;
+        if (chunk.delta) yield { type: 'delta', text: chunk.delta };
+      }
+      const extractReq = assembleRequest({
+        system: this.d.prompts.render('research.extract-citations').text,
+        user: report,
+        data: evidence,
+      });
+      const extracted = await router.json(this.synthAlias, extractReq, ClaimsResult);
       const validIds = new Set(task.sources.map((s) => s.id));
       // Citation integrity: keep only claims backed by a known source (ARCHITECTURE §3.9 / PRD §6.2).
-      task.citations = (synth.claims ?? [])
+      task.citations = (extracted.claims ?? [])
         .map((c) => ({ claim: c.claim, sourceIds: c.sourceIds.filter((id) => validIds.has(id)) }))
         .filter((c): c is Citation => c.sourceIds.length > 0);
       span4.end();
-      yield { type: 'delta', text: synth.report };
       yield { type: 'citations', citations: task.citations };
       yield { type: 'step-end', state: 'generate', stepId: step.id, summary: `${task.citations.length} cited claims` };
 
       // 5) DELIVER (assemble the report artifact)
       step = begin('deliver');
       yield { type: 'step-start', state: 'deliver', stepId: step.id };
-      const artifact = buildReport(input.question, synth.report, task.sources);
+      const artifact = buildReport(input.question, report, task.sources);
       task.artifacts = [artifact];
       yield { type: 'artifact', artifact };
       yield { type: 'step-end', state: 'deliver', stepId: step.id };
@@ -223,7 +229,7 @@ export class ResearchOrchestrator {
       if (this.d.memory) {
         await this.d.memory.note({
           ownerId: input.ownerId,
-          content: `Researched "${input.question}": ${synth.report.slice(0, 240)}`,
+          content: `Researched "${input.question}": ${report.slice(0, 240)}`,
         });
       }
       yield { type: 'cost', totalUsd: task.totalCostUsd };

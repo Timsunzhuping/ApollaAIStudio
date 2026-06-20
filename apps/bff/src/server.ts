@@ -37,7 +37,12 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     return;
   }
   if (method === 'GET' && pathname === '/api/health') {
-    return json(res, 200, { ok: true, mode: harness.mode, persistence: harness.persistence });
+    return json(res, 200, {
+      ok: true,
+      mode: harness.mode,
+      persistence: harness.persistence,
+      features: { auto_skill_write: harness.features.enabled('auto_skill_write') },
+    });
   }
 
   // --- Auth ---
@@ -118,6 +123,9 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   if (method === 'POST' && saveSkill) {
     const task = await harness.repo.get(saveSkill[1]!);
     if (!task || task.ownerId !== ownerId) return json(res, 404, { error: 'unknown task' });
+    if (!harness.features.enabled('auto_skill_write')) {
+      return json(res, 403, { error: 'auto_skill_write is not available for the current model tier' });
+    }
     const draft = autoDraftSkill(task);
     if (!draft) return json(res, 400, { error: 'task is not a completed research task' });
     const saved = await harness.skillRepo.save(ownerId, draft);
@@ -129,9 +137,14 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     const body = await readBody(req);
     const question = String(body.question ?? '').trim();
     if (!question) return json(res, 400, { error: 'question is required' });
+    const q = await harness.quota.check(ownerId);
+    if (!q.ok) {
+      return json(res, 402, { error: 'task quota reached — upgrade your plan', used: q.used, limit: q.limit, plan: q.plan });
+    }
     const taskId = randomUUID();
     harness.pending.set(taskId, { question, projectId: body.projectId });
-    return json(res, 201, { taskId });
+    // Static pre-run cost estimate for a research task (high-cost task hint, PRD §6.8).
+    return json(res, 201, { taskId, estimatedCostUsd: 0.002, quota: q });
   }
 
   const taskMatch = pathname.match(/^\/api\/tasks\/([^/]+)(\/events|\/export)?$/);

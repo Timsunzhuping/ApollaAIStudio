@@ -16,12 +16,11 @@ export class DemoLLMAdapter implements LLMAdapter {
     return user?.content?.trim() || 'the topic';
   }
 
+  /** JSON calls: with data → claims extraction; without data → plan (ARCHITECTURE §3.5/S2-T9). */
   private buildJson(req: LLMRequest): string {
     const q = this.question(req);
     const data = req.data ?? [];
-
     if (data.length === 0) {
-      // PLAN
       return JSON.stringify({
         subquestions: [
           `Background and key definitions for ${q}`,
@@ -31,14 +30,17 @@ export class DemoLLMAdapter implements LLMAdapter {
         estimateSeconds: 75,
       });
     }
+    return JSON.stringify({
+      claims: data.map((d) => ({ claim: d.content.split('\n')[0] ?? d.sourceId, sourceIds: [d.sourceId] })),
+    });
+  }
 
-    // SYNTHESIZE — ground each claim in a real source from the data channel.
-    const claims = data.map((d) => ({
-      claim: d.content.split('\n')[0] ?? d.sourceId,
-      sourceIds: [d.sourceId],
-    }));
+  /** Prose report streamed token-by-token, grounded in the data channel. */
+  private buildProse(req: LLMRequest): string {
+    const q = this.question(req);
+    const data = req.data ?? [];
     const bullets = data.map((d) => `- ${d.content.split('\n')[0] ?? ''} [${d.sourceId}]`).join('\n');
-    const report = [
+    return [
       `## Overview`,
       `This report summarizes the available evidence on **${q}**.`,
       ``,
@@ -47,17 +49,15 @@ export class DemoLLMAdapter implements LLMAdapter {
       ``,
       `_Demo synthesis (offline mode). Connect model keys for full analysis._`,
     ].join('\n');
-    return JSON.stringify({ report, claims });
   }
 
   stream(_modelId: string, req: LLMRequest): LLMStream {
-    const text = this.buildJson(req);
+    const text = this.buildProse(req);
     async function* gen() {
-      yield { delta: text, done: false };
+      for (const word of text.split(/(\s+)/)) yield { delta: word, done: false };
       yield { delta: '', done: true };
     }
-    const usage: TokenUsage = { tokensIn: 200, tokensOut: 400 };
-    return { stream: gen(), usage: Promise.resolve(usage) };
+    return { stream: gen(), usage: Promise.resolve({ tokensIn: 200, tokensOut: 400 } as TokenUsage) };
   }
 
   async json(_modelId: string, req: LLMRequest, _schema: object, _opts: CallOpts): Promise<JsonResult> {

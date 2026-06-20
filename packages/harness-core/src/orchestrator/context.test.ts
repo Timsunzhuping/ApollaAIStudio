@@ -23,11 +23,12 @@ function makeOrch() {
   const orch = new ResearchOrchestrator({
     adapters: new Map([
       ['planp', new MockAdapter('planp', { text: JSON.stringify({ subquestions: ['q1'] }) })],
-      ['synthp', new MockAdapter('synthp', { text: JSON.stringify({ report: 'r [fix:1][ext:1]', claims: [{ claim: 'c', sourceIds: ['fix:1'] }] }) })],
+      ['synthp', new MockAdapter('synthp', { streamText: 'r [fix:1][ext:1]', text: JSON.stringify({ claims: [{ claim: 'c', sourceIds: ['fix:1'] }] }) })],
     ]),
     prompts: new PromptRegistry([
       { promptId: 'research.plan', version: '1', scene: 'p', template: 'plan', safetyConstraints: [], rollout: 1 },
       { promptId: 'research.synthesize', version: '1', scene: 's', template: 'synth', safetyConstraints: [], rollout: 1 },
+      { promptId: 'research.extract-citations', version: '1', scene: 'x', template: 'extract', safetyConstraints: [], rollout: 1 },
     ]),
     tools,
     ledger: new InMemoryCostLedger(),

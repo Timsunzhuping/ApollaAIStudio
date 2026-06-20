@@ -25,7 +25,8 @@ describe('memory personalization injection', () => {
     tools.register(new WebSearchTool(new FakeProvider()));
     const planMock = new MockAdapter('planp', { text: JSON.stringify({ subquestions: ['q1'] }) });
     const synthMock = new MockAdapter('synthp', {
-      text: JSON.stringify({ report: 'r [fix:1]', claims: [{ claim: 'c', sourceIds: ['fix:1'] }] }),
+      streamText: 'r [fix:1]',
+      text: JSON.stringify({ claims: [{ claim: 'c', sourceIds: ['fix:1'] }] }),
     });
     let n = 0;
     const orch = new ResearchOrchestrator({
@@ -36,6 +37,7 @@ describe('memory personalization injection', () => {
       prompts: new PromptRegistry([
         { promptId: 'research.plan', version: '1', scene: 'p', template: 'plan', safetyConstraints: [], rollout: 1 },
         { promptId: 'research.synthesize', version: '1', scene: 's', template: 'synth', safetyConstraints: [], rollout: 1 },
+        { promptId: 'research.extract-citations', version: '1', scene: 'x', template: 'extract', safetyConstraints: [], rollout: 1 },
       ]),
       tools,
       ledger: new InMemoryCostLedger(),

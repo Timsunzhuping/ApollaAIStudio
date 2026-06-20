@@ -19,8 +19,8 @@ class FakeProvider implements SearchProvider {
 
 function makeOrchestrator() {
   const planJSON = JSON.stringify({ subquestions: ['q1', 'q2'], estimateSeconds: 60 });
-  const synthJSON = JSON.stringify({
-    report: 'EV sales rose in 2026 [fake:1].',
+  const synthProse = 'EV sales rose in 2026 [fake:1].';
+  const synthClaims = JSON.stringify({
     claims: [
       { claim: 'EV sales rose', sourceIds: ['fake:1'] },
       { claim: 'unsupported claim', sourceIds: ['nope:9'] },
@@ -33,6 +33,7 @@ function makeOrchestrator() {
   const prompts = new PromptRegistry([
     { promptId: 'research.plan', version: '1', scene: 'plan', template: 'Decompose the question.', safetyConstraints: [], rollout: 1 },
     { promptId: 'research.synthesize', version: '1', scene: 'synth', template: 'Synthesize with citations by sourceId.', safetyConstraints: [], rollout: 1 },
+    { promptId: 'research.extract-citations', version: '1', scene: 'x', template: 'Extract claims.', safetyConstraints: [], rollout: 1 },
   ]);
 
   const ledger = new InMemoryCostLedger(
@@ -43,7 +44,7 @@ function makeOrchestrator() {
   const orch = new ResearchOrchestrator({
     adapters: new Map([
       ['planp', new MockAdapter('planp', { text: planJSON })],
-      ['synthp', new MockAdapter('synthp', { text: synthJSON })],
+      ['synthp', new MockAdapter('synthp', { streamText: synthProse, text: synthClaims })],
     ]),
     prompts,
     tools,
@@ -117,18 +118,19 @@ describe('ResearchOrchestrator', () => {
   it('persists a Task that round-trips through the contract schema', async () => {
     const repo = new InMemoryTaskRepository();
     const planJSON = JSON.stringify({ subquestions: ['q1'], estimateSeconds: 30 });
-    const synthJSON = JSON.stringify({ report: 'r [fake:1]', claims: [{ claim: 'c', sourceIds: ['fake:1'] }] });
+    const synthClaims = JSON.stringify({ claims: [{ claim: 'c', sourceIds: ['fake:1'] }] });
     const tools = new ToolRuntime();
     tools.register(new WebSearchTool(new FakeProvider()));
     let n = 0;
     const orch = new ResearchOrchestrator({
       adapters: new Map([
         ['planp', new MockAdapter('planp', { text: planJSON })],
-        ['synthp', new MockAdapter('synthp', { text: synthJSON })],
+        ['synthp', new MockAdapter('synthp', { streamText: 'r [fake:1]', text: synthClaims })],
       ]),
       prompts: new PromptRegistry([
         { promptId: 'research.plan', version: '1', scene: 'p', template: 'plan', safetyConstraints: [], rollout: 1 },
         { promptId: 'research.synthesize', version: '1', scene: 's', template: 'synth', safetyConstraints: [], rollout: 1 },
+        { promptId: 'research.extract-citations', version: '1', scene: 'x', template: 'extract', safetyConstraints: [], rollout: 1 },
       ]),
       tools,
       ledger: new InMemoryCostLedger(),

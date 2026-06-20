@@ -15,6 +15,8 @@ import {
   ModelRouter,
   makeResearchExecutor,
   makeGenericExecutor,
+  FeatureGates,
+  Quota,
   PricingBook,
   type LLMAdapter,
   type TaskRepository,
@@ -23,7 +25,8 @@ import {
   type Memory,
   type SkillRepository,
 } from '@apolla/harness-core';
-import { getRoute, loadSkills } from '@apolla/config';
+import { getRoute, loadSkills, loadFeatureGates } from '@apolla/config';
+import type { ModelCaps } from '@apolla/contracts';
 import { OpenAIAdapter } from '@apolla/adapter-openai';
 import { AnthropicAdapter } from '@apolla/adapter-anthropic';
 import { StubSearchProvider } from '@apolla/search-stub';
@@ -47,6 +50,8 @@ export interface Harness {
   memory: Memory;
   skills: SkillRuntime;
   skillRepo: SkillRepository;
+  features: FeatureGates;
+  quota: Quota;
   ledger: InMemoryCostLedger;
   pending: Map<string, { question: string; projectId?: string; skillName?: string }>;
   mode: 'real' | 'demo';
@@ -132,6 +137,19 @@ export async function buildHarness(): Promise<Harness> {
   );
   skills.registerExecutor('research', makeResearchExecutor(orchestrator));
 
+  // Capability-gated features. Demo declares capable caps; real deployments recalibrate via probes.
+  const caps: ModelCaps = {
+    toolUse: true,
+    parallelToolUse: false,
+    longContext: 128_000,
+    vision: false,
+    reasoningDepth: 2,
+    structuredReliability: 0.9,
+    agenticReliability: 0.8,
+  };
+  const features = new FeatureGates(loadFeatureGates(), caps);
+  const quota = new Quota((ownerId) => repo.list(ownerId).then((l) => l.length));
+
   return {
     orchestrator,
     repo,
@@ -140,6 +158,8 @@ export async function buildHarness(): Promise<Harness> {
     memory,
     skills,
     skillRepo,
+    features,
+    quota,
     ledger,
     pending: new Map(),
     mode: useReal ? 'real' : 'demo',

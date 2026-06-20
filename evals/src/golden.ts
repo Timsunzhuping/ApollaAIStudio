@@ -34,8 +34,8 @@ export async function runGolden(): Promise<GoldenResult> {
     subquestions: ['EV sales trend 2026', 'EV battery cost 2026'],
     estimateSeconds: 60,
   });
-  const synthJSON = JSON.stringify({
-    report: '## Overview\nEV sales grew in 2026 [fix:1]. Battery costs fell [fix:2].',
+  const synthProse = '## Overview\nEV sales grew in 2026 [fix:1]. Battery costs fell [fix:2].';
+  const synthClaims = JSON.stringify({
     claims: [
       { claim: 'EV sales grew in 2026', sourceIds: ['fix:1'] },
       { claim: 'Battery costs fell', sourceIds: ['fix:2'] },
@@ -54,11 +54,12 @@ export async function runGolden(): Promise<GoldenResult> {
   const orch = new ResearchOrchestrator({
     adapters: new Map([
       ['planp', new MockAdapter('planp', { text: planJSON })],
-      ['synthp', new MockAdapter('synthp', { text: synthJSON })],
+      ['synthp', new MockAdapter('synthp', { streamText: synthProse, text: synthClaims })],
     ]),
     prompts: new PromptRegistry([
       { promptId: 'research.plan', version: '1', scene: 'p', template: 'plan', safetyConstraints: [], rollout: 1 },
       { promptId: 'research.synthesize', version: '1', scene: 's', template: 'synth', safetyConstraints: [], rollout: 1 },
+      { promptId: 'research.extract-citations', version: '1', scene: 'x', template: 'extract', safetyConstraints: [], rollout: 1 },
     ]),
     tools,
     ledger,

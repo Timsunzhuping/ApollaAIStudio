@@ -6,6 +6,8 @@ const USAGE: TokenUsage = { tokensIn: 10, tokensOut: 5 };
 export interface MockBehavior {
   /** Text to stream/return; split into chunks for stream(). */
   text?: string;
+  /** Overrides `text` for stream() only (so stream and json can differ). */
+  streamText?: string;
   /** Throw this many times (across calls) before succeeding — simulates rate-limit/key failure. */
   failFirst?: number;
   /** Error message used while failing. */
@@ -41,7 +43,7 @@ export class MockAdapter implements LLMAdapter {
   stream(modelId: string, req: LLMRequest, opts: CallOpts): LLMStream {
     this.reqs.push(req);
     this.maybeFail(modelId, opts);
-    const text = this.behavior.text ?? 'ok';
+    const text = this.behavior.streamText ?? this.behavior.text ?? 'ok';
     async function* gen() {
       for (const ch of text.split(' ')) yield { delta: ch + ' ', done: false };
       yield { delta: '', done: true };

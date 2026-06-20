@@ -2,7 +2,7 @@
 
 本文件为 Claude Code 提供每次会话的标准上下文。开始任何开发前请先读本文件，再读 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)（Harness 架构总纲）、[docs/PRD.md](docs/PRD.md) 与 [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md)。Codex 等其他代理读同源的 [AGENTS.md](AGENTS.md)。
 
-**当前 Sprint**：[docs/SPRINT_02.md](docs/SPRINT_02.md)（持久化 · 个人化 · 可复用工作台）。Sprint 01（[docs/SPRINT_01.md](docs/SPRINT_01.md)，Harness Core + 研究→成品闭环 + Demo）已完成。从 S2-T1 开始逐任务执行。
+**当前 Sprint**：[docs/SPRINT_03.md](docs/SPRINT_03.md)（多模态成品：文生图/视频 + Media Adapter + Seedance）。已完成：Sprint 01（[SPRINT_01](docs/SPRINT_01.md)，Harness Core + 研究→成品）、Sprint 02（[SPRINT_02](docs/SPRINT_02.md)，持久化/个人化/技能）。从 S3-T1 开始逐任务执行。
 
 ## 产品是什么
 

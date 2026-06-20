@@ -39,7 +39,19 @@ export {
   InMemoryProjectRepository,
   InMemorySkillRepository,
   CompositeSkillSource,
+  InMemoryMediaRepository,
 } from './repo/memory';
+export { MediaRouter } from './media/router';
+export { StubMediaAdapter } from './media/stub';
+export type {
+  MediaAdapter,
+  MediaCost,
+  MediaCallOpts,
+  PollResult,
+  MediaRepository,
+  MediaRouteConfig,
+} from './media/types';
+export type { MediaRouterDeps, MediaGenerateResult } from './media/router';
 export type { TaskRepository, UserRepository, ProjectRepository } from './repo/types';
 export { SkillRuntime } from './skills/runtime';
 export { makeResearchExecutor, makeGenericExecutor } from './skills/executors';

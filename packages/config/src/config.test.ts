@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { loadRoutes, getRoute, loadFeatureGates, loadPrompts, loadSkills } from './index';
+import { loadRoutes, getRoute, loadFeatureGates, loadPrompts, loadSkills, loadMediaRoutes, getMediaRoute } from './index';
 import { parseFrontmatter } from './frontmatter';
 
 describe('routes registry', () => {
@@ -15,6 +15,17 @@ describe('routes registry', () => {
 
   it('resolves a route by alias', () => {
     expect(getRoute('claude_write').alias).toBe('claude_write');
+  });
+});
+
+describe('media routes registry', () => {
+  it('loads all four required media aliases', () => {
+    const aliases = loadMediaRoutes().map((r) => r.alias).sort();
+    expect(aliases).toEqual(['image_fast', 'image_premium', 'video_premium', 'video_standard']);
+  });
+
+  it('resolves a media route by alias with a primary provider id', () => {
+    expect(getMediaRoute('video_premium').primary.length).toBeGreaterThan(0);
   });
 });
 

@@ -8,10 +8,14 @@ import {
   PromptVersion,
   SkillDef,
   ModelAlias,
+  MediaRouteConfig,
+  MediaAlias,
   type RouteConfig as RouteConfigT,
   type FeatureGate as FeatureGateT,
   type PromptVersion as PromptVersionT,
   type SkillDef as SkillDefT,
+  type MediaRouteConfig as MediaRouteConfigT,
+  type MediaAlias as MediaAliasT,
 } from '@apolla/contracts';
 import { parseFrontmatter } from './frontmatter';
 
@@ -45,6 +49,23 @@ export function loadRoutes(): RouteConfigT[] {
 export function getRoute(alias: z.infer<typeof ModelAlias>): RouteConfigT {
   const route = loadRoutes().find((r) => r.alias === alias);
   if (!route) throw new Error(`No route configured for alias: ${alias}`);
+  return route;
+}
+
+/** Load and validate media alias→provider routes. Throws if any required alias is missing. */
+export function loadMediaRoutes(): MediaRouteConfigT[] {
+  const raw = readJson('media-routes.json') as { routes?: unknown };
+  const routes = z.array(MediaRouteConfig).parse(raw.routes ?? []);
+  const present = new Set(routes.map((r) => r.alias));
+  for (const alias of MediaAlias.options) {
+    if (!present.has(alias)) throw new Error(`media-routes.json is missing required alias: ${alias}`);
+  }
+  return routes;
+}
+
+export function getMediaRoute(alias: MediaAliasT): MediaRouteConfigT {
+  const route = loadMediaRoutes().find((r) => r.alias === alias);
+  if (!route) throw new Error(`No media route configured for alias: ${alias}`);
   return route;
 }
 

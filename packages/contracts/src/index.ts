@@ -1,5 +1,6 @@
 export * from './common';
 export * from './identity';
+export * from './memory';
 export * from './model';
 export * from './prompt';
 export * from './tool';

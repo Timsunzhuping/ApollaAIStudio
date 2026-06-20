@@ -6,6 +6,7 @@ import type { TaskRepository } from '@apolla/harness-core';
 export type Sql = postgres.Sql;
 
 export { PostgresUserRepository, PostgresProjectRepository } from './repos';
+export { PostgresMemory } from './memory';
 
 /** Open a connection pool. Reads DATABASE_URL by default. */
 export function createSql(url = process.env.DATABASE_URL): Sql {
@@ -42,6 +43,22 @@ CREATE TABLE IF NOT EXISTS projects (
   created_at  timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS projects_owner_idx ON projects (owner_id);
+
+CREATE TABLE IF NOT EXISTS memory_items (
+  id          text PRIMARY KEY,
+  owner_id    text NOT NULL,
+  kind        text NOT NULL DEFAULT 'note',
+  content     text NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  fts         tsvector GENERATED ALWAYS AS (to_tsvector('english', content)) STORED
+);
+CREATE INDEX IF NOT EXISTS memory_owner_idx ON memory_items (owner_id);
+CREATE INDEX IF NOT EXISTS memory_fts_idx ON memory_items USING gin (fts);
+
+CREATE TABLE IF NOT EXISTS user_model (
+  owner_id    text PRIMARY KEY,
+  data        jsonb NOT NULL
+);
 `;
 
 export async function migrate(sql: Sql): Promise<void> {

@@ -8,11 +8,13 @@ import {
   InMemoryTaskRepository,
   InMemoryUserRepository,
   InMemoryProjectRepository,
+  InMemoryMemory,
   PricingBook,
   type LLMAdapter,
   type TaskRepository,
   type UserRepository,
   type ProjectRepository,
+  type Memory,
 } from '@apolla/harness-core';
 import { getRoute } from '@apolla/config';
 import { OpenAIAdapter } from '@apolla/adapter-openai';
@@ -25,6 +27,7 @@ import {
   PostgresTaskRepository,
   PostgresUserRepository,
   PostgresProjectRepository,
+  PostgresMemory,
 } from '@apolla/db-postgres';
 import { DemoLLMAdapter } from './demo-adapter';
 
@@ -33,6 +36,7 @@ export interface Harness {
   repo: TaskRepository;
   users: UserRepository;
   projects: ProjectRepository;
+  memory: Memory;
   ledger: InMemoryCostLedger;
   pending: Map<string, { question: string; projectId?: string }>;
   mode: 'real' | 'demo';
@@ -71,6 +75,7 @@ export async function buildHarness(): Promise<Harness> {
   let repo: TaskRepository;
   let users: UserRepository;
   let projects: ProjectRepository;
+  let memory: Memory;
   let persistence: Harness['persistence'];
   let close = async (): Promise<void> => {};
 
@@ -80,6 +85,7 @@ export async function buildHarness(): Promise<Harness> {
     repo = new PostgresTaskRepository(sql);
     users = new PostgresUserRepository(sql);
     projects = new PostgresProjectRepository(sql);
+    memory = new PostgresMemory(sql);
     persistence = 'postgres';
     close = async () => {
       await sql.end();
@@ -88,6 +94,7 @@ export async function buildHarness(): Promise<Harness> {
     repo = new InMemoryTaskRepository();
     users = new InMemoryUserRepository();
     projects = new InMemoryProjectRepository();
+    memory = new InMemoryMemory();
     persistence = 'memory';
   }
 
@@ -98,6 +105,7 @@ export async function buildHarness(): Promise<Harness> {
     tools,
     ledger,
     repo,
+    memory,
     routeFor,
     env: { ...process.env, DEMO_KEY: 'demo' },
   });
@@ -107,6 +115,7 @@ export async function buildHarness(): Promise<Harness> {
     repo,
     users,
     projects,
+    memory,
     ledger,
     pending: new Map(),
     mode: useReal ? 'real' : 'demo',

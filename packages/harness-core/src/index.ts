@@ -35,6 +35,9 @@ export {
   InMemoryProjectRepository,
 } from './repo/memory';
 export type { TaskRepository, UserRepository, ProjectRepository } from './repo/types';
+export { InMemoryMemory } from './memory/memory';
+export { userModelDirective } from './memory/types';
+export type { Memory } from './memory/types';
 export { ResearchOrchestrator } from './orchestrator/research';
 export type { ResearchDeps, RunInput } from './orchestrator/research';
 export type { TaskEvent, PlanSketch, Estimate } from './orchestrator/events';

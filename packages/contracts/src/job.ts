@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const JobKind = z.enum(['research', 'agent', 'skill', 'media']);
+export const JobKind = z.enum(['research', 'agent', 'skill', 'media', 'cowork']);
 export type JobKind = z.infer<typeof JobKind>;
 
 export const JobStatus = z.enum(['queued', 'running', 'done', 'failed']);

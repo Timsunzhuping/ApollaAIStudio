@@ -25,6 +25,7 @@ export interface CoworkInput {
   /** Explicit sub-goals; if omitted the orchestrator plans them from the goal. */
   subgoals?: string[];
   approve?: (call: ToolCall) => Promise<boolean>;
+  clarify?: (question: string) => Promise<string | null>;
 }
 
 /**

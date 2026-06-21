@@ -40,6 +40,8 @@ export interface CoordinatorInput {
   taskId?: string;
   /** Approve a sub-agent low_write before it executes. Defaults to DENY (sub-agents never self-confirm). */
   approve?: (call: ToolCall) => Promise<boolean>;
+  /** Answer a sub-agent's clarifying question. Defaults to null (background: never self-answer). */
+  clarify?: (question: string) => Promise<string | null>;
 }
 
 /** Bounded concurrency map preserving input order; true parallelism within `cap`. */
@@ -110,6 +112,7 @@ export class Coordinator {
       goal: subgoal,
       taskId: `${taskId}:${index}`,
       approve: input.approve,
+      clarify: input.clarify,
     });
     for await (const e of events) {
       if (e.type === 'tool-call') toolCalls++;

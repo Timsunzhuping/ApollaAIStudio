@@ -19,12 +19,18 @@ export interface AgentRunInput {
   taskId?: string;
   /** Approve a low-risk write before it executes. Defaults to DENY (safe) — agents never self-confirm. */
   approve?: (call: ToolCall) => Promise<boolean>;
+  /**
+   * Ask the human a clarifying question. Returns their answer, or null when no human is available
+   * (background/scheduled runs). Defaults to null — agents NEVER self-answer (S6-T5).
+   */
+  clarify?: (question: string) => Promise<string | null>;
 }
 
 export type AgentEvent =
   | { type: 'plan'; text: string }
   | { type: 'tool-call'; tool: string; risk: string; args: unknown }
   | { type: 'confirm'; tool: string; risk: string; args: unknown }
+  | { type: 'clarify'; question: string; answered: boolean }
   | { type: 'tool-result'; tool: string; ok: boolean; summary: string }
   | { type: 'denied'; tool: string; reason: string }
   | { type: 'delta'; text: string }
@@ -32,10 +38,11 @@ export type AgentEvent =
   | { type: 'error'; message: string };
 
 const StepDecision = z.object({
-  action: z.enum(['call_tool', 'finish']),
+  action: z.enum(['call_tool', 'finish', 'clarify']),
   tool: z.string().optional(),
   args: z.record(z.any()).optional(),
   answer: z.string().optional(),
+  question: z.string().optional(),
 });
 
 export interface AgentDeps {
@@ -62,6 +69,8 @@ export class AgentOrchestrator {
   async *run(input: AgentRunInput): AsyncIterable<AgentEvent> {
     const safety = this.d.safety ?? new SafetyPolicy();
     const approve = input.approve ?? (async () => false);
+    // No human by default → null. The agent never fabricates an answer to its own question.
+    const clarify = input.clarify ?? (async () => null);
     const alias = this.d.alias ?? 'gpt_premium';
     const maxSteps = this.d.maxSteps ?? 8;
     const taskId = input.taskId ?? (this.d.idGen ?? randomUUID)();
@@ -92,6 +101,18 @@ export class AgentOrchestrator {
           `\n\nAvailable tools:\n${toolMenu}\n\nActions so far:\n${transcript.join('\n') || '(none)'}`;
         const req = assembleRequest({ system, user: input.goal, data: evidence });
         const decision = await this.d.router.json(alias, req, StepDecision);
+
+        if (decision.action === 'clarify') {
+          const question = decision.question ?? '';
+          const answer = await clarify(question);
+          yield { type: 'clarify', question, answered: !!(answer && answer.trim()) };
+          transcript.push(
+            answer && answer.trim()
+              ? `CLARIFICATION Q: ${question}\nA: ${answer}`
+              : `CLARIFICATION Q: ${question} — no answer available; proceed with best effort.`,
+          );
+          continue;
+        }
 
         if (decision.action === 'finish' || !decision.tool) {
           const answer = decision.answer ?? '';

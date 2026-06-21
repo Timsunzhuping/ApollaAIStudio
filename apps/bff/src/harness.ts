@@ -36,6 +36,8 @@ import {
   InMemoryJobRepository,
   InMemoryScheduledTaskRepository,
   InMemoryNotificationRepository,
+  InMemoryPluginRepository,
+  type PluginRepository,
   type MediaAdapter,
   type MediaRepository,
   type ConnectorRepository,
@@ -52,7 +54,7 @@ import {
   type Memory,
   type SkillRepository,
 } from '@apolla/harness-core';
-import { getRoute, loadSkills, loadFeatureGates, getMediaRoute } from '@apolla/config';
+import { getRoute, loadSkills, loadPlugins, loadFeatureGates, getMediaRoute } from '@apolla/config';
 import type { ModelCaps } from '@apolla/contracts';
 import { OpenAIImageAdapter } from '@apolla/media-openai';
 import { SeedanceVideoAdapter } from '@apolla/media-seedance';
@@ -76,6 +78,7 @@ import {
   PostgresJobRepository,
   PostgresScheduledTaskRepository,
   PostgresNotificationRepository,
+  PostgresPluginRepository,
 } from '@apolla/db-postgres';
 import { DemoLLMAdapter } from './demo-adapter';
 
@@ -99,6 +102,8 @@ export interface Harness {
   scheduler: Scheduler;
   scheduleRepo: ScheduledTaskRepository;
   notifications: NotificationRepository;
+  plugins: PluginRepository;
+  officialPlugins: () => import('@apolla/contracts').Plugin[];
   stubMcp: StubMCPClient;
   mcpClientFor: (transport: string) => MCPClient;
   llmRouter: ModelRouter;
@@ -154,6 +159,7 @@ export async function buildHarness(): Promise<Harness> {
   let jobRepo: JobRepository;
   let scheduleRepo: ScheduledTaskRepository;
   let notificationRepo: NotificationRepository;
+  let pluginRepo: PluginRepository;
   let persistence: Harness['persistence'];
   let close = async (): Promise<void> => {};
 
@@ -171,6 +177,7 @@ export async function buildHarness(): Promise<Harness> {
     jobRepo = new PostgresJobRepository(sql);
     scheduleRepo = new PostgresScheduledTaskRepository(sql);
     notificationRepo = new PostgresNotificationRepository(sql);
+    pluginRepo = new PostgresPluginRepository(sql);
     persistence = 'postgres';
     close = async () => {
       await sql.end();
@@ -187,6 +194,7 @@ export async function buildHarness(): Promise<Harness> {
     jobRepo = new InMemoryJobRepository();
     scheduleRepo = new InMemoryScheduledTaskRepository();
     notificationRepo = new InMemoryNotificationRepository();
+    pluginRepo = new InMemoryPluginRepository();
     persistence = 'memory';
   }
 
@@ -206,7 +214,7 @@ export async function buildHarness(): Promise<Harness> {
   // Skill Runtime: built-in config skills + user skills; research → orchestrator, else generic.
   const router = new ModelRouter({ adapters, routeFor, env: { ...process.env, DEMO_KEY: 'demo' }, onUsage: (e) => ledger.recordLLM(e) });
   const skills = new SkillRuntime(
-    new CompositeSkillSource(loadSkills(), skillRepo),
+    new CompositeSkillSource(loadSkills(), skillRepo, pluginRepo),
     makeGenericExecutor({ router, prompts, tools }),
   );
   skills.registerExecutor('research', makeResearchExecutor(orchestrator));
@@ -341,6 +349,8 @@ export async function buildHarness(): Promise<Harness> {
     scheduler,
     scheduleRepo,
     notifications: notificationRepo,
+    plugins: pluginRepo,
+    officialPlugins: loadPlugins,
     stubMcp,
     mcpClientFor,
     llmRouter: router,

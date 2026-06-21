@@ -10,6 +10,8 @@ import {
   ModelAlias,
   MediaRouteConfig,
   MediaAlias,
+  Plugin,
+  type Plugin as PluginT,
   type RouteConfig as RouteConfigT,
   type FeatureGate as FeatureGateT,
   type PromptVersion as PromptVersionT,
@@ -89,6 +91,16 @@ export function loadSkills(): SkillDefT[] {
     const { data } = parseFrontmatter(fs.readFileSync(file, 'utf8'));
     return SkillDef.parse(data);
   });
+}
+
+/** Load official plugin manifests from packages/config/plugins/*.json (S6-T2). */
+export function loadPlugins(): PluginT[] {
+  const dir = path.join(pkgRoot, 'plugins');
+  if (!fs.existsSync(dir)) return [];
+  return fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith('.json'))
+    .map((f) => Plugin.parse(JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))));
 }
 
 export { parseFrontmatter } from './frontmatter';

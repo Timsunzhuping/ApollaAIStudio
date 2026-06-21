@@ -7,6 +7,7 @@ export * from './media';
 export * from './memory';
 export * from './model';
 export * from './notification';
+export * from './plugin';
 export * from './schedule';
 export * from './prompt';
 export * from './tool';

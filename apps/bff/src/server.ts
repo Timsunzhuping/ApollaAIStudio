@@ -126,6 +126,29 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     return json(res, 200, { ok: true });
   }
 
+  // --- Plugins (Cowork §15.2): role-specific capability bundles ---
+  if (method === 'GET' && pathname === '/api/plugins/official') {
+    return json(res, 200, harness.officialPlugins());
+  }
+  if (method === 'GET' && pathname === '/api/plugins') {
+    return json(res, 200, await harness.plugins.list(ownerId));
+  }
+  if (method === 'POST' && pathname === '/api/plugins/install') {
+    const body = await readBody(req);
+    const plugin = harness.officialPlugins().find((p) => p.name === String(body.name ?? ''));
+    if (!plugin) return json(res, 404, { error: 'unknown plugin' });
+    await harness.plugins.install(ownerId, plugin);
+    // Flag any required connectors the owner has not connected yet (install still succeeds).
+    const connected = new Set((await harness.connectors.list(ownerId)).map((c) => c.name));
+    const missingConnectors = plugin.requiredConnectors.filter((rc) => !connected.has(rc));
+    return json(res, 201, { plugin, missingConnectors });
+  }
+  const pluginDelete = pathname.match(/^\/api\/plugins\/([^/]+)$/);
+  if (method === 'DELETE' && pluginDelete) {
+    await harness.plugins.uninstall(ownerId, decodeURIComponent(pluginDelete[1]!));
+    return json(res, 200, { ok: true });
+  }
+
   // --- Scheduled tasks ---
   if (method === 'POST' && pathname === '/api/schedules') {
     const body = await readBody(req);

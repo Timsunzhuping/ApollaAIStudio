@@ -13,6 +13,7 @@ export { PostgresAuditRepository } from './audit';
 export { PostgresJobRepository } from './job';
 export { PostgresScheduledTaskRepository } from './schedule';
 export { PostgresNotificationRepository } from './notification';
+export { PostgresPluginRepository } from './plugin';
 
 /** Open a connection pool. Reads DATABASE_URL by default. */
 export function createSql(url = process.env.DATABASE_URL): Sql {
@@ -136,6 +137,15 @@ CREATE TABLE IF NOT EXISTS notifications (
   created_at  timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS notif_owner_idx ON notifications (owner_id);
+
+CREATE TABLE IF NOT EXISTS plugins (
+  owner_id    text NOT NULL,
+  name        text NOT NULL,
+  data        jsonb NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (owner_id, name)
+);
+CREATE INDEX IF NOT EXISTS plugins_owner_idx ON plugins (owner_id);
 `;
 
 export async function migrate(sql: Sql): Promise<void> {

@@ -7,6 +7,8 @@ export interface JobRunnerDeps {
   resolve: JobResolver;
   /** Called once a job reaches a terminal state (notifications hook, S5-T5). */
   onComplete?: (job: Job) => Promise<void> | void;
+  /** Quota/eligibility gate — applies to ALL jobs incl. scheduler-triggered ones (S5-T7). */
+  canRun?: (ownerId: string) => Promise<boolean> | boolean;
   idGen?: () => string;
 }
 
@@ -36,6 +38,14 @@ export class JobRunner {
       scheduledTaskId: opts.scheduledTaskId,
     };
     await this.d.repo.create(job);
+    // Quota/eligibility gate — also catches scheduler-triggered jobs that bypass the HTTP layer.
+    if (this.d.canRun && !(await this.d.canRun(ownerId))) {
+      job.status = 'failed';
+      job.error = 'quota exceeded';
+      await this.d.repo.save(job);
+      await this.d.onComplete?.(job);
+      return { job, done: Promise.resolve() };
+    }
     // Mutate a copy in the background so the returned job stays a clean 'queued' snapshot.
     const done = this.runInBackground({ ...job }, spec);
     return { job, done };

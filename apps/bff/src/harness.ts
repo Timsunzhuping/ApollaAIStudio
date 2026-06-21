@@ -28,11 +28,14 @@ import {
   AgentOrchestrator,
   JobRunner,
   Scheduler,
+  notifyJobComplete,
+  WebhookDelivery,
   InMemoryMediaRepository,
   InMemoryConnectorRepository,
   InMemoryAuditRepository,
   InMemoryJobRepository,
   InMemoryScheduledTaskRepository,
+  InMemoryNotificationRepository,
   type MediaAdapter,
   type MediaRepository,
   type ConnectorRepository,
@@ -40,6 +43,7 @@ import {
   type JobRepository,
   type JobResolver,
   type ScheduledTaskRepository,
+  type NotificationRepository,
   type MCPClient,
   type LLMAdapter,
   type TaskRepository,
@@ -71,6 +75,7 @@ import {
   PostgresAuditRepository,
   PostgresJobRepository,
   PostgresScheduledTaskRepository,
+  PostgresNotificationRepository,
 } from '@apolla/db-postgres';
 import { DemoLLMAdapter } from './demo-adapter';
 
@@ -93,6 +98,7 @@ export interface Harness {
   jobRepo: JobRepository;
   scheduler: Scheduler;
   scheduleRepo: ScheduledTaskRepository;
+  notifications: NotificationRepository;
   stubMcp: StubMCPClient;
   mcpClientFor: (transport: string) => MCPClient;
   llmRouter: ModelRouter;
@@ -147,6 +153,7 @@ export async function buildHarness(): Promise<Harness> {
   let auditRepo: AuditRepository;
   let jobRepo: JobRepository;
   let scheduleRepo: ScheduledTaskRepository;
+  let notificationRepo: NotificationRepository;
   let persistence: Harness['persistence'];
   let close = async (): Promise<void> => {};
 
@@ -163,6 +170,7 @@ export async function buildHarness(): Promise<Harness> {
     auditRepo = new PostgresAuditRepository(sql);
     jobRepo = new PostgresJobRepository(sql);
     scheduleRepo = new PostgresScheduledTaskRepository(sql);
+    notificationRepo = new PostgresNotificationRepository(sql);
     persistence = 'postgres';
     close = async () => {
       await sql.end();
@@ -178,6 +186,7 @@ export async function buildHarness(): Promise<Harness> {
     auditRepo = new InMemoryAuditRepository();
     jobRepo = new InMemoryJobRepository();
     scheduleRepo = new InMemoryScheduledTaskRepository();
+    notificationRepo = new InMemoryNotificationRepository();
     persistence = 'memory';
   }
 
@@ -298,7 +307,13 @@ export async function buildHarness(): Promise<Harness> {
       yield* agent.run({ ownerId, goal: String(input.goal ?? input.question ?? ''), taskId: jobId, approve: async (call) => allow.has(call.tool) });
     })();
   };
-  const jobs = new JobRunner({ repo: jobRepo, resolve: jobResolve });
+  const delivery = process.env.NOTIFY_WEBHOOK_URL ? new WebhookDelivery(process.env.NOTIFY_WEBHOOK_URL) : undefined;
+  const jobs = new JobRunner({
+    repo: jobRepo,
+    resolve: jobResolve,
+    onComplete: (job) => notifyJobComplete(job, { repo: notificationRepo, delivery }),
+    canRun: (id) => quota.check(id).then((q) => q.ok),
+  });
   const scheduler = new Scheduler({
     repo: scheduleRepo,
     trigger: (t) => {
@@ -325,6 +340,7 @@ export async function buildHarness(): Promise<Harness> {
     jobRepo,
     scheduler,
     scheduleRepo,
+    notifications: notificationRepo,
     stubMcp,
     mcpClientFor,
     llmRouter: router,

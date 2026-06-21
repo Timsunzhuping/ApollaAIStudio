@@ -116,6 +116,16 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     return json(res, 200, await harness.audit.list(ownerId, taskId));
   }
 
+  // --- Notifications ---
+  if (method === 'GET' && pathname === '/api/notifications') {
+    return json(res, 200, await harness.notifications.list(ownerId));
+  }
+  const notifRead = pathname.match(/^\/api\/notifications\/([^/]+)\/read$/);
+  if (method === 'POST' && notifRead) {
+    await harness.notifications.markRead(ownerId, notifRead[1]!);
+    return json(res, 200, { ok: true });
+  }
+
   // --- Scheduled tasks ---
   if (method === 'POST' && pathname === '/api/schedules') {
     const body = await readBody(req);

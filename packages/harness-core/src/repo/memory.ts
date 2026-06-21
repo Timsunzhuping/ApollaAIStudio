@@ -1,6 +1,7 @@
-import type { Task, User, Project, SkillDef, MediaTask, Connector, AuditEntry, Job, ScheduledTask } from '@apolla/contracts';
+import type { Task, User, Project, SkillDef, MediaTask, Connector, AuditEntry, Job, ScheduledTask, Notification } from '@apolla/contracts';
 import type { JobRepository } from '../jobs/types';
 import type { ScheduledTaskRepository } from '../schedule/scheduler';
+import type { NotificationRepository } from '../notify/notify';
 import type {
   TaskRepository,
   UserRepository,
@@ -183,6 +184,23 @@ export class InMemoryScheduledTaskRepository implements ScheduledTaskRepository 
   async delete(ownerId: string, id: string): Promise<void> {
     const t = this.byId.get(id);
     if (t && t.ownerId === ownerId) this.byId.delete(id);
+  }
+}
+
+export class InMemoryNotificationRepository implements NotificationRepository {
+  private readonly items: Notification[] = [];
+
+  async create(n: Notification): Promise<void> {
+    this.items.push(structuredClone(n));
+  }
+
+  async list(ownerId: string): Promise<Notification[]> {
+    return this.items.filter((n) => n.ownerId === ownerId).map((n) => structuredClone(n));
+  }
+
+  async markRead(ownerId: string, id: string): Promise<void> {
+    const n = this.items.find((x) => x.id === id && x.ownerId === ownerId);
+    if (n) n.read = true;
   }
 }
 

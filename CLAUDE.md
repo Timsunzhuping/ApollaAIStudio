@@ -2,7 +2,8 @@
 
 本文件为 Claude Code 提供每次会话的标准上下文。开始任何开发前请先读本文件，再读 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)（Harness 架构总纲）、[docs/PRD.md](docs/PRD.md) 与 [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md)。Codex 等其他代理读同源的 [AGENTS.md](AGENTS.md)。
 
-**已完成 Sprint**：01（Harness Core）、02（持久化/个人化/技能）、03（多模态成品）、04（[SPRINT_04](docs/SPRINT_04.md) 工具生态与低风险执行：MCP + 多工具 Agent + 分级确认 + 审计）。
+**已完成 Sprint**：01（Harness Core）、02（持久化/个人化/技能）、03（多模态成品）、04（工具生态与低风险执行：MCP + Agent + 分级确认 + 审计）。
+**当前 Sprint**：[docs/SPRINT_05.md](docs/SPRINT_05.md)（主动智能：定时任务 + 后台自治运行 + 通知）。从 S5-T1 开始。后台/定时运行无人确认——默认只读或预授权白名单（上限 low_write），high_write 永拒。
 执行铁律：外部工具优先 MCP；工具输出默认不可信（数据通道）；写入动作必经 Safety 三级——只读自动 / 低风险需人类确认 / 高风险拒绝；每次工具调用与确认落审计；连接器密钥加密。后续候选见 SPRINT_04 §0：文本产品面、浏览器执行、Cowork、生产级 Next.js 前端。
 
 ## 产品是什么

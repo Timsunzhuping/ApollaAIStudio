@@ -10,6 +10,7 @@ export { PostgresMemory } from './memory';
 export { PostgresMediaRepository } from './media';
 export { PostgresConnectorRepository } from './connector';
 export { PostgresAuditRepository } from './audit';
+export { PostgresJobRepository } from './job';
 
 /** Open a connection pool. Reads DATABASE_URL by default. */
 export function createSql(url = process.env.DATABASE_URL): Sql {
@@ -98,6 +99,22 @@ CREATE TABLE IF NOT EXISTS audit_log (
 );
 CREATE INDEX IF NOT EXISTS audit_owner_idx ON audit_log (owner_id);
 CREATE INDEX IF NOT EXISTS audit_task_idx ON audit_log (task_id);
+
+CREATE TABLE IF NOT EXISTS jobs (
+  id          text PRIMARY KEY,
+  owner_id    text NOT NULL,
+  status      text NOT NULL,
+  data        jsonb NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS jobs_owner_idx ON jobs (owner_id);
+
+CREATE TABLE IF NOT EXISTS job_events (
+  job_id  text NOT NULL,
+  seq     bigserial,
+  data    jsonb NOT NULL,
+  PRIMARY KEY (job_id, seq)
+);
 `;
 
 export async function migrate(sql: Sql): Promise<void> {

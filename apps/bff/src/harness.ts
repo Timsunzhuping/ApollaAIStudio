@@ -25,13 +25,18 @@ import {
   StubMediaAdapter,
   RuleModerator,
   StubMCPClient,
+  AgentOrchestrator,
+  JobRunner,
   InMemoryMediaRepository,
   InMemoryConnectorRepository,
   InMemoryAuditRepository,
+  InMemoryJobRepository,
   type MediaAdapter,
   type MediaRepository,
   type ConnectorRepository,
   type AuditRepository,
+  type JobRepository,
+  type JobResolver,
   type MCPClient,
   type LLMAdapter,
   type TaskRepository,
@@ -61,6 +66,7 @@ import {
   PostgresMediaRepository,
   PostgresConnectorRepository,
   PostgresAuditRepository,
+  PostgresJobRepository,
 } from '@apolla/db-postgres';
 import { DemoLLMAdapter } from './demo-adapter';
 
@@ -79,6 +85,8 @@ export interface Harness {
   mediaRepo: MediaRepository;
   connectors: ConnectorRepository;
   audit: AuditRepository;
+  jobs: JobRunner;
+  jobRepo: JobRepository;
   stubMcp: StubMCPClient;
   mcpClientFor: (transport: string) => MCPClient;
   llmRouter: ModelRouter;
@@ -131,6 +139,7 @@ export async function buildHarness(): Promise<Harness> {
   let mediaRepo: MediaRepository;
   let connectorRepo: ConnectorRepository;
   let auditRepo: AuditRepository;
+  let jobRepo: JobRepository;
   let persistence: Harness['persistence'];
   let close = async (): Promise<void> => {};
 
@@ -145,6 +154,7 @@ export async function buildHarness(): Promise<Harness> {
     mediaRepo = new PostgresMediaRepository(sql);
     connectorRepo = new PostgresConnectorRepository(sql);
     auditRepo = new PostgresAuditRepository(sql);
+    jobRepo = new PostgresJobRepository(sql);
     persistence = 'postgres';
     close = async () => {
       await sql.end();
@@ -158,6 +168,7 @@ export async function buildHarness(): Promise<Harness> {
     mediaRepo = new InMemoryMediaRepository();
     connectorRepo = new InMemoryConnectorRepository();
     auditRepo = new InMemoryAuditRepository();
+    jobRepo = new InMemoryJobRepository();
     persistence = 'memory';
   }
 
@@ -247,6 +258,39 @@ export async function buildHarness(): Promise<Harness> {
     makeAgentExecutor({ router, prompts, toolsFor: agentToolsFor, audit: (e) => auditRepo.record(e) }),
   );
 
+  // Background jobs: resolve a JobSpec to the right orchestrator's event stream.
+  const jobResolve: JobResolver = (ownerId, spec, jobId) => {
+    const input = spec.input as Record<string, unknown>;
+    if (spec.kind === 'research') {
+      return orchestrator.run({ ownerId, question: String(input.question ?? ''), taskId: jobId, projectId: input.projectId as string | undefined });
+    }
+    if (spec.kind === 'media') {
+      const alias = String(input.alias ?? 'image_premium');
+      return mediaOrch.run({
+        ownerId,
+        alias: alias as never,
+        job: { kind: (alias.startsWith('video') ? 'video' : 'image') as never, prompt: String(input.prompt ?? input.question ?? ''), params: {} },
+        taskId: jobId,
+      });
+    }
+    if (spec.kind === 'skill') {
+      return (async function* () {
+        const skill = await skills.get(String(input.skill ?? ''), ownerId);
+        if (!skill) throw new Error(`unknown skill: ${String(input.skill)}`);
+        yield* skills.run(skill, { ownerId, question: String(input.question ?? ''), taskId: jobId });
+      })();
+    }
+    // agent — background runs are non-interactive: only pre-authorized (allowTools) low_write
+    // tools may run; high_write is always denied (S5-T7).
+    const allow = new Set((spec.allowTools ?? []) as string[]);
+    return (async function* () {
+      const tools = await agentToolsFor(ownerId);
+      const agent = new AgentOrchestrator({ router, tools, prompts, audit: (e) => auditRepo.record(e) });
+      yield* agent.run({ ownerId, goal: String(input.goal ?? input.question ?? ''), taskId: jobId, approve: async (call) => allow.has(call.tool) });
+    })();
+  };
+  const jobs = new JobRunner({ repo: jobRepo, resolve: jobResolve });
+
   return {
     orchestrator,
     repo,
@@ -262,6 +306,8 @@ export async function buildHarness(): Promise<Harness> {
     mediaRepo,
     connectors: connectorRepo,
     audit: auditRepo,
+    jobs,
+    jobRepo,
     stubMcp,
     mcpClientFor,
     llmRouter: router,

@@ -2,6 +2,7 @@ export * from './audit';
 export * from './common';
 export * from './connector';
 export * from './identity';
+export * from './job';
 export * from './media';
 export * from './memory';
 export * from './model';

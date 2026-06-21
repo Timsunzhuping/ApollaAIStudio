@@ -47,7 +47,11 @@ export {
   InMemoryMediaRepository,
   InMemoryConnectorRepository,
   InMemoryAuditRepository,
+  InMemoryJobRepository,
 } from './repo/memory';
+export { JobRunner } from './jobs/runner';
+export type { JobRunnerDeps } from './jobs/runner';
+export type { JobRepository, JobResolver } from './jobs/types';
 export { MediaRouter } from './media/router';
 export { StubMediaAdapter } from './media/stub';
 export { MediaOrchestrator } from './media/orchestrator';

@@ -13,6 +13,8 @@ function json(res: ServerResponse, code: number, body: unknown): void {
   res.end(JSON.stringify(body));
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 async function readBody(req: IncomingMessage): Promise<any> {
   const chunks: Buffer[] = [];
   for await (const c of req) chunks.push(c as Buffer);
@@ -112,6 +114,49 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   if (method === 'GET' && pathname === '/api/audit') {
     const taskId = url.searchParams.get('taskId') ?? undefined;
     return json(res, 200, await harness.audit.list(ownerId, taskId));
+  }
+
+  // --- Background jobs ---
+  if (method === 'POST' && pathname === '/api/jobs') {
+    const body = await readBody(req);
+    const kind = String(body.kind ?? '');
+    if (!['research', 'agent', 'skill', 'media'].includes(kind)) return json(res, 400, { error: 'invalid job kind' });
+    const q = await harness.quota.check(ownerId);
+    if (!q.ok) return json(res, 402, { error: 'quota reached — upgrade your plan', ...q });
+    const { job } = await harness.jobs.start(ownerId, {
+      kind: kind as never,
+      input: (body.input ?? {}) as Record<string, unknown>,
+      allowTools: Array.isArray(body.allowTools) ? body.allowTools : [],
+    });
+    return json(res, 201, { jobId: job.id });
+  }
+  if (method === 'GET' && pathname === '/api/jobs') {
+    return json(res, 200, await harness.jobRepo.list(ownerId));
+  }
+  const jobEvents = pathname.match(/^\/api\/jobs\/([^/]+)\/events$/);
+  if (method === 'GET' && jobEvents) {
+    const jobId = jobEvents[1]!;
+    const job0 = await harness.jobRepo.get(jobId);
+    if (!job0 || job0.ownerId !== ownerId) return json(res, 404, { error: 'unknown job' });
+    res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
+    let sent = 0;
+    for (;;) {
+      const evs = await harness.jobRepo.events(jobId);
+      for (; sent < evs.length; sent++) res.write(`data: ${JSON.stringify(evs[sent])}\n\n`);
+      const job = await harness.jobRepo.get(jobId);
+      if (!job || job.status === 'done' || job.status === 'failed') {
+        res.write(`data: ${JSON.stringify({ type: 'job-status', status: job?.status ?? 'failed' })}\n\n`);
+        break;
+      }
+      await sleep(300);
+    }
+    res.end();
+    return;
+  }
+  const jobOne = pathname.match(/^\/api\/jobs\/([^/]+)$/);
+  if (method === 'GET' && jobOne) {
+    const job = await harness.jobRepo.get(jobOne[1]!);
+    return job && job.ownerId === ownerId ? json(res, 200, job) : json(res, 404, { error: 'unknown job' });
   }
 
   // --- Agent (multi-tool, tiered confirmation) ---

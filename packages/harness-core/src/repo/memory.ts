@@ -1,4 +1,5 @@
-import type { Task, User, Project, SkillDef, MediaTask, Connector, AuditEntry } from '@apolla/contracts';
+import type { Task, User, Project, SkillDef, MediaTask, Connector, AuditEntry, Job } from '@apolla/contracts';
+import type { JobRepository } from '../jobs/types';
 import type {
   TaskRepository,
   UserRepository,
@@ -122,6 +123,38 @@ export class InMemoryConnectorRepository implements ConnectorRepository {
   async delete(ownerId: string, id: string): Promise<void> {
     const c = this.byId.get(id);
     if (c && c.ownerId === ownerId) this.byId.delete(id);
+  }
+}
+
+export class InMemoryJobRepository implements JobRepository {
+  private readonly jobs = new Map<string, Job>();
+  private readonly log = new Map<string, unknown[]>();
+
+  async create(job: Job): Promise<Job> {
+    this.jobs.set(job.id, structuredClone(job));
+    this.log.set(job.id, []);
+    return structuredClone(job);
+  }
+
+  async get(id: string): Promise<Job | undefined> {
+    const j = this.jobs.get(id);
+    return j ? structuredClone(j) : undefined;
+  }
+
+  async save(job: Job): Promise<void> {
+    this.jobs.set(job.id, structuredClone(job));
+  }
+
+  async list(ownerId: string): Promise<Job[]> {
+    return [...this.jobs.values()].filter((j) => j.ownerId === ownerId).map((j) => structuredClone(j));
+  }
+
+  async appendEvent(jobId: string, event: unknown): Promise<void> {
+    (this.log.get(jobId) ?? this.log.set(jobId, []).get(jobId)!).push(structuredClone(event));
+  }
+
+  async events(jobId: string): Promise<unknown[]> {
+    return structuredClone(this.log.get(jobId) ?? []);
   }
 }
 

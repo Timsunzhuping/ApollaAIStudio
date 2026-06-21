@@ -23,6 +23,17 @@ export class DemoLLMAdapter implements LLMAdapter {
 
     // Agent step (S4): system prompt lists available tools and expects a call_tool/finish decision.
     const sys = req.messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n');
+
+    // Cowork plan (S6): break a goal into parallel sub-goals.
+    if (sys.includes('sub-goal')) {
+      return JSON.stringify({
+        subgoals: [
+          `Background and key definitions for ${q}`,
+          `Current state and recent developments in ${q}`,
+          `Outlook, risks, and implications of ${q}`,
+        ],
+      });
+    }
     if (sys.includes('Available tools:')) {
       if (!sys.includes('(none)')) {
         return JSON.stringify({ action: 'finish', answer: `Done — completed "${q}" using the available tools. _(demo agent)_` });

@@ -76,6 +76,16 @@ export const UI_HTML = `<!doctype html>
     <div id="agentConfirm" style="margin-top:.4rem"></div>
     <h3 style="margin-top:1rem">Audit</h3><div id="agentAudit" class="muted">—</div>
   </div>
+  <div class="bar" style="border-top:1px solid var(--bd)">
+    <button class="ghost" id="addSchedule">+ Daily schedule</button>
+    <button class="ghost" id="refreshInbox">↻ Inbox</button>
+    <span id="notifBadge" class="muted">🔔 0</span>
+  </div>
+  <div class="grid" style="grid-template-columns:1fr 1fr 1fr">
+    <div class="col"><h3>Schedules</h3><div id="schedules" class="muted">—</div></div>
+    <div class="col"><h3>Job history</h3><div id="jobs" class="muted">—</div></div>
+    <div class="col"><h3>Notifications</h3><div id="notifs" class="muted">—</div></div>
+  </div>
 </div>
 
 <script>
@@ -91,7 +101,43 @@ async function boot() {
 function showApp(u) {
   $('login').style.display='none'; $('app').style.display='block';
   $('who').textContent = u.email; $('logout').style.display='inline-block';
-  loadProjects(); loadSkills(); loadConnectors();
+  loadProjects(); loadSkills(); loadConnectors(); refreshInbox();
+}
+function btn(label, cls, fn){ const b=document.createElement('button'); b.textContent=label; if(cls)b.className=cls; b.onclick=fn; b.style.marginRight='.3rem'; return b; }
+async function refreshInbox(){ loadSchedules(); loadJobs(); loadNotifs(); }
+$('refreshInbox').onclick = refreshInbox;
+$('addSchedule').onclick = async () => {
+  const question = prompt('Daily research question'); if(!question) return;
+  const cron = prompt('Cron (UTC), default daily 08:00', '0 8 * * *') || '0 8 * * *';
+  await fetch('/api/schedules',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:question.slice(0,40),cron,kind:'research',input:{question}})});
+  loadSchedules();
+};
+async function loadSchedules(){
+  const list = await fetch('/api/schedules').then(r=>r.json());
+  const box = $('schedules'); box.innerHTML='';
+  if(!list.length){ box.className='muted'; box.textContent='—'; return; } box.className='';
+  for(const s of list){ const d=document.createElement('div'); d.className='step';
+    d.textContent = (s.enabled?'🟢 ':'⚪️ ')+(s.name||s.cron)+' · '+s.cron+' ';
+    d.appendChild(btn('run now','ghost', async()=>{ await fetch('/api/schedules/'+s.id+'/run-now',{method:'POST'}); loadJobs(); }));
+    d.appendChild(btn(s.enabled?'pause':'resume','ghost', async()=>{ await fetch('/api/schedules/'+s.id+'/toggle',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({enabled:!s.enabled})}); loadSchedules(); }));
+    d.appendChild(btn('✕','ghost', async()=>{ await fetch('/api/schedules/'+s.id,{method:'DELETE'}); loadSchedules(); }));
+    box.appendChild(d);
+  }
+}
+async function loadJobs(){
+  const list = await fetch('/api/jobs').then(r=>r.json());
+  $('jobs').className = list.length?'':'muted';
+  $('jobs').innerHTML = list.length ? list.slice(0,20).map(j=>'<div class="step">'+j.kind+' · '+j.status+'</div>').join('') : '—';
+}
+async function loadNotifs(){
+  const list = await fetch('/api/notifications').then(r=>r.json());
+  const unread = list.filter(n=>!n.read).length; $('notifBadge').textContent='🔔 '+unread;
+  const box=$('notifs'); box.innerHTML=''; if(!list.length){ box.className='muted'; box.textContent='—'; return; } box.className='';
+  for(const n of list.slice(0,20)){ const d=document.createElement('div'); d.className='step'+(n.read?' done':'');
+    d.textContent=(n.read?'· ':'• ')+n.title+' ';
+    if(!n.read) d.appendChild(btn('read','ghost', async()=>{ await fetch('/api/notifications/'+n.id+'/read',{method:'POST'}); loadNotifs(); }));
+    box.appendChild(d);
+  }
 }
 let agentId = null;
 async function loadConnectors(){

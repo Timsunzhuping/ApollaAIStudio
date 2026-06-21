@@ -105,15 +105,17 @@ S6-T3(子代理编排) ─ S6-T4(Cowork 编排) ─┬─ S6-T5(澄清)
 - **每完成一个任务**：跑该模块单测 + 相关 eval；一任务一 PR，CI 绿即合；提交说明写清「动了哪个注册点 + 加了哪个 eval」。
 
 ## Sprint 06 Definition of Done（整体验收）
-- [ ] Plugins：声明式 Plugin 可安装/卸载，安装后其 skills 可 match/run；所需连接器标注；按 owner 隔离、持久化。
-- [ ] 官方包：一键安装官方 Plugin，新增官方包无需改业务代码。
-- [ ] 子代理：Coordinator 并行 fan-out + 汇总；并发与总量有上限；事件可回放；每个子代理审计。
-- [ ] Cowork：装 Plugin → Cowork 目标 → 规划 subgoals → 子代理并行 → 汇总交付；可作为后台/定时 Job。
-- [ ] 澄清：前台可问可答续跑；后台返回 null、安全降级、绝不自答。
-- [ ] 安全：子代理继承 Safety 三级 + 后台规则；high_write 永拒；配额计入 Cowork + 子代理。
-- [ ] `pnpm eval` 含 Plugin 生效 / fan-out 封顶 / 澄清门控 / Cowork 端到端 / 安全继承；CI 全门禁绿。
-- [ ] 持久化：已安装 Plugin / Cowork Job 重启后仍在（Postgres）。
-- [ ] README/命令/架构文档一致更新；Demo 端到端走通（离线可演示）。
+- [x] Plugins：声明式 Plugin 可安装/卸载，安装后其 skills 可 match/run；所需连接器标注；按 owner 隔离、持久化。
+- [x] 官方包：一键安装官方 Plugin，新增官方包无需改业务代码。
+- [x] 子代理：Coordinator 并行 fan-out + 汇总；并发与总量有上限；事件可回放；每个子代理审计。
+- [x] Cowork：装 Plugin → Cowork 目标 → 规划 subgoals → 子代理并行 → 汇总交付；可作为后台/定时 Job。
+- [x] 澄清：前台可问可答续跑；后台返回 null、安全降级、绝不自答。
+- [x] 安全：子代理继承 Safety 三级 + 后台规则；high_write 永拒；配额计入 Cowork + 子代理。
+- [x] `pnpm eval` 含 Plugin 生效 / fan-out 封顶 / 澄清门控 / Cowork 端到端 / 安全继承；CI 全门禁绿。
+- [x] 持久化：已安装 Plugin / Cowork Job 重启后仍在（Postgres）。
+- [x] README/命令/架构文档一致更新；Demo 端到端走通（离线可演示）。
+
+> **Sprint 06 完成。** S6-T1–T9 全部合并到 main（PR #40–#43 + 本 PR）。24 项 eval 全绿（研究 6 + 媒体 4 + 执行 5 + 自治 4 + Cowork 5）。Cowork 离线端到端验证：装 research-analyst → cowork job → 3 个子代理并行 → 汇总 deliverable → done。
 
 ## 风险与提示（给代理）
 - **fan-out 必须封顶**：子代理并发 + 总量硬上限（防一个 Cowork 目标炸出无限子代理）；超限钳制并 log，不静默无界。

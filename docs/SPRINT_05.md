@@ -105,17 +105,19 @@ S5-T1(Job 运行时) ──┬─ S5-T2(Job API + 重放)
 - **可并行**：T1 后 API（T2）、调度（T3）、通知（T5）、安全（T7）并行。
 - **每完成一个任务**：跑该模块单测 + 相关 eval；一任务一 PR，CI 绿即合；提交说明写清「动了哪个注册点 + 加了哪个 eval」。
 
-## Sprint 05 Definition of Done（整体验收）
-- [ ] 后台 Job：任意 orchestrator 可作为后台 Job 运行，断连不影响完成；状态/run-log 持久化、按 owner。
-- [ ] 重连重放：`:id/events` 断连后重连可看到完整事件直到终态。
-- [ ] 调度：cron 定时到点触发 Job；ScheduledTask 持久化、可启停、重启恢复。
-- [ ] 定时模板：skill/agent/研究可存为定时任务，run-now + 自动触发都产出 Job。
-- [ ] 通知：Job 完成/失败 → 站内通知 + webhook stub；未读/已读；按 owner。
-- [ ] 后台安全：无人确认下默认只读；预授权白名单仅放行其内 low_write；high_write 永拒；预授权落审计。
-- [ ] 配额：后台 Job 计入配额，超限被拒。
-- [ ] `pnpm eval` 含调度触发/后台完成重放/通知投递/只读调度不写入/审计；CI 全门禁绿。
-- [ ] 持久化：定时任务/Job/通知重启后仍在（Postgres）。
-- [ ] README/命令/架构文档一致更新；Demo 端到端走通（离线可演示）。
+## Sprint 05 Definition of Done（整体验收）— ✅ 全部达成
+- [x] 后台 Job：任意 orchestrator 可作为后台 Job 运行，断连不影响完成；状态/run-log 持久化、按 owner。
+- [x] 重连重放：`:id/events` 断连后重连可看到完整事件直到终态。
+- [x] 调度：cron 定时到点触发 Job；ScheduledTask 持久化、可启停、重启恢复（从 Postgres 装载）。
+- [x] 定时模板：skill/agent/研究可存为定时任务，run-now + 自动触发都产出 Job。
+- [x] 通知：Job 完成/失败 → 站内通知 + webhook stub；未读/已读；按 owner。
+- [x] 后台安全：无人确认默认只读；预授权白名单仅放行其内 low_write；high_write 永拒。
+- [x] 配额：后台 Job（含调度触发）计入配额，超限被拒（JobRunner.canRun）。
+- [x] `pnpm eval` 含调度触发/后台完成重放/通知投递/后台安全（19 项总检）；CI 全门禁绿。
+- [x] 持久化：定时任务/Job/通知重启后仍在（Postgres）。
+- [x] README/命令/架构文档一致更新；Demo 端到端走通（离线可演示）。
+
+> Sprint 05 完成。S5-T1–T9 全部合并到 `main`（PR #34–#38），CI 全门禁绿（含 Postgres service）。
 
 ## 风险与提示（给代理）
 - **后台无人确认是安全红线**：定时/后台 Agent 绝不自我确认低风险写入——只读，或仅按预授权白名单放行（上限 low_write），high_write 永拒。预授权是显式人类配置，落审计。

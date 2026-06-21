@@ -1,0 +1,17 @@
+{
+  "name": "personal-assistant",
+  "description": "Daily digests and a multi-tool web agent.",
+  "skills": [
+    {
+      "name": "daily-digest",
+      "triggers": ["daily digest", "每日摘要", "digest"],
+      "tools": ["web_search"],
+      "io": {},
+      "risk": "read",
+      "promptRef": "research.synthesize",
+      "executor": "research"
+    }
+  ],
+  "requiredConnectors": [],
+  "commands": []
+}

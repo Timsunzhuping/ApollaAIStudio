@@ -1,4 +1,5 @@
-import type { Task, User, Project, SkillDef, MediaTask, Connector, AuditEntry, Job, ScheduledTask, Notification } from '@apolla/contracts';
+import type { Task, User, Project, SkillDef, MediaTask, Connector, AuditEntry, Job, ScheduledTask, Notification, Plugin } from '@apolla/contracts';
+import type { PluginRepository } from '../plugins/types';
 import type { JobRepository } from '../jobs/types';
 import type { ScheduledTaskRepository } from '../schedule/scheduler';
 import type { NotificationRepository } from '../notify/notify';
@@ -240,15 +241,40 @@ export class InMemoryMediaRepository implements MediaRepository {
   }
 }
 
-/** Combines built-in config skills with a user's saved skills into one source for the runtime. */
+export class InMemoryPluginRepository implements PluginRepository {
+  private readonly byOwner = new Map<string, Map<string, Plugin>>();
+
+  async install(ownerId: string, plugin: Plugin): Promise<void> {
+    const map = this.byOwner.get(ownerId) ?? new Map();
+    map.set(plugin.name, structuredClone(plugin));
+    this.byOwner.set(ownerId, map);
+  }
+
+  async list(ownerId: string): Promise<Plugin[]> {
+    return [...(this.byOwner.get(ownerId)?.values() ?? [])].map((p) => structuredClone(p));
+  }
+
+  async uninstall(ownerId: string, name: string): Promise<void> {
+    this.byOwner.get(ownerId)?.delete(name);
+  }
+
+  async skillsFor(ownerId: string): Promise<SkillDef[]> {
+    return (await this.list(ownerId)).flatMap((p) => p.skills);
+  }
+}
+
+/** Combines built-in config skills + a user's saved skills + installed-plugin skills (S6-T1). */
 export class CompositeSkillSource implements SkillSource {
   constructor(
     private readonly builtIns: SkillDef[],
     private readonly userSkills: SkillRepository,
+    private readonly plugins?: { skillsFor(ownerId: string): Promise<SkillDef[]> },
   ) {}
 
   async list(ownerId?: string): Promise<SkillDef[]> {
-    const user = ownerId ? await this.userSkills.list(ownerId) : [];
-    return [...this.builtIns, ...user];
+    if (!ownerId) return [...this.builtIns];
+    const user = await this.userSkills.list(ownerId);
+    const fromPlugins = this.plugins ? await this.plugins.skillsFor(ownerId) : [];
+    return [...this.builtIns, ...user, ...fromPlugins];
   }
 }

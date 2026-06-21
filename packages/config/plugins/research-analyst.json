@@ -1,0 +1,17 @@
+{
+  "name": "research-analyst",
+  "description": "Multi-angle research, competitive briefs, and cover images.",
+  "skills": [
+    {
+      "name": "competitive-brief",
+      "triggers": ["competitive brief", "竞品简报", "brief"],
+      "tools": ["web_search"],
+      "io": {},
+      "risk": "read",
+      "promptRef": "research.synthesize",
+      "executor": "research"
+    }
+  ],
+  "requiredConnectors": [],
+  "commands": [{ "alias": "/brief", "skill": "competitive-brief" }]
+}

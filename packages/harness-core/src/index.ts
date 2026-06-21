@@ -50,7 +50,9 @@ export {
   InMemoryJobRepository,
   InMemoryScheduledTaskRepository,
   InMemoryNotificationRepository,
+  InMemoryPluginRepository,
 } from './repo/memory';
+export type { PluginRepository } from './plugins/types';
 export { notifyJobComplete, StubDelivery, WebhookDelivery } from './notify/notify';
 export type { NotificationRepository, NotificationDelivery, NotifyDeps } from './notify/notify';
 export { JobRunner } from './jobs/runner';

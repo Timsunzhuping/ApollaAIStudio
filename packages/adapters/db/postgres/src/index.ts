@@ -11,6 +11,7 @@ export { PostgresMediaRepository } from './media';
 export { PostgresConnectorRepository } from './connector';
 export { PostgresAuditRepository } from './audit';
 export { PostgresJobRepository } from './job';
+export { PostgresScheduledTaskRepository } from './schedule';
 
 /** Open a connection pool. Reads DATABASE_URL by default. */
 export function createSql(url = process.env.DATABASE_URL): Sql {
@@ -115,6 +116,16 @@ CREATE TABLE IF NOT EXISTS job_events (
   data    jsonb NOT NULL,
   PRIMARY KEY (job_id, seq)
 );
+
+CREATE TABLE IF NOT EXISTS scheduled_tasks (
+  id          text PRIMARY KEY,
+  owner_id    text NOT NULL,
+  enabled     boolean NOT NULL DEFAULT true,
+  data        jsonb NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS sched_owner_idx ON scheduled_tasks (owner_id);
+CREATE INDEX IF NOT EXISTS sched_enabled_idx ON scheduled_tasks (enabled);
 `;
 
 export async function migrate(sql: Sql): Promise<void> {

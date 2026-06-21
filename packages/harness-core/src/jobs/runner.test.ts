@@ -48,6 +48,25 @@ describe('JobRunner', () => {
     expect(completed[0]!.status).toBe('failed');
   });
 
+  it('rejects a job (failed) when canRun denies — covers scheduler-triggered jobs (S5-T7)', async () => {
+    const repo = new InMemoryJobRepository();
+    let resolved = false;
+    const runner = new JobRunner({
+      repo,
+      idGen: () => 'jq',
+      canRun: async () => false,
+      resolve: async function* () {
+        resolved = true;
+        yield { type: 'done' };
+      },
+    });
+    const { job, done } = await runner.start('u1', spec);
+    await done;
+    expect(job.status).toBe('failed');
+    expect((await repo.get('jq'))?.error).toContain('quota');
+    expect(resolved).toBe(false); // the orchestrator never ran
+  });
+
   it('isolates jobs by owner', async () => {
     const repo = new InMemoryJobRepository();
     let n = 0;

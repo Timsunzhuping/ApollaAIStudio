@@ -49,7 +49,10 @@ export {
   InMemoryAuditRepository,
   InMemoryJobRepository,
   InMemoryScheduledTaskRepository,
+  InMemoryNotificationRepository,
 } from './repo/memory';
+export { notifyJobComplete, StubDelivery, WebhookDelivery } from './notify/notify';
+export type { NotificationRepository, NotificationDelivery, NotifyDeps } from './notify/notify';
 export { JobRunner } from './jobs/runner';
 export type { JobRunnerDeps } from './jobs/runner';
 export type { JobRepository, JobResolver } from './jobs/types';

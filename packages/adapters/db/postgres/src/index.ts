@@ -12,6 +12,7 @@ export { PostgresConnectorRepository } from './connector';
 export { PostgresAuditRepository } from './audit';
 export { PostgresJobRepository } from './job';
 export { PostgresScheduledTaskRepository } from './schedule';
+export { PostgresNotificationRepository } from './notification';
 
 /** Open a connection pool. Reads DATABASE_URL by default. */
 export function createSql(url = process.env.DATABASE_URL): Sql {
@@ -126,6 +127,15 @@ CREATE TABLE IF NOT EXISTS scheduled_tasks (
 );
 CREATE INDEX IF NOT EXISTS sched_owner_idx ON scheduled_tasks (owner_id);
 CREATE INDEX IF NOT EXISTS sched_enabled_idx ON scheduled_tasks (enabled);
+
+CREATE TABLE IF NOT EXISTS notifications (
+  id          text PRIMARY KEY,
+  owner_id    text NOT NULL,
+  read        boolean NOT NULL DEFAULT false,
+  data        jsonb NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS notif_owner_idx ON notifications (owner_id);
 `;
 
 export async function migrate(sql: Sql): Promise<void> {

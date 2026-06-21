@@ -48,10 +48,14 @@ export {
   InMemoryConnectorRepository,
   InMemoryAuditRepository,
   InMemoryJobRepository,
+  InMemoryScheduledTaskRepository,
 } from './repo/memory';
 export { JobRunner } from './jobs/runner';
 export type { JobRunnerDeps } from './jobs/runner';
 export type { JobRepository, JobResolver } from './jobs/types';
+export { Scheduler } from './schedule/scheduler';
+export type { ScheduledTaskRepository, SchedulerDeps } from './schedule/scheduler';
+export { cronMatches, nextRun } from './schedule/cron';
 export { MediaRouter } from './media/router';
 export { StubMediaAdapter } from './media/stub';
 export { MediaOrchestrator } from './media/orchestrator';

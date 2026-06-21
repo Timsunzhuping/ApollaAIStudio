@@ -1,5 +1,6 @@
-import type { Task, User, Project, SkillDef, MediaTask, Connector, AuditEntry, Job } from '@apolla/contracts';
+import type { Task, User, Project, SkillDef, MediaTask, Connector, AuditEntry, Job, ScheduledTask } from '@apolla/contracts';
 import type { JobRepository } from '../jobs/types';
+import type { ScheduledTaskRepository } from '../schedule/scheduler';
 import type {
   TaskRepository,
   UserRepository,
@@ -155,6 +156,33 @@ export class InMemoryJobRepository implements JobRepository {
 
   async events(jobId: string): Promise<unknown[]> {
     return structuredClone(this.log.get(jobId) ?? []);
+  }
+}
+
+export class InMemoryScheduledTaskRepository implements ScheduledTaskRepository {
+  private readonly byId = new Map<string, ScheduledTask>();
+
+  async save(task: ScheduledTask): Promise<ScheduledTask> {
+    this.byId.set(task.id, structuredClone(task));
+    return structuredClone(task);
+  }
+
+  async get(id: string): Promise<ScheduledTask | undefined> {
+    const t = this.byId.get(id);
+    return t ? structuredClone(t) : undefined;
+  }
+
+  async list(ownerId: string): Promise<ScheduledTask[]> {
+    return [...this.byId.values()].filter((t) => t.ownerId === ownerId).map((t) => structuredClone(t));
+  }
+
+  async listEnabled(): Promise<ScheduledTask[]> {
+    return [...this.byId.values()].filter((t) => t.enabled).map((t) => structuredClone(t));
+  }
+
+  async delete(ownerId: string, id: string): Promise<void> {
+    const t = this.byId.get(id);
+    if (t && t.ownerId === ownerId) this.byId.delete(id);
   }
 }
 

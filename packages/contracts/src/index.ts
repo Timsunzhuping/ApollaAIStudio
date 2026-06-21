@@ -6,6 +6,7 @@ export * from './job';
 export * from './media';
 export * from './memory';
 export * from './model';
+export * from './schedule';
 export * from './prompt';
 export * from './tool';
 export * from './task';

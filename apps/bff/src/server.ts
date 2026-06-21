@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { randomUUID } from 'node:crypto';
-import { exportArtifact, autoDraftSkill, embedMedia, encryptSecret, inferRisk, AgentOrchestrator } from '@apolla/harness-core';
+import { exportArtifact, autoDraftSkill, embedMedia, encryptSecret, inferRisk, AgentOrchestrator, nextRun } from '@apolla/harness-core';
 import type { Connector } from '@apolla/contracts';
 import { buildHarness, type Harness } from './harness';
 import { readSession, setSession, clearSession } from './auth';
@@ -114,6 +114,55 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   if (method === 'GET' && pathname === '/api/audit') {
     const taskId = url.searchParams.get('taskId') ?? undefined;
     return json(res, 200, await harness.audit.list(ownerId, taskId));
+  }
+
+  // --- Scheduled tasks ---
+  if (method === 'POST' && pathname === '/api/schedules') {
+    const body = await readBody(req);
+    const cron = String(body.cron ?? '').trim();
+    const kind = String(body.kind ?? '');
+    if (!cron || !['research', 'agent', 'skill', 'media'].includes(kind)) {
+      return json(res, 400, { error: 'cron and a valid kind are required' });
+    }
+    let next: string | undefined;
+    try {
+      next = nextRun(cron, new Date())?.toISOString();
+    } catch (e) {
+      return json(res, 400, { error: `invalid cron: ${e instanceof Error ? e.message : String(e)}` });
+    }
+    const task = await harness.scheduleRepo.save({
+      id: randomUUID(),
+      ownerId,
+      name: String(body.name ?? ''),
+      cron,
+      jobSpec: { kind: kind as never, input: (body.input ?? {}) as Record<string, unknown>, allowTools: Array.isArray(body.allowTools) ? body.allowTools : [] },
+      enabled: true,
+      nextRunAt: next,
+    });
+    return json(res, 201, task);
+  }
+  if (method === 'GET' && pathname === '/api/schedules') {
+    return json(res, 200, await harness.scheduleRepo.list(ownerId));
+  }
+  const schedToggle = pathname.match(/^\/api\/schedules\/([^/]+)\/toggle$/);
+  if (method === 'POST' && schedToggle) {
+    const t = await harness.scheduleRepo.get(schedToggle[1]!);
+    if (!t || t.ownerId !== ownerId) return json(res, 404, { error: 'unknown schedule' });
+    const body = await readBody(req);
+    const saved = await harness.scheduleRepo.save({ ...t, enabled: body.enabled !== false });
+    return json(res, 200, saved);
+  }
+  const schedRunNow = pathname.match(/^\/api\/schedules\/([^/]+)\/run-now$/);
+  if (method === 'POST' && schedRunNow) {
+    const t = await harness.scheduleRepo.get(schedRunNow[1]!);
+    if (!t || t.ownerId !== ownerId) return json(res, 404, { error: 'unknown schedule' });
+    const { job } = await harness.jobs.start(ownerId, t.jobSpec, { scheduledTaskId: t.id });
+    return json(res, 201, { jobId: job.id });
+  }
+  const schedDelete = pathname.match(/^\/api\/schedules\/([^/]+)$/);
+  if (method === 'DELETE' && schedDelete) {
+    await harness.scheduleRepo.delete(ownerId, schedDelete[1]!);
+    return json(res, 200, { ok: true });
   }
 
   // --- Background jobs ---
@@ -455,3 +504,8 @@ createServer((req, res) => {
 }).listen(PORT, () => {
   console.log(`Apolla BFF [${harness.mode}/${harness.persistence}] → http://localhost:${PORT}`);
 });
+
+// In-process cron tick (S5-T3). Production would use a durable queue/worker instead.
+setInterval(() => {
+  harness.scheduler.tick(new Date()).catch(() => {});
+}, 30_000);

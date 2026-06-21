@@ -27,16 +27,19 @@ import {
   StubMCPClient,
   AgentOrchestrator,
   JobRunner,
+  Scheduler,
   InMemoryMediaRepository,
   InMemoryConnectorRepository,
   InMemoryAuditRepository,
   InMemoryJobRepository,
+  InMemoryScheduledTaskRepository,
   type MediaAdapter,
   type MediaRepository,
   type ConnectorRepository,
   type AuditRepository,
   type JobRepository,
   type JobResolver,
+  type ScheduledTaskRepository,
   type MCPClient,
   type LLMAdapter,
   type TaskRepository,
@@ -67,6 +70,7 @@ import {
   PostgresConnectorRepository,
   PostgresAuditRepository,
   PostgresJobRepository,
+  PostgresScheduledTaskRepository,
 } from '@apolla/db-postgres';
 import { DemoLLMAdapter } from './demo-adapter';
 
@@ -87,6 +91,8 @@ export interface Harness {
   audit: AuditRepository;
   jobs: JobRunner;
   jobRepo: JobRepository;
+  scheduler: Scheduler;
+  scheduleRepo: ScheduledTaskRepository;
   stubMcp: StubMCPClient;
   mcpClientFor: (transport: string) => MCPClient;
   llmRouter: ModelRouter;
@@ -140,6 +146,7 @@ export async function buildHarness(): Promise<Harness> {
   let connectorRepo: ConnectorRepository;
   let auditRepo: AuditRepository;
   let jobRepo: JobRepository;
+  let scheduleRepo: ScheduledTaskRepository;
   let persistence: Harness['persistence'];
   let close = async (): Promise<void> => {};
 
@@ -155,6 +162,7 @@ export async function buildHarness(): Promise<Harness> {
     connectorRepo = new PostgresConnectorRepository(sql);
     auditRepo = new PostgresAuditRepository(sql);
     jobRepo = new PostgresJobRepository(sql);
+    scheduleRepo = new PostgresScheduledTaskRepository(sql);
     persistence = 'postgres';
     close = async () => {
       await sql.end();
@@ -169,6 +177,7 @@ export async function buildHarness(): Promise<Harness> {
     connectorRepo = new InMemoryConnectorRepository();
     auditRepo = new InMemoryAuditRepository();
     jobRepo = new InMemoryJobRepository();
+    scheduleRepo = new InMemoryScheduledTaskRepository();
     persistence = 'memory';
   }
 
@@ -290,6 +299,12 @@ export async function buildHarness(): Promise<Harness> {
     })();
   };
   const jobs = new JobRunner({ repo: jobRepo, resolve: jobResolve });
+  const scheduler = new Scheduler({
+    repo: scheduleRepo,
+    trigger: (t) => {
+      void jobs.start(t.ownerId, t.jobSpec, { scheduledTaskId: t.id });
+    },
+  });
 
   return {
     orchestrator,
@@ -308,6 +323,8 @@ export async function buildHarness(): Promise<Harness> {
     audit: auditRepo,
     jobs,
     jobRepo,
+    scheduler,
+    scheduleRepo,
     stubMcp,
     mcpClientFor,
     llmRouter: router,

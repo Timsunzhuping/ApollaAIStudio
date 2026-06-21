@@ -208,6 +208,12 @@ interface Orchestrator {
 - 长任务异步 + 计划草图 + 阶段进度 + 预估成本/耗时。
 - Cowork 模式（[PRD §15](./PRD.md)）= Orchestrator 在沙箱中后台自治 + 子代理 + Plugins + 连接器 + 桌面文件工作区 + 主动澄清。
 
+**Cowork 实现（Sprint 06，已落地）** —— 三块拼装在已有 harness 上，不另造运行时：
+- **Plugins**（`Plugin` 契约 + `PluginRepository` + `CompositeSkillSource`）：角色化能力包，打包 `skills` + 所需连接器 + 命令别名；按 owner 安装即把其 skills 并入该用户可用技能（match/run），卸载即移除；官方包声明在 `config/plugins/*.json`，新增无需改业务代码。
+- **子代理编排**（`Coordinator`）：把目标 fan-out 给一个 subgoal 一个**有界子代理**——每个子代理就是一次完整 `AgentOrchestrator` 运行，因此**继承 Safety 三级 + 审计 + 后台 approve 策略**；`maxSubAgents`（总量）+ `concurrency`（并发）双重硬上限防失控，超限钳制并上报 `truncated`；汇总成单一交付。事件 `plan/subagent-start/subagent-result/synthesize/done` 可回放。
+- **集成式 `CoworkOrchestrator`**：规划 subgoals（LLM 结构化）→ 驱动 Coordinator。`cowork` 是一种 `JobKind`，因此 Cowork 直接复用 Sprint 05 的 JobRunner（前台 SSE / 后台 / 定时）+ 通知 + 配额闸（`JobRunner.canRun`）。
+- **澄清**（`clarify(question)` 解析器，贯穿 Agent→Coordinator→Cowork）：不确定/不可逆前主动提问；**后台无人 → 返回 null → 安全降级（best-effort），绝不自答**。
+
 ### 3.10 Eval Harness（升级安全网）
 五类回归（每次模型/Prompt/工具/媒体变更必跑）：
 1. Golden set 质量回归 2. Citation correctness 3. Cost regression 4. Tool success regression 5. 安全（prompt 注入对抗 / 沙箱逃逸 / 越权动作）。

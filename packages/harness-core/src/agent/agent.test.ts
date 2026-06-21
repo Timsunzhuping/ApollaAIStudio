@@ -112,4 +112,36 @@ describe('AgentOrchestrator', () => {
     // the high_write is still denied despite the injected tool output
     expect(events.filter((e) => e.type === 'denied').some((e) => (e as { tool: string }).tool === 'danger/delete_all')).toBe(true);
   });
+
+  it('clarify (foreground): asks the user, uses the answer, then finishes (S6-T5)', async () => {
+    const tools = await withTools();
+    const router = decisions([
+      { action: 'clarify', question: 'which region?' },
+      { action: 'finish', answer: 'done with EU' },
+    ]);
+    const clarify = vi.fn(async () => 'EU');
+    const events = await collect(
+      new AgentOrchestrator({ router, tools, prompts }).run({ ownerId: 'u', goal: 'ambiguous', taskId: 'tc1', clarify }),
+    );
+    const c = events.find((e) => e.type === 'clarify') as { question: string; answered: boolean } | undefined;
+    expect(c?.question).toBe('which region?');
+    expect(c?.answered).toBe(true);
+    expect(clarify).toHaveBeenCalledOnce();
+    expect(events.at(-1)?.type).toBe('done');
+  });
+
+  it('clarify (background): no human → never self-answers, proceeds safely (S6-T5)', async () => {
+    const tools = await withTools();
+    const router = decisions([
+      { action: 'clarify', question: 'which region?' },
+      { action: 'finish', answer: 'best-effort' },
+    ]);
+    // no clarify resolver passed → background; the agent must NOT fabricate an answer and must not hang
+    const events = await collect(
+      new AgentOrchestrator({ router, tools, prompts }).run({ ownerId: 'u', goal: 'ambiguous', taskId: 'tc2' }),
+    );
+    const c = events.find((e) => e.type === 'clarify') as { answered: boolean } | undefined;
+    expect(c?.answered).toBe(false);
+    expect(events.at(-1)?.type).toBe('done');
+  });
 });

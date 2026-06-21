@@ -26,6 +26,8 @@ import {
   RuleModerator,
   StubMCPClient,
   AgentOrchestrator,
+  Coordinator,
+  CoworkOrchestrator,
   JobRunner,
   Scheduler,
   notifyJobComplete,
@@ -304,6 +306,26 @@ export async function buildHarness(): Promise<Harness> {
         const skill = await skills.get(String(input.skill ?? ''), ownerId);
         if (!skill) throw new Error(`unknown skill: ${String(input.skill)}`);
         yield* skills.run(skill, { ownerId, question: String(input.question ?? ''), taskId: jobId });
+      })();
+    }
+    if (spec.kind === 'cowork') {
+      // Cowork (S6): plan → fan out to sub-agents → synthesize. Each sub-agent is a full agent run,
+      // so it inherits Safety tiers + audit. As a (background) job it's non-interactive: only
+      // pre-authorized low_write tools run (high_write always denied), and clarify defaults to null
+      // (no human → never self-answers).
+      const allowCowork = new Set((spec.allowTools ?? []) as string[]);
+      return (async function* () {
+        const tools = await agentToolsFor(ownerId);
+        const agent = new AgentOrchestrator({ router, tools, prompts, audit: (e) => auditRepo.record(e) });
+        const coordinator = new Coordinator({ agent, router, prompts });
+        const cowork = new CoworkOrchestrator({ coordinator, router, prompts });
+        yield* cowork.run({
+          ownerId,
+          goal: String(input.goal ?? input.question ?? ''),
+          subgoals: Array.isArray(input.subgoals) ? (input.subgoals as string[]) : undefined,
+          taskId: jobId,
+          approve: async (call) => allowCowork.has(call.tool),
+        });
       })();
     }
     // agent — background runs are non-interactive: only pre-authorized (allowTools) low_write

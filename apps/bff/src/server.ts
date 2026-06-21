@@ -149,12 +149,27 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     return json(res, 200, { ok: true });
   }
 
+  // --- Cowork (S6): start an integrative sub-agent run as a background job ---
+  if (method === 'POST' && pathname === '/api/cowork') {
+    const body = await readBody(req);
+    const goal = String(body.goal ?? '').trim();
+    if (!goal) return json(res, 400, { error: 'goal is required' });
+    const q = await harness.quota.check(ownerId);
+    if (!q.ok) return json(res, 402, { error: 'quota reached — upgrade your plan', ...q });
+    const { job } = await harness.jobs.start(ownerId, {
+      kind: 'cowork',
+      input: { goal, ...(Array.isArray(body.subgoals) ? { subgoals: body.subgoals } : {}) },
+      allowTools: Array.isArray(body.allowTools) ? body.allowTools : [],
+    });
+    return json(res, 201, { jobId: job.id });
+  }
+
   // --- Scheduled tasks ---
   if (method === 'POST' && pathname === '/api/schedules') {
     const body = await readBody(req);
     const cron = String(body.cron ?? '').trim();
     const kind = String(body.kind ?? '');
-    if (!cron || !['research', 'agent', 'skill', 'media'].includes(kind)) {
+    if (!cron || !['research', 'agent', 'skill', 'media', 'cowork'].includes(kind)) {
       return json(res, 400, { error: 'cron and a valid kind are required' });
     }
     let next: string | undefined;
@@ -202,7 +217,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   if (method === 'POST' && pathname === '/api/jobs') {
     const body = await readBody(req);
     const kind = String(body.kind ?? '');
-    if (!['research', 'agent', 'skill', 'media'].includes(kind)) return json(res, 400, { error: 'invalid job kind' });
+    if (!['research', 'agent', 'skill', 'media', 'cowork'].includes(kind)) return json(res, 400, { error: 'invalid job kind' });
     const q = await harness.quota.check(ownerId);
     if (!q.ok) return json(res, 402, { error: 'quota reached — upgrade your plan', ...q });
     const { job } = await harness.jobs.start(ownerId, {

@@ -86,6 +86,21 @@ export const UI_HTML = `<!doctype html>
     <div class="col"><h3>Job history</h3><div id="jobs" class="muted">—</div></div>
     <div class="col"><h3>Notifications</h3><div id="notifs" class="muted">—</div></div>
   </div>
+  <div class="bar" style="border-top:1px solid var(--bd)">
+    <b>Cowork</b>
+    <select id="pluginSel"></select>
+    <button class="ghost" id="installPlugin">Install plugin</button>
+    <span id="pluginList" class="muted">no plugins</span>
+  </div>
+  <div class="bar">
+    <input id="coworkGoal" placeholder="Cowork goal, e.g. “Research the EV market across 3 angles and write a brief”" />
+    <button id="runCowork">Run Cowork</button>
+    <button class="ghost" id="scheduleCowork">+ Daily Cowork</button>
+  </div>
+  <div class="grid" style="grid-template-columns:1fr 1fr">
+    <div class="col"><h3>Cowork trace (sub-agent fan-out)</h3><div id="coworkTrace" class="muted">—</div></div>
+    <div class="col"><h3>Deliverable</h3><div id="coworkOut" class="muted">—</div></div>
+  </div>
 </div>
 
 <script>
@@ -101,7 +116,7 @@ async function boot() {
 function showApp(u) {
   $('login').style.display='none'; $('app').style.display='block';
   $('who').textContent = u.email; $('logout').style.display='inline-block';
-  loadProjects(); loadSkills(); loadConnectors(); refreshInbox();
+  loadProjects(); loadSkills(); loadConnectors(); loadPlugins(); refreshInbox();
 }
 function btn(label, cls, fn){ const b=document.createElement('button'); b.textContent=label; if(cls)b.className=cls; b.onclick=fn; b.style.marginRight='.3rem'; return b; }
 async function refreshInbox(){ loadSchedules(); loadJobs(); loadNotifs(); }
@@ -139,6 +154,52 @@ async function loadNotifs(){
     box.appendChild(d);
   }
 }
+// --- Plugins + Cowork (S6) ---
+async function loadPlugins(){
+  const [official, installed] = await Promise.all([
+    fetch('/api/plugins/official').then(r=>r.json()),
+    fetch('/api/plugins').then(r=>r.json()),
+  ]);
+  $('pluginSel').innerHTML = official.map(p=>'<option value="'+p.name+'">'+escapeHtml(p.name)+'</option>').join('');
+  const box=$('pluginList'); box.innerHTML='';
+  if(!installed.length){ box.className='muted'; box.textContent='no plugins installed'; return; } box.className='';
+  for(const p of installed){ const s=document.createElement('span'); s.style.marginRight='.4rem';
+    s.textContent='🧩 '+p.name+' ';
+    s.appendChild(btn('✕','ghost', async()=>{ await fetch('/api/plugins/'+encodeURIComponent(p.name),{method:'DELETE'}); loadPlugins(); loadSkills(); }));
+    box.appendChild(s);
+  }
+}
+$('installPlugin').onclick = async () => {
+  const name=$('pluginSel').value; if(!name) return;
+  const j = await fetch('/api/plugins/install',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name})}).then(r=>r.json());
+  if(j.missingConnectors && j.missingConnectors.length) alert('Installed "'+name+'". Connect required: '+j.missingConnectors.join(', '));
+  loadPlugins(); loadSkills();
+};
+$('runCowork').onclick = async () => {
+  const goal=$('coworkGoal').value.trim(); if(!goal) return;
+  $('coworkTrace').innerHTML=''; $('coworkTrace').className=''; $('coworkOut').className='muted'; $('coworkOut').textContent='…';
+  const r = await fetch('/api/cowork',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({goal})});
+  if(!r.ok){ alert('cowork failed: '+(await r.json()).error); return; }
+  const {jobId} = await r.json();
+  const es = new EventSource('/api/jobs/'+jobId+'/events');
+  es.onmessage=(m)=>{ const ev=JSON.parse(m.data); const line=document.createElement('div'); line.className='step';
+    if(ev.type==='plan') line.textContent='📋 plan: '+ev.subgoals.length+' sub-agents'+(ev.truncated?(' (capped, dropped '+ev.truncated+')'):'');
+    else if(ev.type==='subagent-start') line.textContent='🤖 #'+(ev.index+1)+' '+ev.subgoal;
+    else if(ev.type==='subagent-result') line.textContent='✓ #'+(ev.index+1)+' done ('+ev.result.toolCalls+' tool calls)';
+    else if(ev.type==='clarify') line.textContent='❓ '+ev.question+(ev.answered?' (answered)':' (no answer — proceeding safely)');
+    else if(ev.type==='synthesize'){ $('coworkOut').className=''; $('coworkOut').textContent=ev.text; line.textContent='🧩 synthesized deliverable'; }
+    else if(ev.type==='done'){ es.close(); loadJobs(); }
+    else if(ev.type==='error'){ line.textContent='error: '+ev.message; es.close(); }
+    $('coworkTrace').appendChild(line);
+  };
+  es.onerror=()=>es.close();
+};
+$('scheduleCowork').onclick = async () => {
+  const goal=$('coworkGoal').value.trim()||prompt('Cowork goal'); if(!goal) return;
+  const cron=prompt('Cron (UTC), default daily 08:00','0 8 * * *')||'0 8 * * *';
+  await fetch('/api/schedules',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:'Cowork: '+goal.slice(0,30),cron,kind:'cowork',input:{goal}})});
+  loadSchedules();
+};
 let agentId = null;
 async function loadConnectors(){
   const l = await fetch('/api/connectors').then(r=>r.json());

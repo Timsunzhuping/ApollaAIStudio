@@ -226,6 +226,38 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     return json(res, 200, result);
   }
 
+  // --- Text product surfaces (S8): translate / sheet / notes ---
+  if (method === 'GET' && pathname === '/api/surfaces') {
+    return json(res, 200, harness.officialSurfaces());
+  }
+  if (method === 'POST' && pathname === '/api/surface') {
+    const body = await readBody(req);
+    const surface = harness.officialSurfaces().find((s) => s.id === String(body.surfaceId ?? ''));
+    if (!surface) return json(res, 404, { error: 'unknown surface' });
+    const params = (body.params ?? {}) as Record<string, unknown>;
+    let outputPath = String(body.outputPath ?? '').trim();
+    if (!outputPath) {
+      if (surface.inputKind === 'doc' && body.sourcePath) {
+        const src = String(body.sourcePath);
+        const dot = src.lastIndexOf('.');
+        const tag = surface.id === 'translate' ? String(params.targetLang ?? 'out').toLowerCase().slice(0, 5) : surface.id;
+        outputPath = dot > 0 ? `${src.slice(0, dot)}.${tag}${src.slice(dot)}` : `${src}.${tag}`;
+      } else {
+        outputPath = `surface-${surface.id}.md`;
+      }
+    }
+    let result: { path: string; version: number } | undefined;
+    let structured: unknown;
+    let error: string | undefined;
+    for await (const e of harness.surfaces.run({ ownerId, projectId: body.projectId || undefined, surface, text: body.text, sourcePath: body.sourcePath, params, outputPath })) {
+      if (e.type === 'written') result = { path: e.path, version: e.version };
+      else if (e.type === 'structured') structured = e.data;
+      else if (e.type === 'error') error = e.message;
+    }
+    if (error || !result) return json(res, 400, { error: error ?? 'surface failed' });
+    return json(res, 200, { ...result, structured });
+  }
+
   // --- Scheduled tasks ---
   if (method === 'POST' && pathname === '/api/schedules') {
     const body = await readBody(req);

@@ -1,0 +1,9 @@
+{
+  "id": "translate",
+  "title": "Translator",
+  "inputKind": "doc",
+  "params": { "targetLang": "English", "sourceLang": "auto" },
+  "promptRef": "surface.translate",
+  "outputMime": "text/markdown",
+  "executor": "translate"
+}

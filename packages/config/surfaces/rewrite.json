@@ -1,0 +1,9 @@
+{
+  "id": "rewrite",
+  "title": "Rewrite",
+  "inputKind": "text",
+  "params": { "instruction": "Improve clarity and concision." },
+  "promptRef": "surface.rewrite",
+  "outputMime": "text/markdown",
+  "executor": "generic"
+}

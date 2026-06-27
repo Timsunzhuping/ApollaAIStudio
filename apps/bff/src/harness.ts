@@ -32,6 +32,9 @@ import {
   GuardedWorkspaceRepository,
   makeWorkspaceTools,
   WriterOrchestrator,
+  SurfaceRuntime,
+  genericExecutor,
+  translateExecutor,
   JobRunner,
   Scheduler,
   notifyJobComplete,
@@ -61,7 +64,7 @@ import {
   type Memory,
   type SkillRepository,
 } from '@apolla/harness-core';
-import { getRoute, loadSkills, loadPlugins, loadFeatureGates, getMediaRoute } from '@apolla/config';
+import { getRoute, loadSkills, loadPlugins, loadSurfaces, loadFeatureGates, getMediaRoute } from '@apolla/config';
 import type { ModelCaps } from '@apolla/contracts';
 import { OpenAIImageAdapter } from '@apolla/media-openai';
 import { SeedanceVideoAdapter } from '@apolla/media-seedance';
@@ -114,6 +117,8 @@ export interface Harness {
   officialPlugins: () => import('@apolla/contracts').Plugin[];
   workspace: WorkspaceRepository;
   writer: WriterOrchestrator;
+  surfaces: SurfaceRuntime;
+  officialSurfaces: () => import('@apolla/contracts').Surface[];
   stubMcp: StubMCPClient;
   mcpClientFor: (transport: string) => MCPClient;
   llmRouter: ModelRouter;
@@ -393,6 +398,10 @@ export async function buildHarness(): Promise<Harness> {
     officialPlugins: loadPlugins,
     workspace: workspaceRepo,
     writer: new WriterOrchestrator({ router, prompts, workspace: workspaceRepo }),
+    surfaces: new SurfaceRuntime({ router, prompts, workspace: workspaceRepo })
+      .registerExecutor('generic', (c) => genericExecutor(c))
+      .registerExecutor('translate', (c) => translateExecutor(c)),
+    officialSurfaces: loadSurfaces,
     stubMcp,
     mcpClientFor,
     llmRouter: router,

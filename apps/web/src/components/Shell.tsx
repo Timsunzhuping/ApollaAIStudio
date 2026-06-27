@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
+import { api } from '../lib/api';
 
 const NAV = [
   { to: '/research', label: 'Research' },
@@ -12,6 +14,10 @@ const NAV = [
 
 export function Shell() {
   const { user, logout } = useAuth();
+  const [health, setHealth] = useState<string | null>(null);
+  useEffect(() => {
+    void api.health().then((h) => setHealth(`${h.mode === 'real' ? 'live models' : 'demo mode'} · ${h.persistence}`)).catch(() => {});
+  }, []);
   return (
     <div className="shell">
       <nav className="sidebar" aria-label="Primary">
@@ -26,6 +32,7 @@ export function Shell() {
         <header className="topbar">
           <strong>Workbench</strong>
           <div className="row">
+            {health && <span className="badge">{health}</span>}
             <span className="muted">{user?.email}</span>
             <button className="ghost" onClick={() => void logout()}>Sign out</button>
           </div>

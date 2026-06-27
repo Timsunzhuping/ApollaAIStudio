@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './lib/auth';
 import { Shell } from './components/Shell';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { Login } from './pages/Login';
 import { Research } from './pages/Research';
 import { Workspace } from './pages/Workspace';
@@ -31,9 +32,11 @@ function Gate() {
 
 export function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <AuthProvider>
-        <Gate />
+        <ErrorBoundary>
+          <Gate />
+        </ErrorBoundary>
       </AuthProvider>
     </BrowserRouter>
   );

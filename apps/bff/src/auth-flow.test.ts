@@ -74,4 +74,24 @@ describe('auth + isolation (HTTP)', () => {
     const aToggle = await fetch(`${base}/api/schedules/${sched.id}/toggle`, authed(a, { enabled: false }));
     expect(aToggle.status).toBe(200);
   });
+
+  it('a user cannot read another user\'s job (IDOR fail-closed)', async () => {
+    const a = await register();
+    const b = await register();
+    const aId = ((await (await fetch(`${base}/api/auth/me`, authed(a))).json()) as { id: string }).id;
+    // Seed a terminal job owned by A directly (avoids spawning a background runner in tests).
+    await harness.jobRepo.create({ id: 'idor-job-1', ownerId: aId, kind: 'research', input: {}, status: 'done' });
+    expect((await fetch(`${base}/api/jobs/idor-job-1`, authed(b))).status).toBe(404);
+    expect((await fetch(`${base}/api/jobs/idor-job-1`, authed(a))).status).toBe(200);
+  });
+
+  it('a user cannot read another user\'s workspace file (owner-scoped)', async () => {
+    const a = await register();
+    const b = await register();
+    await fetch(`${base}/api/workspace/save-artifact`, authed(a, { path: 'secret.md', content: 'top secret' }));
+    expect((await fetch(`${base}/api/workspace/file?path=secret.md`, authed(b))).status).toBe(404);
+    const aRead = await fetch(`${base}/api/workspace/file?path=secret.md`, authed(a));
+    expect(aRead.status).toBe(200);
+    expect(((await aRead.json()) as { content: string }).content).toBe('top secret');
+  });
 });

@@ -2,11 +2,11 @@
 
 面向个人知识工作的 AI 工作台，采用 **Harness 架构**：模型是可替换、持续变强的能力提供者；平台只做路由、上下文、工具、记忆、安全、评测、交付。模型变强 → 平台能力自动变强。
 
-> 文档：[架构总纲](docs/ARCHITECTURE.md) · [PRD](docs/PRD.md) · [开发计划](docs/DEVELOPMENT_PLAN.md) · Sprint [01](docs/SPRINT_01.md)–[07](docs/SPRINT_07.md) · 代理约定 [AGENTS.md](AGENTS.md) / [CLAUDE.md](CLAUDE.md)
+> 文档：[架构总纲](docs/ARCHITECTURE.md) · [PRD](docs/PRD.md) · [开发计划](docs/DEVELOPMENT_PLAN.md) · Sprint [01](docs/SPRINT_01.md)–[08](docs/SPRINT_08.md) · 代理约定 [AGENTS.md](AGENTS.md) / [CLAUDE.md](CLAUDE.md)
 
 ## 状态
 
-**Sprint 01–07 完成** —— 从研究→成品骨架，升级为持久化、多用户、有记忆、技能可复用、支持多模态成品（文生图/视频）、具备工具生态与低风险执行（MCP + Agent + 分级确认 + 审计）、能主动运行（定时任务 + 后台 Job + 通知）、具备 Cowork 集成式自治（角色化 Plugins + 子代理并行编排 + 澄清机制）、并拥有 **版本化项目文件区（文件感知工具 + Writer 文档编辑 + Cowork 文件协作）**的工作台。
+**Sprint 01–08 完成** —— 从研究→成品骨架，升级为持久化、多用户、有记忆、技能可复用、支持多模态成品（文生图/视频）、具备工具生态与低风险执行（MCP + Agent + 分级确认 + 审计）、能主动运行（定时任务 + 后台 Job + 通知）、具备 Cowork 集成式自治（角色化 Plugins + 子代理并行编排 + 澄清机制）、拥有版本化项目文件区（文件感知工具 + Writer + Cowork 文件协作）、并提供 **文本产品面（翻译 / 表格 / 会议纪要，基于工作区的结构化文档变换）**的工作台。
 - **Harness Core**：Model Router（failover/多密钥）、Prompt Registry、Tool Runtime（Web Search）、Safety & Policy（三级权限 + 防注入）、Cost Ledger、研究状态机（流式综合）、FeatureGate 运行时。
 - **持久化与账号**：Postgres（接口的 PG 实现）、最小 Auth、Projects。
 - **个人化**：Memory（FTS 检索 + 用户模型 + 注入研究流）。
@@ -16,7 +16,8 @@
 - **主动智能（Sprint 05）**：任意运行作为**后台 Job**（异步、run-log 可重放、断连重连）、**cron 定时任务**（存为"每日早报"等）、**通知/收件箱**（Job 完成站内 feed + webhook stub）；**后台执行安全**（无人确认 → 只读或预授权白名单，high_write 永拒；配额计入后台）。
 - **Cowork 模式（Sprint 06）**：**角色化 Plugins**（打包 skills + 所需连接器 + 命令，按 owner 安装即生效；官方包一键装）、**子代理并行编排**（Coordinator 把目标 fan-out 给有界子代理——各为一次完整 agent 运行、继承 Safety 三级 + 审计——并发/总量封顶后汇总）、**澄清机制**（不确定时主动提问；后台无人 → 安全降级、**绝不自答**）；Cowork 作为 Job 前台/后台/定时运行。
 - **Workspace & Files（Sprint 07）**：**版本化项目文件区**（写入追加新版本 / 历史 / 读旧版 / 回滚；按 owner-project 隔离；**路径规范化 + 越界拒绝**）、**文件感知工具**（`fs_read`/`fs_list` 自动 + `fs_write` 低风险，读到的内容走 untrusted 数据通道）、**Writer**（对工作区文档 AI 编辑产出新版本）、**Cowork 文件协作**（子代理各写 `sections/*` → 汇总读回拼 `brief.md`，受 fs_write 授权约束）；写入计入**配额 + 落审计**。
-- **Demo**：`apps/bff` —— 登录 → 研究/Agent → 存为定时任务 → 后台运行 → 历史+通知 → 导出；连接 MCP → 跑 Agent → 低风险写入弹确认 → 审计；装 Plugin → 跑 Cowork → 子代理 fan-out 轨迹 → 汇总简报；**研究 → 存为 `report.md` → Writer 编辑 → v2 → 回滚 → 下载；Cowork → 文件树出现 `sections/*` + `brief.md`**。
+- **文本产品面（Sprint 08）**：声明式 **Surface substrate**（capability-as-config：输入类型 + 参数 + promptRef + 输出 mime + executor，新增面 ≈ 配置 + executor）+ 三个面 —— **翻译**（保 Markdown 结构）、**表格**（结构化表 zod 校验 + AI 加列产新版本）、**会议纪要**（转写 → 结构化摘要/决策/行动项）；产物经工作区 guard（路径/配额/审计），输入走 untrusted 数据通道，结构化输出 zod 校验失败安全降级。
+- **Demo**：`apps/bff` —— 登录 → 研究/Agent → 存为定时任务 → 后台运行 → 历史+通知 → 导出；连接 MCP → 跑 Agent → 低风险写入弹确认 → 审计；装 Plugin → 跑 Cowork → 子代理 fan-out → 汇总；研究 → 存为 `report.md` → Writer 编辑 → 回滚 → 下载；**粘转写 → 会议纪要 `notes.md`；翻译 `report.md` → `report.en.md`；生成对比表 `table.csv` → 加列 → 新版本**。
 
 ## 快速开始
 
@@ -46,7 +47,7 @@ pnpm dev          # BFF 自动迁移 + 切到 Postgres，数据重启后仍在
 | `pnpm lint` | ESLint |
 | `pnpm test` | vitest 单测（含离线端到端 demo 测试） |
 | `pnpm build` | 各包 tsc 产物 |
-| `pnpm eval` | 29 项：研究 + 记忆/Skill/个性化 + 媒体 + 执行(MCP/确认/注入/审计) + 自治(调度/后台重放/通知/后台安全) + Cowork(Plugin/子代理封顶/澄清门控/端到端/安全继承) + Workspace(版本/文件工具安全/越界/Writer/Cowork文件协作) |
+| `pnpm eval` | 34 项：研究 + 记忆/Skill/个性化 + 媒体 + 执行(MCP/确认/注入/审计) + 自治(调度/后台重放/通知/后台安全) + Cowork(Plugin/子代理封顶/澄清门控/端到端/安全继承) + Workspace(版本/文件工具安全/越界/Writer/Cowork文件协作) + Surfaces(翻译/表格/会议纪要/落工作区/结构化校验) |
 | `pnpm contract-test` | Provider 契约测试 |
 | `pnpm db:up` / `db:down` | 启停本地 Postgres（docker） |
 | `pnpm db:migrate` | 迁移 schema（读 `DATABASE_URL`） |

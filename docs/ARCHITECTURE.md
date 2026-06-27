@@ -222,6 +222,13 @@ interface Orchestrator {
 - **Cowork 文件协作**：`Coordinator` 可选挂 workspace——授权时（镜像 fs_write allowlist，后台安全）子代理各节落 `cowork/<id>/sections/<i>.md`，汇总读回拼 `cowork/<id>/brief.md`。
 - **配额 + 审计**（`GuardedWorkspaceRepository` 装饰器）：每 owner 文件数 + 总字节上限，超限拒写；**每次写入（含越界拒绝）落审计**。
 
+**Text Product Surfaces（Sprint 08，已落地）** —— 在工作区之上落地 Monica/Genspark 式文本面，但用统一 substrate（capability-as-config），新增面 ≈ 配置 + executor：
+- **Surface substrate**（`Surface` 契约 + `SurfaceRuntime` + `config/surfaces/*.json`）：声明 inputKind（text|doc）+ params + promptRef + outputMime + executor；Runtime 解析输入（doc 经 workspace 读入数据通道）→ 分派 executor → 产物经（Guarded）workspace 写回。复用 Prompt Registry + Router + Workspace + Cost。
+- **翻译**（`translate` executor）：文本/文档 → 目标语言译文，保 Markdown 结构（流式）。
+- **表格**（`sheet` executor）：`generate`（提示 → 结构化表，`router.json` + zod）/`addColumn`（已有 CSV → AI 补一列，行数不变 → 新版本）/`summarize`；CSV 编解码。
+- **会议纪要**（`notes` executor）：转写 → 结构化 `{summary, decisions[], actionItems[{owner,task,due}]}`（zod）→ Markdown。
+- **健壮性/安全**：输入是 untrusted 数据；产物只走工作区 guard（路径/配额/审计）；**结构化输出 zod 校验失败 → 安全降级，不写半成品**；每次 LLM 调用计入 Cost Ledger。
+
 ### 3.10 Eval Harness（升级安全网）
 五类回归（每次模型/Prompt/工具/媒体变更必跑）：
 1. Golden set 质量回归 2. Citation correctness 3. Cost regression 4. Tool success regression 5. 安全（prompt 注入对抗 / 沙箱逃逸 / 越权动作）。

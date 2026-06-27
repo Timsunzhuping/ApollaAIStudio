@@ -164,6 +164,68 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     return json(res, 201, { jobId: job.id });
   }
 
+  // --- Workspace (S7): versioned project files ---
+  if (method === 'GET' && pathname === '/api/workspace') {
+    const projectId = url.searchParams.get('projectId') || undefined;
+    return json(res, 200, await harness.workspace.list(ownerId, { projectId }));
+  }
+  if (method === 'GET' && pathname === '/api/workspace/file') {
+    const path = url.searchParams.get('path') || '';
+    const projectId = url.searchParams.get('projectId') || undefined;
+    const version = url.searchParams.get('version') ? Number(url.searchParams.get('version')) : undefined;
+    try {
+      const file = await harness.workspace.read(ownerId, path, { projectId, version });
+      if (!file) return json(res, 404, { error: 'no such file' });
+      if (url.searchParams.get('download')) {
+        res.writeHead(200, { 'content-type': file.mime, 'content-disposition': `attachment; filename="${file.path.split('/').pop()}"` });
+        return void res.end(file.content);
+      }
+      return json(res, 200, file);
+    } catch (e) {
+      return json(res, 400, { error: e instanceof Error ? e.message : String(e) });
+    }
+  }
+  if (method === 'GET' && pathname === '/api/workspace/history') {
+    const path = url.searchParams.get('path') || '';
+    try {
+      return json(res, 200, await harness.workspace.history(ownerId, path));
+    } catch (e) {
+      return json(res, 400, { error: e instanceof Error ? e.message : String(e) });
+    }
+  }
+  if (method === 'POST' && pathname === '/api/workspace/save-artifact') {
+    const body = await readBody(req);
+    try {
+      const file = await harness.workspace.write({ ownerId, projectId: body.projectId || undefined, path: String(body.path ?? ''), content: String(body.content ?? ''), mime: body.mime });
+      return json(res, 201, file);
+    } catch (e) {
+      return json(res, 400, { error: e instanceof Error ? e.message : String(e) });
+    }
+  }
+  if (method === 'POST' && pathname === '/api/workspace/rollback') {
+    const body = await readBody(req);
+    try {
+      const file = await harness.workspace.rollback(ownerId, String(body.path ?? ''), Number(body.version), { projectId: body.projectId || undefined });
+      return json(res, 200, file);
+    } catch (e) {
+      return json(res, 400, { error: e instanceof Error ? e.message : String(e) });
+    }
+  }
+  if (method === 'POST' && pathname === '/api/writer') {
+    const body = await readBody(req);
+    const path = String(body.path ?? '');
+    const instruction = String(body.instruction ?? '');
+    if (!path || !instruction) return json(res, 400, { error: 'path and instruction are required' });
+    let result: { path: string; version: number } | undefined;
+    let error: string | undefined;
+    for await (const e of harness.writer.run({ ownerId, projectId: body.projectId || undefined, path, instruction })) {
+      if (e.type === 'written') result = { path: e.path, version: e.version };
+      else if (e.type === 'error') error = e.message;
+    }
+    if (error || !result) return json(res, 400, { error: error ?? 'writer failed' });
+    return json(res, 200, result);
+  }
+
   // --- Scheduled tasks ---
   if (method === 'POST' && pathname === '/api/schedules') {
     const body = await readBody(req);

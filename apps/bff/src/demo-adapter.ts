@@ -65,6 +65,12 @@ export class DemoLLMAdapter implements LLMAdapter {
   private buildProse(req: LLMRequest): string {
     const q = this.question(req);
     const data = req.data ?? [];
+
+    // Writer (S7): edit the provided document per the instruction. Returns a clearly-changed doc.
+    const sys = req.messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n');
+    if (sys.includes('document editor') && data[0]) {
+      return `${data[0].content}\n\n_(edited per instruction: ${q} — demo Writer)_`;
+    }
     const bullets = data.map((d) => `- ${d.content.split('\n')[0] ?? ''} [${d.sourceId}]`).join('\n');
     return [
       `## Overview`,

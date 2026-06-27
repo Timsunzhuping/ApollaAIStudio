@@ -28,6 +28,9 @@ import {
   AgentOrchestrator,
   Coordinator,
   CoworkOrchestrator,
+  InMemoryWorkspaceRepository,
+  makeWorkspaceTools,
+  WriterOrchestrator,
   JobRunner,
   Scheduler,
   notifyJobComplete,
@@ -40,6 +43,7 @@ import {
   InMemoryNotificationRepository,
   InMemoryPluginRepository,
   type PluginRepository,
+  type WorkspaceRepository,
   type MediaAdapter,
   type MediaRepository,
   type ConnectorRepository,
@@ -81,6 +85,7 @@ import {
   PostgresScheduledTaskRepository,
   PostgresNotificationRepository,
   PostgresPluginRepository,
+  PostgresWorkspaceRepository,
 } from '@apolla/db-postgres';
 import { DemoLLMAdapter } from './demo-adapter';
 
@@ -106,6 +111,8 @@ export interface Harness {
   notifications: NotificationRepository;
   plugins: PluginRepository;
   officialPlugins: () => import('@apolla/contracts').Plugin[];
+  workspace: WorkspaceRepository;
+  writer: WriterOrchestrator;
   stubMcp: StubMCPClient;
   mcpClientFor: (transport: string) => MCPClient;
   llmRouter: ModelRouter;
@@ -162,6 +169,7 @@ export async function buildHarness(): Promise<Harness> {
   let scheduleRepo: ScheduledTaskRepository;
   let notificationRepo: NotificationRepository;
   let pluginRepo: PluginRepository;
+  let workspaceRepo: WorkspaceRepository;
   let persistence: Harness['persistence'];
   let close = async (): Promise<void> => {};
 
@@ -180,6 +188,7 @@ export async function buildHarness(): Promise<Harness> {
     scheduleRepo = new PostgresScheduledTaskRepository(sql);
     notificationRepo = new PostgresNotificationRepository(sql);
     pluginRepo = new PostgresPluginRepository(sql);
+    workspaceRepo = new PostgresWorkspaceRepository(sql);
     persistence = 'postgres';
     close = async () => {
       await sql.end();
@@ -197,6 +206,7 @@ export async function buildHarness(): Promise<Harness> {
     scheduleRepo = new InMemoryScheduledTaskRepository();
     notificationRepo = new InMemoryNotificationRepository();
     pluginRepo = new InMemoryPluginRepository();
+    workspaceRepo = new InMemoryWorkspaceRepository();
     persistence = 'memory';
   }
 
@@ -260,6 +270,8 @@ export async function buildHarness(): Promise<Harness> {
   const agentToolsFor = async (ownerId: string): Promise<ToolRuntime> => {
     const rt = new ToolRuntime();
     rt.register(new WebSearchTool(search));
+    // Workspace file tools (S7): fs_read/fs_list (read) + fs_write (low_write), owner-scoped.
+    for (const t of makeWorkspaceTools(workspaceRepo, { ownerId })) rt.register(t);
     for (const c of await connectorRepo.list(ownerId)) {
       if (!c.enabled) continue;
       try {
@@ -317,7 +329,7 @@ export async function buildHarness(): Promise<Harness> {
       return (async function* () {
         const tools = await agentToolsFor(ownerId);
         const agent = new AgentOrchestrator({ router, tools, prompts, audit: (e) => auditRepo.record(e) });
-        const coordinator = new Coordinator({ agent, router, prompts });
+        const coordinator = new Coordinator({ agent, router, prompts, workspace: workspaceRepo });
         const cowork = new CoworkOrchestrator({ coordinator, router, prompts });
         yield* cowork.run({
           ownerId,
@@ -325,6 +337,8 @@ export async function buildHarness(): Promise<Harness> {
           subgoals: Array.isArray(input.subgoals) ? (input.subgoals as string[]) : undefined,
           taskId: jobId,
           approve: async (call) => allowCowork.has(call.tool),
+          // File collaboration is authorized iff fs_write is pre-authorized (background-safe).
+          files: { enabled: allowCowork.has('fs_write'), basePath: `cowork/${jobId}` },
         });
       })();
     }
@@ -373,6 +387,8 @@ export async function buildHarness(): Promise<Harness> {
     notifications: notificationRepo,
     plugins: pluginRepo,
     officialPlugins: loadPlugins,
+    workspace: workspaceRepo,
+    writer: new WriterOrchestrator({ router, prompts, workspace: workspaceRepo }),
     stubMcp,
     mcpClientFor,
     llmRouter: router,

@@ -70,6 +70,8 @@ export { normalizeWorkspacePath, PathError } from './workspace/path';
 export type { WorkspaceRepository, WorkspaceWriteInput, WorkspaceScope } from './workspace/types';
 export { FsReadTool, FsListTool, FsWriteTool, makeWorkspaceTools } from './tools/fs';
 export type { WorkspaceToolScope } from './tools/fs';
+export { WriterOrchestrator, writerTaskId } from './workspace/writer';
+export type { WriterDeps, WriterInput, WriterEvent } from './workspace/writer';
 export { MediaRouter } from './media/router';
 export { StubMediaAdapter } from './media/stub';
 export { MediaOrchestrator } from './media/orchestrator';

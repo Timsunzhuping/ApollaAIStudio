@@ -26,6 +26,8 @@ export interface CoworkInput {
   subgoals?: string[];
   approve?: (call: ToolCall) => Promise<boolean>;
   clarify?: (question: string) => Promise<string | null>;
+  /** Persist sections + brief to the workspace (S7-T4); `enabled` should mirror fs_write authorization. */
+  files?: { enabled: boolean; basePath: string; projectId?: string };
 }
 
 /**

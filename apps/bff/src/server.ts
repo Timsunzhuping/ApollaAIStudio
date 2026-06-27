@@ -5,6 +5,7 @@ import type { Connector } from '@apolla/contracts';
 import { hashPassword, verifyPassword } from '@apolla/harness-core';
 import { buildHarness, type Harness } from './harness';
 import { readSession, startSession, endSession } from './auth';
+import { applySecurityHeaders, applyCors, clientIp, limiters, isExpensive, MAX_BODY_BYTES } from './security';
 import { UI_HTML } from './ui';
 
 // Assigned by the entry point (or by tests via setHarness) — keeps handlers free of a build-at-import
@@ -42,6 +43,20 @@ export async function handle(req: IncomingMessage, res: ServerResponse): Promise
   const url = new URL(req.url ?? '/', 'http://localhost');
   const { pathname } = url;
   const method = req.method ?? 'GET';
+
+  applySecurityHeaders(res);
+  if (applyCors(req, res)) return; // handled preflight
+
+  // Per-IP rate limit (protects login/register + overall). Fail-closed with 429 + Retry-After.
+  const ip = clientIp(req);
+  if (!limiters.ip().allow(ip)) {
+    res.setHeader('Retry-After', String(limiters.ip().retryAfterSec(ip)));
+    return json(res, 429, { error: 'rate limit exceeded' });
+  }
+  // Body size limit for write methods.
+  if ((method === 'POST' || method === 'PUT' || method === 'PATCH') && Number(req.headers['content-length'] ?? 0) > MAX_BODY_BYTES) {
+    return json(res, 413, { error: 'payload too large' });
+  }
 
   if (method === 'GET' && pathname === '/') {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
@@ -117,6 +132,12 @@ export async function handle(req: IncomingMessage, res: ServerResponse): Promise
     return user ? json(res, 200, user) : json(res, 401, { error: 'not authenticated' });
   }
   if (!ownerId) return json(res, 401, { error: 'not authenticated' });
+
+  // Strict per-owner limit on expensive (LLM/media) endpoints (S10-T3).
+  if (isExpensive(method, pathname) && !limiters.owner().allow(ownerId)) {
+    res.setHeader('Retry-After', String(limiters.owner().retryAfterSec(ownerId)));
+    return json(res, 429, { error: 'rate limit exceeded — slow down' });
+  }
 
   // --- Projects ---
   if (method === 'POST' && pathname === '/api/projects') {

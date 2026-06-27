@@ -35,6 +35,8 @@ import {
   SurfaceRuntime,
   genericExecutor,
   translateExecutor,
+  sheetExecutor,
+  notesExecutor,
   JobRunner,
   Scheduler,
   notifyJobComplete,
@@ -400,7 +402,9 @@ export async function buildHarness(): Promise<Harness> {
     writer: new WriterOrchestrator({ router, prompts, workspace: workspaceRepo }),
     surfaces: new SurfaceRuntime({ router, prompts, workspace: workspaceRepo })
       .registerExecutor('generic', (c) => genericExecutor(c))
-      .registerExecutor('translate', (c) => translateExecutor(c)),
+      .registerExecutor('translate', (c) => translateExecutor(c))
+      .registerExecutor('sheet', (c) => sheetExecutor(c))
+      .registerExecutor('notes', (c) => notesExecutor(c)),
     officialSurfaces: loadSurfaces,
     stubMcp,
     mcpClientFor,

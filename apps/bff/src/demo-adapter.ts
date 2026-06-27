@@ -24,6 +24,22 @@ export class DemoLLMAdapter implements LLMAdapter {
     // Agent step (S4): system prompt lists available tools and expects a call_tool/finish decision.
     const sys = req.messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n');
 
+    // Surfaces (S8): structured table / meeting notes / add-column.
+    if (sys.includes('structured meeting notes')) {
+      return JSON.stringify({
+        summary: 'The team reviewed progress and agreed on next steps.',
+        decisions: ['Ship the beta next week', 'Adopt the new pricing tiers'],
+        actionItems: [
+          { owner: 'Alice', task: 'Finalize the launch checklist', due: 'Friday' },
+          { owner: 'Bob', task: 'Update the pricing page' },
+        ],
+      });
+    }
+    if (sys.includes('structured tables')) {
+      if (sys.includes('Mode: addColumn')) return JSON.stringify({ values: ['yes', 'no', 'maybe', 'yes', 'no'] });
+      return JSON.stringify({ columns: ['Option', 'Price', 'Rating'], rows: [['A', '$10', '4.5'], ['B', '$20', '4.0'], ['C', '$15', '4.8']] });
+    }
+
     // Cowork plan (S6): break a goal into parallel sub-goals.
     if (sys.includes('sub-goal')) {
       return JSON.stringify({

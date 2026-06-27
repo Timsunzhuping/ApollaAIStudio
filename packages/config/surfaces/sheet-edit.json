@@ -1,0 +1,9 @@
+{
+  "id": "sheet-edit",
+  "title": "Sheet edit",
+  "inputKind": "doc",
+  "params": { "mode": "addColumn", "column": "notes" },
+  "promptRef": "surface.sheet",
+  "outputMime": "text/csv",
+  "executor": "sheet"
+}

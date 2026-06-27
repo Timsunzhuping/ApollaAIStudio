@@ -12,6 +12,8 @@ import {
   MediaAlias,
   Plugin,
   type Plugin as PluginT,
+  Surface,
+  type Surface as SurfaceT,
   type RouteConfig as RouteConfigT,
   type FeatureGate as FeatureGateT,
   type PromptVersion as PromptVersionT,
@@ -101,6 +103,16 @@ export function loadPlugins(): PluginT[] {
     .readdirSync(dir)
     .filter((f) => f.endsWith('.json'))
     .map((f) => Plugin.parse(JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))));
+}
+
+/** Load declarative text product surfaces from packages/config/surfaces/*.json (S8-T1). */
+export function loadSurfaces(): SurfaceT[] {
+  const dir = path.join(pkgRoot, 'surfaces');
+  if (!fs.existsSync(dir)) return [];
+  return fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith('.json'))
+    .map((f) => Surface.parse(JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))));
 }
 
 export { parseFrontmatter } from './frontmatter';

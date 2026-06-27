@@ -74,6 +74,10 @@ export { FsReadTool, FsListTool, FsWriteTool, makeWorkspaceTools } from './tools
 export type { WorkspaceToolScope } from './tools/fs';
 export { WriterOrchestrator, writerTaskId } from './workspace/writer';
 export type { WriterDeps, WriterInput, WriterEvent } from './workspace/writer';
+export { SurfaceRuntime, surfaceTaskId } from './surface/runtime';
+export type { SurfaceRuntimeDeps } from './surface/runtime';
+export { genericExecutor, translateExecutor } from './surface/executors';
+export type { SurfaceRunInput, SurfaceEvent, SurfaceExecCtx, SurfaceChunk, SurfaceExecutorFn } from './surface/types';
 export { MediaRouter } from './media/router';
 export { StubMediaAdapter } from './media/stub';
 export { MediaOrchestrator } from './media/orchestrator';

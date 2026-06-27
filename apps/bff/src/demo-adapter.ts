@@ -71,6 +71,10 @@ export class DemoLLMAdapter implements LLMAdapter {
     if (sys.includes('document editor') && data[0]) {
       return `${data[0].content}\n\n_(edited per instruction: ${q} — demo Writer)_`;
     }
+    // Translator (S8): return a clearly-translated, structure-preserving doc offline.
+    if (sys.includes('professional translator') && data[0]) {
+      return `> _Translated (demo)_\n\n${data[0].content}`;
+    }
     const bullets = data.map((d) => `- ${d.content.split('\n')[0] ?? ''} [${d.sourceId}]`).join('\n');
     return [
       `## Overview`,

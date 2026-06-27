@@ -4,7 +4,8 @@ import { api, ApiError, type User } from './api';
 interface AuthState {
   user: User | null;
   loading: boolean;
-  login: (email: string) => Promise<void>;
+  login: (email: string, password?: string) => Promise<void>;
+  register: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -24,13 +25,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false));
   }, []);
 
-  const login = async (email: string) => setUser(await api.login(email));
+  const login = async (email: string, password?: string) => setUser(await api.login(email, password));
+  const register = async (email: string, password: string) => setUser(await api.register(email, password));
   const logout = async () => {
     await api.logout();
     setUser(null);
   };
 
-  return <AuthContext.Provider value={{ user, loading, login, logout }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, loading, login, register, logout }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth(): AuthState {

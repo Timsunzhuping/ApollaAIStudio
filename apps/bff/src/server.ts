@@ -2,11 +2,20 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { randomUUID } from 'node:crypto';
 import { exportArtifact, autoDraftSkill, embedMedia, encryptSecret, inferRisk, AgentOrchestrator, nextRun } from '@apolla/harness-core';
 import type { Connector } from '@apolla/contracts';
+import { hashPassword, verifyPassword } from '@apolla/harness-core';
 import { buildHarness, type Harness } from './harness';
-import { readSession, setSession, clearSession } from './auth';
+import { readSession, startSession, endSession } from './auth';
 import { UI_HTML } from './ui';
 
-const harness: Harness = await buildHarness();
+// Assigned by the entry point (or by tests via setHarness) — keeps handlers free of a build-at-import
+// singleton so the handler can be exercised against a constructed harness.
+let harness: Harness;
+export function setHarness(h: Harness): void {
+  harness = h;
+}
+
+// Production requires a password; demo mode keeps zero-config (email-only) login.
+const PASSWORD_MODE = process.env.AUTH_MODE === 'password' || process.env.NODE_ENV === 'production';
 
 function json(res: ServerResponse, code: number, body: unknown): void {
   res.writeHead(code, { 'content-type': 'application/json' });
@@ -29,7 +38,7 @@ async function projectContext(projectId: string | undefined, ownerId: string): P
   return `Project context — "${p.name}": ${p.description}`.trim();
 }
 
-async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
+export async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const url = new URL(req.url ?? '/', 'http://localhost');
   const { pathname } = url;
   const method = req.method ?? 'GET';
@@ -58,21 +67,50 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   }
 
   // --- Auth ---
+  // Register: email + password (scrypt-hashed; never stored/logged in plaintext).
+  if (method === 'POST' && pathname === '/api/auth/register') {
+    const body = await readBody(req);
+    const email = String(body.email ?? '').trim().toLowerCase();
+    const password = String(body.password ?? '');
+    if (!email.includes('@')) return json(res, 400, { error: 'valid email required' });
+    if (password.length < 8) return json(res, 400, { error: 'password must be at least 8 characters' });
+    try {
+      const user = await harness.users.register(email, hashPassword(password));
+      await startSession(res, harness.sessions, user.id);
+      return json(res, 201, { id: user.id, email: user.email });
+    } catch {
+      return json(res, 409, { error: 'email already registered' });
+    }
+  }
   if (method === 'POST' && pathname === '/api/auth/login') {
     const body = await readBody(req);
     const email = String(body.email ?? '').trim().toLowerCase();
+    const password = String(body.password ?? '');
     if (!email.includes('@')) return json(res, 400, { error: 'valid email required' });
+    if (PASSWORD_MODE || password) {
+      // Verify against a stored credential. A non-existent user is rejected the same way as a wrong
+      // password (no account enumeration), after a verify against a dummy hash to equalize timing.
+      const cred = await harness.users.findCredentialByEmail(email);
+      const ok = cred && verifyPassword(password, cred.passwordHash);
+      if (!ok) {
+        if (!cred) verifyPassword(password, hashPassword('x'));
+        return json(res, 401, { error: 'invalid email or password' });
+      }
+      await startSession(res, harness.sessions, cred.user.id);
+      return json(res, 200, { id: cred.user.id, email: cred.user.email });
+    }
+    // Demo mode, no password supplied: zero-config email-only login.
     const user = await harness.users.upsertByEmail(email);
-    setSession(res, user.id);
+    await startSession(res, harness.sessions, user.id);
     return json(res, 200, { id: user.id, email: user.email });
   }
   if (method === 'POST' && pathname === '/api/auth/logout') {
-    clearSession(res);
+    await endSession(req, res, harness.sessions);
     return json(res, 200, { ok: true });
   }
 
   // Everything below requires a session.
-  const ownerId = readSession(req);
+  const ownerId = await readSession(req, harness.sessions);
   if (method === 'GET' && pathname === '/api/auth/me') {
     if (!ownerId) return json(res, 401, { error: 'not authenticated' });
     const user = await harness.users.get(ownerId);
@@ -360,12 +398,14 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     const goal = String(body.goal ?? '').trim();
     if (!goal) return json(res, 400, { error: 'goal required' });
     const agentId = randomUUID();
-    harness.pendingAgents.set(agentId, { goal });
+    harness.pendingAgents.set(agentId, { goal, ownerId });
     return json(res, 201, { agentId });
   }
   if (method === 'POST' && pathname.match(/^\/api\/agent\/[^/]+\/confirm$/)) {
     const id = pathname.split('/')[3]!;
     const body = await readBody(req);
+    const pending = harness.pendingAgents.get(id);
+    if (!pending || pending.ownerId !== ownerId) return json(res, 404, { error: 'no pending confirmation' });
     const waiter = harness.confirmMailbox.get(id);
     if (!waiter) return json(res, 404, { error: 'no pending confirmation' });
     waiter(body.approved === true);
@@ -376,7 +416,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   if (method === 'GET' && agentEvents) {
     const agentId = agentEvents[1]!;
     const input = harness.pendingAgents.get(agentId);
-    if (!input) return json(res, 404, { error: 'unknown agent task' });
+    if (!input || input.ownerId !== ownerId) return json(res, 404, { error: 'unknown agent task' });
     res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
     const tools = await harness.agentToolsFor(ownerId);
     const agent = new AgentOrchestrator({
@@ -490,7 +530,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       return json(res, 200, { requiresConfirmation: true, estimateUsd });
     }
     const mediaId = randomUUID();
-    harness.pendingMedia.set(mediaId, { alias, kind, prompt, projectId: body.projectId });
+    harness.pendingMedia.set(mediaId, { alias, kind, prompt, ownerId, projectId: body.projectId });
     return json(res, 201, { mediaId, estimateUsd });
   }
   if (method === 'GET' && pathname === '/api/media') {
@@ -500,7 +540,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   if (method === 'GET' && mediaEvents) {
     const mediaId = mediaEvents[1]!;
     const input = harness.pendingMedia.get(mediaId);
-    if (!input) return json(res, 404, { error: 'unknown media task' });
+    if (!input || input.ownerId !== ownerId) return json(res, 404, { error: 'unknown media task' });
     res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
     try {
       for await (const ev of harness.mediaOrch.run({
@@ -537,7 +577,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     const question = String(body.question ?? '').trim();
     if (!question) return json(res, 400, { error: 'question required' });
     const taskId = randomUUID();
-    harness.pending.set(taskId, { question, skillName: skill.name });
+    harness.pending.set(taskId, { question, ownerId, skillName: skill.name });
     return json(res, 201, { taskId });
   }
 
@@ -555,7 +595,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     if (kind === 'video' && !body.confirm) return json(res, 200, { requiresConfirmation: true, estimateUsd });
     const mediaId = randomUUID();
     const prompt = `${kind === 'video' ? 'A short explainer video' : 'A cover image'} for: ${task.question ?? 'the research report'}`;
-    harness.pendingMedia.set(mediaId, { alias, kind, prompt, projectId: task.projectId, sourceTaskId: task.id });
+    harness.pendingMedia.set(mediaId, { alias, kind, prompt, ownerId, projectId: task.projectId, sourceTaskId: task.id });
     return json(res, 201, { mediaId, estimateUsd });
   }
 
@@ -582,7 +622,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       return json(res, 402, { error: 'task quota reached — upgrade your plan', used: q.used, limit: q.limit, plan: q.plan });
     }
     const taskId = randomUUID();
-    harness.pending.set(taskId, { question, projectId: body.projectId });
+    harness.pending.set(taskId, { question, ownerId, projectId: body.projectId });
     // Static pre-run cost estimate for a research task (high-cost task hint, PRD §6.8).
     return json(res, 201, { taskId, estimatedCostUsd: 0.002, quota: q });
   }
@@ -594,7 +634,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
 
     if (method === 'GET' && sub === '/events') {
       const input = harness.pending.get(taskId);
-      if (!input) return json(res, 404, { error: 'unknown task' });
+      if (!input || input.ownerId !== ownerId) return json(res, 404, { error: 'unknown task' });
       res.writeHead(200, {
         'content-type': 'text/event-stream',
         'cache-control': 'no-cache',
@@ -644,14 +684,18 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   json(res, 404, { error: 'not found' });
 }
 
-const PORT = Number(process.env.PORT ?? 3000);
-createServer((req, res) => {
-  handle(req, res).catch((e) => json(res, 500, { error: e instanceof Error ? e.message : String(e) }));
-}).listen(PORT, () => {
-  console.log(`Apolla BFF [${harness.mode}/${harness.persistence}] → http://localhost:${PORT}`);
-});
+// Entry point — skipped under vitest so tests can import { handle, setHarness } without listening.
+if (!process.env.VITEST) {
+  setHarness(await buildHarness());
+  const PORT = Number(process.env.PORT ?? 3000);
+  createServer((req, res) => {
+    handle(req, res).catch((e) => json(res, 500, { error: e instanceof Error ? e.message : String(e) }));
+  }).listen(PORT, () => {
+    console.log(`Apolla BFF [${harness.mode}/${harness.persistence}] → http://localhost:${PORT}`);
+  });
 
-// In-process cron tick (S5-T3). Production would use a durable queue/worker instead.
-setInterval(() => {
-  harness.scheduler.tick(new Date()).catch(() => {});
-}, 30_000);
+  // In-process cron tick (S5-T3). Production would use a durable queue/worker instead.
+  setInterval(() => {
+    harness.scheduler.tick(new Date()).catch(() => {});
+  }, 30_000);
+}

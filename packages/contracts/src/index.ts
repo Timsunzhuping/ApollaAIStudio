@@ -9,6 +9,7 @@ export * from './model';
 export * from './notification';
 export * from './plugin';
 export * from './schedule';
+export * from './session';
 export * from './prompt';
 export * from './tool';
 export * from './task';

@@ -98,14 +98,16 @@ S10-T1(鉴权+会话) ─ S10-T2(隔离审计) ─┬─ S10-T3(限流)
 - **建议 PR 分组**：A(T1+T2) · B(T3+T4) · C(T5+T6) · D(T7+T8)。
 
 ## Sprint 10 Definition of Done（整体验收）
-- [ ] 真实鉴权：邮箱+密码注册/登录，scrypt 哈希（DB 无明文），签名 httpOnly 会话（过期+轮换+登出失效）；生产模式要求密码，demo 模式保留零配置登录。
-- [ ] 多租户隔离：每个 `:id`/path 端点校验 ownerId，跨租户 fail-closed；回归测试拒绝跨租户访问。
-- [ ] 限流：per-owner + per-IP 令牌桶，昂贵端点更严，超限 429 + Retry-After。
-- [ ] 周界：安全响应头 + CORS 白名单 + body 体积上限 + 安全 cookie 标志。
-- [ ] 可观测性：脱敏结构化请求日志 + request-id + `/metrics`（无敏感数据）。
-- [ ] 韧性：启动对账非终态 Job（恢复/标 interrupted）、优雅停机不丢状态。
-- [ ] 测试：会话必需/IDOR/限流/密码/Job 恢复回归；`pnpm test` + `pnpm test:web` + CI 全门禁绿。
-- [ ] README/架构文档更新（env + 生产/demo 模式）；Demo 离线可演示。
+- [x] 真实鉴权：邮箱+密码注册/登录，scrypt 哈希（DB 无明文），签名 httpOnly 会话（过期+轮换+登出失效）；生产模式要求密码，demo 模式保留零配置登录。
+- [x] 多租户隔离：每个 `:id`/path 端点校验 ownerId，跨租户 fail-closed；回归测试拒绝跨租户访问（修复 4 处 IDOR）。
+- [x] 限流：per-owner + per-IP 令牌桶，昂贵端点更严，超限 429 + Retry-After。
+- [x] 周界：安全响应头 + CORS 白名单 + body 体积上限 + 安全 cookie 标志。
+- [x] 可观测性：脱敏结构化请求日志 + request-id + `/metrics`（无敏感数据）。
+- [x] 韧性：启动对账非终态 Job（标 interrupted）、优雅停机不丢状态。
+- [x] 测试：会话必需/IDOR/限流/密码/Job 恢复回归；`pnpm test` + `pnpm test:web` + CI 全门禁绿。
+- [x] README/架构文档更新（env + 生产/demo 模式）；Demo 离线可演示。
+
+> **Sprint 10 完成。** S10-T1–T8 全部合并到 main（PR #61–#63 + 本 PR）。安全周界落地：真实鉴权（scrypt + 服务端会话）、多租户隔离（修复 4 处 IDOR，fail-closed）、限流（per-IP + per-owner 429）、安全头/CORS/body 上限、`/metrics` + request-id + 脱敏日志、Job 启动对账 + 优雅停机。回归测试覆盖会话必需/IDOR（schedule/job/workspace）/限流/密码/会话过期/Job 恢复；root 222 + web 16 测试，eval 34，CI 全门禁绿。demo 模式仍零配置。
 
 ## 风险与提示（给代理）
 - **fail-closed 是默认**：拿不准归属就拒；跨租户访问宁可 404，不泄露资源是否存在。

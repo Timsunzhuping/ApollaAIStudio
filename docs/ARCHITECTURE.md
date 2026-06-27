@@ -193,6 +193,14 @@ interface SkillRuntime {
 - **沙箱/VM**：代码执行 / Artifact 运行 / 浏览器动作 / Cowork 任务在容器或 VM 隔离，按任务 allowlist（[PRD §12.D / §15.3](./PRD.md)）。
 - **按工具连接器开关**、RBAC、花费上限（企业，[PRD §15.4](./PRD.md)）。
 
+**安全周界（Sprint 10，已落地）** —— 把内核安全延伸到服务边界：
+- **真实鉴权**：邮箱+密码（scrypt 哈希 + 每用户盐 + 定时安全比较，绝不明文/入日志）；**服务端会话**（`SessionRepository`，签名 httpOnly cookie 携带随机会话 id，过期 + 登录轮换 + 登出失效，生产 `Secure`）。demo 模式保留零配置邮箱登录，由 `AUTH_MODE`/`NODE_ENV` 切换，不削弱生产默认。
+- **多租户隔离（防 IDOR）**：每个取 `:id`/path/SSE/确认的端点都校验 `ownerId === 会话用户`，跨租户 **fail-closed**（404，不泄露存在性）；S10 审计修复了 4 处仅按 id 解析的 in-process pending map（研究/agent/媒体任务 + agent 确认）。
+- **限流**（`RateLimiter` 令牌桶）：per-IP（含登录/注册）+ 昂贵 LLM/媒体端点 per-owner；429 + `Retry-After`。
+- **周界**：安全响应头（CSP/nosniff/frame-deny/referrer）、CORS 白名单（`CORS_ORIGIN`）、请求体上限（413）。
+- **可观测性**：`Metrics`（计数 + 延迟直方图）→ `GET /metrics`（仅聚合数字）；每请求 `x-request-id` + 脱敏结构化访问日志（绝不含密码/cookie/令牌）。
+- **韧性**：启动 `reconcileJobs` 把残留 `queued`/`running` Job 标 `interrupted`（终态）；`SIGTERM` 优雅停机（停 cron、drain server、关连接池）。
+
 ### 3.9 Task Orchestrator（任务对象 / 子代理 / Plugins / Cowork）
 ```ts
 interface Task {

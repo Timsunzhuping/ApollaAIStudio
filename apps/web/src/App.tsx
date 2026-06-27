@@ -6,7 +6,8 @@ import { Research } from './pages/Research';
 import { Workspace } from './pages/Workspace';
 import { Surfaces } from './pages/Surfaces';
 import { Agent } from './pages/Agent';
-import { Placeholder } from './pages/Placeholder';
+import { Automation } from './pages/Automation';
+import { Settings } from './pages/Settings';
 import { Loading } from './components/ui';
 
 function Gate() {
@@ -20,8 +21,8 @@ function Gate() {
         <Route path="/workspace" element={<Workspace />} />
         <Route path="/surfaces" element={<Surfaces />} />
         <Route path="/agent" element={<Agent />} />
-        <Route path="/automation" element={<Placeholder title="Automation" />} />
-        <Route path="/settings" element={<Placeholder title="Settings" />} />
+        <Route path="/automation" element={<Automation />} />
+        <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/research" replace />} />
       </Route>
     </Routes>

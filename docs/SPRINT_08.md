@@ -97,13 +97,15 @@ S8-T1(Surface substrate) ─ S8-T2(翻译) ─┬─ S8-T3(表格)
 - **建议 PR 分组**：A(T1+T2) · B(T3+T4) · C(T5+T6) · D(T7+T8)。
 
 ## Sprint 08 Definition of Done（整体验收）
-- [ ] Surface substrate：声明式 surface（输入类型 + 参数 schema + promptRef + 输出 mime + executor），SurfaceRuntime 分派；新增面 ≈ 配置 + executor，不改管线。
-- [ ] 翻译：文本/文档 → 目标语言译文（保结构）→ 落工作区（新文档/版本）。
-- [ ] 表格：提示/文档 → 合法结构化表 → `.csv`；addColumn/summarize 变换产新版本。
-- [ ] 会议纪要：转写 → 结构化（摘要/决策/行动项）→ `notes.md`；行动项可枚举。
-- [ ] 安全：产物经工作区 guard（路径/配额/审计）；输入走数据通道；结构化 zod 校验失败安全降级、不写半成品；成本计量。
-- [ ] `pnpm eval` 含 翻译/表格/会议纪要/产物落工作区/结构化失败拦截（34 项）；CI 全门禁绿。
-- [ ] README/命令/架构文档一致更新；Demo 端到端走通（离线可演示）。
+- [x] Surface substrate：声明式 surface（输入类型 + 参数 schema + promptRef + 输出 mime + executor），SurfaceRuntime 分派；新增面 ≈ 配置 + executor，不改管线。
+- [x] 翻译：文本/文档 → 目标语言译文（保结构）→ 落工作区（新文档/版本）。
+- [x] 表格：提示/文档 → 合法结构化表 → `.csv`；addColumn/summarize 变换产新版本。
+- [x] 会议纪要：转写 → 结构化（摘要/决策/行动项）→ `notes.md`；行动项可枚举。
+- [x] 安全：产物经工作区 guard（路径/配额/审计）；输入走数据通道；结构化 zod 校验失败安全降级、不写半成品；成本计量。
+- [x] `pnpm eval` 含 翻译/表格/会议纪要/产物落工作区/结构化失败拦截（34 项）；CI 全门禁绿。
+- [x] README/命令/架构文档一致更新；Demo 端到端走通（离线可演示）。
+
+> **Sprint 08 完成。** S8-T1–T8 全部合并到 main（PR #51–#53 + 本 PR）。34 项 eval 全绿（研究 6 + 媒体 4 + 执行 5 + 自治 4 + Cowork 5 + Workspace 5 + Surfaces 5）。离线端到端验证：会议转写 → `notes.md`；翻译 `report.md` → `report.en.md`（保结构）；对比表 `table.csv` → 加列 → v2（列+1、行不变）。
 
 ## 风险与提示（给代理）
 - **substrate 优先，别写三个一次性 prompt**：先把 Surface 契约 + Runtime 做对，三个面只是配置 + executor；否则后续每个新面都要重写管线，违背 harness 杠杆。

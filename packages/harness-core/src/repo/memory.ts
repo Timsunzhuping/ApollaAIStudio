@@ -168,6 +168,10 @@ export class InMemoryJobRepository implements JobRepository {
     return [...this.jobs.values()].filter((j) => j.ownerId === ownerId).map((j) => structuredClone(j));
   }
 
+  async listNonTerminal(): Promise<Job[]> {
+    return [...this.jobs.values()].filter((j) => j.status === 'queued' || j.status === 'running').map((j) => structuredClone(j));
+  }
+
   async appendEvent(jobId: string, event: unknown): Promise<void> {
     (this.log.get(jobId) ?? this.log.set(jobId, []).get(jobId)!).push(structuredClone(event));
   }

@@ -6,6 +6,8 @@ export interface JobRepository {
   get(id: string): Promise<Job | undefined>;
   save(job: Job): Promise<void>;
   list(ownerId: string): Promise<Job[]>;
+  /** All non-terminal jobs (queued/running) across owners — for startup reconciliation (S10-T6). */
+  listNonTerminal(): Promise<Job[]>;
   /** Append one orchestrator event to the job's run-log (ordered). */
   appendEvent(jobId: string, event: unknown): Promise<void>;
   /** The run-log in order (for reconnect/replay). */

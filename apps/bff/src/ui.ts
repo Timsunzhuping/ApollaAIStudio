@@ -102,6 +102,15 @@ export const UI_HTML = `<!doctype html>
     <div class="col"><h3>Deliverable</h3><div id="coworkOut" class="muted">—</div></div>
   </div>
   <div class="bar" style="border-top:1px solid var(--bd)">
+    <b>Surfaces</b>
+    <select id="sfSel"></select>
+    <input id="sfSource" placeholder="source file (doc), e.g. report.md" style="max-width:12rem" />
+    <input id="sfParams" placeholder='params JSON, e.g. {"targetLang":"English"}' style="max-width:14rem" />
+    <input id="sfOut" placeholder="output path (optional)" style="max-width:10rem" />
+    <button id="runSurface">Run surface</button>
+  </div>
+  <div class="bar"><textarea id="sfText" placeholder="text input (for text surfaces, e.g. paste a meeting transcript)" style="width:100%;min-height:3rem"></textarea></div>
+  <div class="bar" style="border-top:1px solid var(--bd)">
     <b>Workspace</b>
     <button class="ghost" id="refreshWs">↻ Files</button>
     <input id="wrPath" placeholder="file path, e.g. report.md" style="max-width:14rem" />
@@ -130,7 +139,7 @@ async function boot() {
 function showApp(u) {
   $('login').style.display='none'; $('app').style.display='block';
   $('who').textContent = u.email; $('logout').style.display='inline-block';
-  loadProjects(); loadSkills(); loadConnectors(); loadPlugins(); loadWorkspace(); refreshInbox();
+  loadProjects(); loadSkills(); loadConnectors(); loadPlugins(); loadSurfaces(); loadWorkspace(); refreshInbox();
 }
 function btn(label, cls, fn){ const b=document.createElement('button'); b.textContent=label; if(cls)b.className=cls; b.onclick=fn; b.style.marginRight='.3rem'; return b; }
 async function refreshInbox(){ loadSchedules(); loadJobs(); loadNotifs(); }
@@ -214,6 +223,24 @@ $('scheduleCowork').onclick = async () => {
   const cron=prompt('Cron (UTC), default daily 08:00','0 8 * * *')||'0 8 * * *';
   await fetch('/api/schedules',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:'Cowork: '+goal.slice(0,30),cron,kind:'cowork',input:{goal}})});
   loadSchedules();
+};
+// --- Surfaces (S8): translate / sheet / notes ---
+let surfaces = [];
+async function loadSurfaces(){
+  surfaces = await fetch('/api/surfaces').then(r=>r.json());
+  $('sfSel').innerHTML = surfaces.map(s=>'<option value="'+s.id+'">'+escapeHtml(s.title||s.id)+'</option>').join('');
+}
+$('runSurface').onclick = async () => {
+  const id=$('sfSel').value; const s=surfaces.find(x=>x.id===id); if(!s) return;
+  let params={}; const raw=$('sfParams').value.trim();
+  if(raw){ try{ params=JSON.parse(raw); }catch{ alert('params must be valid JSON'); return; } }
+  const body={ surfaceId:id, params, outputPath:$('sfOut').value.trim()||undefined };
+  if(s.inputKind==='doc') body.sourcePath=$('sfSource').value.trim();
+  else body.text=$('sfText').value;
+  const r=await fetch('/api/surface',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+  const b=await r.json();
+  if(!r.ok){ alert('surface failed: '+b.error); return; }
+  loadWorkspace(); viewFile(b.path);
 };
 // --- Workspace (S7): versioned files + Writer ---
 async function loadWorkspace(){

@@ -28,6 +28,8 @@ import {
   AgentOrchestrator,
   Coordinator,
   CoworkOrchestrator,
+  InMemorySessionRepository,
+  type SessionRepository,
   InMemoryWorkspaceRepository,
   GuardedWorkspaceRepository,
   makeWorkspaceTools,
@@ -92,6 +94,7 @@ import {
   PostgresNotificationRepository,
   PostgresPluginRepository,
   PostgresWorkspaceRepository,
+  PostgresSessionRepository,
 } from '@apolla/db-postgres';
 import { DemoLLMAdapter } from './demo-adapter';
 
@@ -99,6 +102,7 @@ export interface Harness {
   orchestrator: ResearchOrchestrator;
   repo: TaskRepository;
   users: UserRepository;
+  sessions: SessionRepository;
   projects: ProjectRepository;
   memory: Memory;
   skills: SkillRuntime;
@@ -126,12 +130,12 @@ export interface Harness {
   llmRouter: ModelRouter;
   prompts: PromptRegistry;
   agentToolsFor: (ownerId: string) => Promise<ToolRuntime>;
-  pendingAgents: Map<string, { goal: string }>;
+  pendingAgents: Map<string, { goal: string; ownerId: string }>;
   confirmMailbox: Map<string, (approved: boolean) => void>;
   objectStore: LocalObjectStore;
   ledger: InMemoryCostLedger;
-  pending: Map<string, { question: string; projectId?: string; skillName?: string }>;
-  pendingMedia: Map<string, { alias: string; kind: string; prompt: string; projectId?: string; sourceTaskId?: string }>;
+  pending: Map<string, { question: string; ownerId: string; projectId?: string; skillName?: string }>;
+  pendingMedia: Map<string, { alias: string; kind: string; prompt: string; ownerId: string; projectId?: string; sourceTaskId?: string }>;
   mode: 'real' | 'demo';
   persistence: 'postgres' | 'memory';
   close: () => Promise<void>;
@@ -167,6 +171,7 @@ export async function buildHarness(): Promise<Harness> {
 
   let repo: TaskRepository;
   let users: UserRepository;
+  let sessions: SessionRepository;
   let projects: ProjectRepository;
   let memory: Memory;
   let skillRepo: SkillRepository;
@@ -186,6 +191,7 @@ export async function buildHarness(): Promise<Harness> {
     await migrate(sql);
     repo = new PostgresTaskRepository(sql);
     users = new PostgresUserRepository(sql);
+    sessions = new PostgresSessionRepository(sql);
     projects = new PostgresProjectRepository(sql);
     memory = new PostgresMemory(sql);
     skillRepo = new PostgresSkillRepository(sql);
@@ -204,6 +210,7 @@ export async function buildHarness(): Promise<Harness> {
   } else {
     repo = new InMemoryTaskRepository();
     users = new InMemoryUserRepository();
+    sessions = new InMemorySessionRepository();
     projects = new InMemoryProjectRepository();
     memory = new InMemoryMemory();
     skillRepo = new InMemorySkillRepository();
@@ -380,6 +387,7 @@ export async function buildHarness(): Promise<Harness> {
     orchestrator,
     repo,
     users,
+    sessions,
     projects,
     memory,
     skills,

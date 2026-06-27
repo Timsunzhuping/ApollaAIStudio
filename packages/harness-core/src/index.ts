@@ -53,6 +53,9 @@ export {
   InMemoryPluginRepository,
 } from './repo/memory';
 export type { PluginRepository } from './plugins/types';
+export { hashPassword, verifyPassword } from './auth/password';
+export { InMemorySessionRepository } from './auth/session';
+export type { SessionRepository } from './auth/session';
 export { notifyJobComplete, StubDelivery, WebhookDelivery } from './notify/notify';
 export type { NotificationRepository, NotificationDelivery, NotifyDeps } from './notify/notify';
 export { JobRunner } from './jobs/runner';

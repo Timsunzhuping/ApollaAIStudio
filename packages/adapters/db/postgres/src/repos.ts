@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { User, Project, SkillDef, type User as UserT, type Project as ProjectT, type SkillDef as SkillDefT } from '@apolla/contracts';
-import type { UserRepository, ProjectRepository, SkillRepository } from '@apolla/harness-core';
+import { User, Project, SkillDef, Session, type User as UserT, type Project as ProjectT, type SkillDef as SkillDefT, type Session as SessionT } from '@apolla/contracts';
+import type { UserRepository, ProjectRepository, SkillRepository, SessionRepository } from '@apolla/harness-core';
 import type { Sql } from './index';
 
 export class PostgresUserRepository implements UserRepository {
@@ -15,9 +15,55 @@ export class PostgresUserRepository implements UserRepository {
     return User.parse(rows[0]);
   }
 
+  async register(email: string, passwordHash: string): Promise<UserT> {
+    const rows = await this.sql<{ id: string; email: string }[]>`
+      INSERT INTO users (id, email, password_hash) VALUES (${randomUUID()}, ${email}, ${passwordHash})
+      ON CONFLICT (email) DO NOTHING
+      RETURNING id, email
+    `;
+    if (!rows[0]) throw new Error('email already registered');
+    return User.parse(rows[0]);
+  }
+
+  async findCredentialByEmail(email: string): Promise<{ user: UserT; passwordHash: string | null } | undefined> {
+    const rows = await this.sql<{ id: string; email: string; password_hash: string | null }[]>`
+      SELECT id, email, password_hash FROM users WHERE email = ${email}
+    `;
+    const r = rows[0];
+    return r ? { user: User.parse({ id: r.id, email: r.email }), passwordHash: r.password_hash } : undefined;
+  }
+
   async get(id: string): Promise<UserT | undefined> {
     const rows = await this.sql<{ id: string; email: string }[]>`SELECT id, email FROM users WHERE id = ${id}`;
     return rows[0] ? User.parse(rows[0]) : undefined;
+  }
+}
+
+export class PostgresSessionRepository implements SessionRepository {
+  constructor(private readonly sql: Sql) {}
+
+  async create(session: SessionT): Promise<void> {
+    await this.sql`
+      INSERT INTO sessions (id, owner_id, expires_at) VALUES (${session.id}, ${session.ownerId}, ${session.expiresAt})
+      ON CONFLICT (id) DO NOTHING
+    `;
+  }
+
+  async get(id: string, now: Date = new Date()): Promise<SessionT | undefined> {
+    const rows = await this.sql<{ id: string; owner_id: string; expires_at: Date }[]>`
+      SELECT id, owner_id, expires_at FROM sessions WHERE id = ${id}
+    `;
+    const r = rows[0];
+    if (!r) return undefined;
+    if (r.expires_at.getTime() <= now.getTime()) {
+      await this.delete(id);
+      return undefined;
+    }
+    return Session.parse({ id: r.id, ownerId: r.owner_id, expiresAt: r.expires_at.toISOString() });
+  }
+
+  async delete(id: string): Promise<void> {
+    await this.sql`DELETE FROM sessions WHERE id = ${id}`;
   }
 }
 

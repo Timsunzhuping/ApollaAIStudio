@@ -51,6 +51,7 @@ function genId(prefix: string): string {
 export class InMemoryUserRepository implements UserRepository {
   private readonly byId = new Map<string, User>();
   private readonly byEmail = new Map<string, string>();
+  private readonly hashByOwner = new Map<string, string>();
 
   async upsertByEmail(email: string): Promise<User> {
     const existing = this.byEmail.get(email);
@@ -59,6 +60,21 @@ export class InMemoryUserRepository implements UserRepository {
     this.byId.set(user.id, user);
     this.byEmail.set(email, user.id);
     return structuredClone(user);
+  }
+
+  async register(email: string, passwordHash: string): Promise<User> {
+    if (this.byEmail.has(email)) throw new Error('email already registered');
+    const user: User = { id: genId('user'), email };
+    this.byId.set(user.id, user);
+    this.byEmail.set(email, user.id);
+    this.hashByOwner.set(user.id, passwordHash);
+    return structuredClone(user);
+  }
+
+  async findCredentialByEmail(email: string): Promise<{ user: User; passwordHash: string | null } | undefined> {
+    const id = this.byEmail.get(email);
+    if (!id) return undefined;
+    return { user: structuredClone(this.byId.get(id)!), passwordHash: this.hashByOwner.get(id) ?? null };
   }
 
   async get(id: string): Promise<User | undefined> {

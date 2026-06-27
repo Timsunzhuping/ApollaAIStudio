@@ -41,7 +41,8 @@ export const api = {
   base: BASE,
   // auth
   me: () => http<User>('GET', '/api/auth/me'),
-  login: (email: string) => http<User>('POST', '/api/auth/login', { email }),
+  login: (email: string, password?: string) => http<User>('POST', '/api/auth/login', password ? { email, password } : { email }),
+  register: (email: string, password: string) => http<User>('POST', '/api/auth/register', { email, password }),
   logout: () => http<void>('POST', '/api/auth/logout'),
   health: () => http<{ mode: string; persistence: string }>('GET', '/api/health'),
   // projects + memory

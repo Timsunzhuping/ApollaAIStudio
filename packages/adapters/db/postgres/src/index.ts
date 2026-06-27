@@ -5,7 +5,7 @@ import type { TaskRepository } from '@apolla/harness-core';
 
 export type Sql = postgres.Sql;
 
-export { PostgresUserRepository, PostgresProjectRepository, PostgresSkillRepository } from './repos';
+export { PostgresUserRepository, PostgresProjectRepository, PostgresSkillRepository, PostgresSessionRepository } from './repos';
 export { PostgresMemory } from './memory';
 export { PostgresMediaRepository } from './media';
 export { PostgresConnectorRepository } from './connector';
@@ -42,6 +42,15 @@ CREATE TABLE IF NOT EXISTS users (
   email       text UNIQUE NOT NULL,
   created_at  timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash text;
+
+CREATE TABLE IF NOT EXISTS sessions (
+  id          text PRIMARY KEY,
+  owner_id    text NOT NULL,
+  expires_at  timestamptz NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS sessions_owner_idx ON sessions (owner_id);
 
 CREATE TABLE IF NOT EXISTS projects (
   id          text PRIMARY KEY,

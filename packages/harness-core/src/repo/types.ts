@@ -9,9 +9,13 @@ export interface TaskRepository {
 }
 
 export interface UserRepository {
-  /** Find-or-create a user by email (Sprint 02 email-identity auth). */
+  /** Find-or-create a user by email (demo email-identity auth). */
   upsertByEmail(email: string): Promise<User>;
   get(id: string): Promise<User | undefined>;
+  /** Create a user with a password hash (S10). Throws if the email already exists. */
+  register(email: string, passwordHash: string): Promise<User>;
+  /** Look up a user + their stored password hash by email (hash is null for passwordless demo users). */
+  findCredentialByEmail(email: string): Promise<{ user: User; passwordHash: string | null } | undefined>;
 }
 
 export interface ProjectRepository {

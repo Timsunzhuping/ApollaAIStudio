@@ -70,6 +70,8 @@ flowchart TB
 
 > **Harness Core 是本平台的工程重心**。中台/触点/基础设施都是常规工程；真正的杠杆在 Core 的注册表与编排。
 
+**前端触点层（Sprint 09，已落地 Web App）**：`apps/web`（Vite + React + TS SPA）是面向用户的生产前端——纯 API 客户端，通过类型化客户端 + SSE hook 消费 BFF 的 HTTP/SSE 接口，**不旁路 BFF、不直连模型/库、不持密钥**（鉴权走会话 cookie），Markdown 安全渲染。BFF（`apps/bff`，刻意独立的 Node 服务）仍是唯一后端与组合根；其内联工作台保留为零配置兜底。SSR/营销站、桌面宿主、扩展、移动端为后续触点。
+
 ---
 
 ## 3. Harness Core 模块规格（含接口契约）
@@ -294,9 +296,10 @@ interface Orchestrator {
 ```
 apolla/
   apps/
-    web/                 # Next.js + TS（主工作台）
-    extension/           # MV3 浏览器扩展
-    desktop/             # 桌面 / Cowork 宿主（v1+）
+    bff/                 # ★ 独立 Node BFF：HTTP/SSE API + 组合根 + 内联工作台（唯一后端）
+    web/                 # ★ 生产前端：Vite + React + TS SPA，消费 BFF（Sprint 09，已落地）
+    extension/           # MV3 浏览器扩展（后续）
+    desktop/             # 桌面 / Cowork 宿主（后续）
   packages/
     harness-core/        # ★ Model Router / Prompt Registry / Tool Runtime / Media / Skill / Memory / Safety / Orchestrator / Eval
     adapters/

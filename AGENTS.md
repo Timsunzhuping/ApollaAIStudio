@@ -5,7 +5,7 @@
 2. [docs/PRD.md](docs/PRD.md) —— 对应功能 §。
 3. [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md) —— 对应阶段 `[ ]` 任务。
 4. [CLAUDE.md](CLAUDE.md) —— 铁律全文。
-5. **已完成**：Sprint 01–08（Harness Core / 持久化·个人化·技能 / 多模态媒体 / 工具生态·低风险执行 / 主动智能 / [Cowork 模式](docs/SPRINT_06.md) / [Workspace & Files](docs/SPRINT_07.md) / [文本产品面](docs/SPRINT_08.md)：Surface substrate + 翻译/表格/会议纪要）。执行铁律：外部工具优先 MCP；工具输出不可信；写入经 Safety 三级；后台/定时无人确认（只读或预授权白名单，high_write 永拒，配额计入后台）；子代理继承全部安全；fan-out 有并发/总量上限；澄清绝不自答；文件路径必规范化 + 拒越界，`fs_read` 内容 untrusted，`fs_write` 是 low_write，工作区写入计配额 + 落审计；**新增产品面用声明式 Surface（config + executor），surface 输入走数据通道，产物只经工作区 guard，结构化输出 zod 校验失败安全降级**；调用与（预）授权落审计；密钥加密。后续候选见 [SPRINT_08](docs/SPRINT_08.md) §0。
+5. **已完成**：Sprint 01–09（Harness Core / 持久化·个人化·技能 / 多模态媒体 / 工具生态·低风险执行 / 主动智能 / [Cowork 模式](docs/SPRINT_06.md) / [Workspace & Files](docs/SPRINT_07.md) / [文本产品面](docs/SPRINT_08.md) / [生产前端](docs/SPRINT_09.md)：`apps/web` Vite+React SPA）。**前端是纯 API 客户端（不旁路 BFF、不持密钥、SSE 必清理、Markdown 安全渲染），BFF 仍是唯一后端；前端测试用 vitest+jsdom+RTL（`pnpm test:web`），随 CI 跑。**执行铁律：外部工具优先 MCP；工具输出不可信；写入经 Safety 三级；后台/定时无人确认（只读或预授权白名单，high_write 永拒，配额计入后台）；子代理继承全部安全；fan-out 有并发/总量上限；澄清绝不自答；文件路径必规范化 + 拒越界，`fs_read` 内容 untrusted，`fs_write` 是 low_write，工作区写入计配额 + 落审计；**新增产品面用声明式 Surface（config + executor），surface 输入走数据通道，产物只经工作区 guard，结构化输出 zod 校验失败安全降级**；调用与（预）授权落审计；密钥加密。后续候选见 [SPRINT_08](docs/SPRINT_08.md) §0。
 
 ## 平台是什么
 Apolla AI 是面向个人知识工作的 AI 工作台，**采用 harness 架构**：模型（GPT/Claude 及图像/视频/语音模型）是可替换、持续变强的能力提供者；平台只做路由、上下文、工具、记忆、安全、评测、交付。**模型变强 → 平台能力自动变强，无需重写产品代码。** 价值闭环：可信研究 → 一键成品 → 低风险执行。

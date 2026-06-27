@@ -2,7 +2,7 @@
 
 本文件为 Claude Code 提供每次会话的标准上下文。开始任何开发前请先读本文件，再读 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)（Harness 架构总纲）、[docs/PRD.md](docs/PRD.md) 与 [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md)。Codex 等其他代理读同源的 [AGENTS.md](AGENTS.md)。
 
-**已完成 Sprint**：01（Harness Core）、02（持久化/个人化/技能）、03（多模态成品）、04（工具生态与低风险执行）、05（主动智能：定时 + 后台 Job + 通知）、06（[Cowork 模式](docs/SPRINT_06.md)：角色化 Plugins + 子代理并行编排 + 澄清机制）、07（[Workspace & Files](docs/SPRINT_07.md)：版本化文件区 + 文件感知工具 + Writer + Cowork 文件协作）、08（[文本产品面](docs/SPRINT_08.md)：Surface substrate + 翻译/表格/会议纪要）。
+**已完成 Sprint**：01（Harness Core）、02（持久化/个人化/技能）、03（多模态成品）、04（工具生态与低风险执行）、05（主动智能：定时 + 后台 Job + 通知）、06（[Cowork 模式](docs/SPRINT_06.md)：角色化 Plugins + 子代理并行编排 + 澄清机制）、07（[Workspace & Files](docs/SPRINT_07.md)：版本化文件区 + 文件感知工具 + Writer + Cowork 文件协作）、08（[文本产品面](docs/SPRINT_08.md)：Surface substrate + 翻译/表格/会议纪要）、09（[生产前端](docs/SPRINT_09.md)：`apps/web` Vite+React SPA 消费 BFF）。**前端是纯 API 客户端（不旁路 BFF、不持密钥、SSE 必清理、Markdown 安全渲染）；BFF 仍是唯一后端。**
 执行铁律：外部工具优先 MCP；工具输出默认不可信（数据通道）；写入动作必经 Safety 三级——只读自动 / 低风险需人类确认 / 高风险拒绝；每次工具调用与确认落审计；连接器密钥加密。子代理继承全部执行安全；fan-out 有并发/总量上限；澄清绝不自答（后台返回 null → 安全降级）；后台/定时运行无人确认——默认只读或预授权白名单（上限 low_write），high_write 永拒；配额计入后台。文件路径必规范化 + 拒越界（`..`/绝对/跨 owner-project）；`fs_read` 内容是 untrusted 数据；`fs_write` 是 low_write；工作区写入计配额 + 落审计。**新增产品面用声明式 Surface（config + executor，不重写管线）；surface 输入走数据通道；产物只经工作区 guard；结构化输出 zod 校验，失败安全降级不写半成品。** 后续候选见 SPRINT_08 §0：表格公式引擎、ASR 语音、生产级 Next.js 前端、裸机本地目录、HTTP/SSE MCP transport、Plugin 市场。
 
 ## 产品是什么

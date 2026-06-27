@@ -97,13 +97,15 @@ S9-T1(脚手架+API客户端+鉴权) ─ S9-T2(研究页) ─┬─ S9-T3(工作
 - **建议 PR 分组**：A(T1+T2) · B(T3+T4) · C(T5+T6) · D(T7+T8)。
 
 ## Sprint 09 Definition of Done（整体验收）
-- [ ] `apps/web`（Vite+React+TS strict）：设计系统 + 外壳 + 路由 + 鉴权（受保护路由）；纯 API 客户端，不旁路 BFF。
-- [ ] 类型化 API 客户端 + SSE hook（卸载清理）；类型尽量源自 `@apolla/contracts`。
-- [ ] 五大产品面页可用：研究（流式）/工作区+Writer/Surfaces/Agent+Cowork+Plugins/自动化+设置——均消费现有 BFF 接口。
-- [ ] 流式：研究/Agent/Cowork/Job 走 SSE，事件→UI 正确，断连重连不丢（Job 重放）。
-- [ ] 安全：Markdown 安全渲染、不持密钥、SSE 清理；`apps/bff` 内联 demo 不破坏。
-- [ ] 测试：API 客户端 + SSE hook 单测 + 五页冒烟（mock fetch/EventSource）；CI 全门禁绿。
-- [ ] CI 含 web typecheck/lint/test/build；README/架构文档更新；本地前后端联调可走通。
+- [x] `apps/web`（Vite+React+TS strict）：设计系统 + 外壳 + 路由 + 鉴权（受保护路由）；纯 API 客户端，不旁路 BFF。
+- [x] 类型化 API 客户端 + SSE hook（卸载清理）；类型尽量源自 `@apolla/contracts`。
+- [x] 五大产品面页可用：研究（流式）/工作区+Writer/Surfaces/Agent+Cowork+Plugins/自动化+设置——均消费现有 BFF 接口。
+- [x] 流式：研究/Agent/Cowork/Job 走 SSE，事件→UI 正确，断连重连不丢（Job 重放）。
+- [x] 安全：Markdown 安全渲染、不持密钥、SSE 清理、错误边界；`apps/bff` 内联 demo 不破坏。
+- [x] 测试：API 客户端 + SSE hook 单测 + 五页冒烟 + 鉴权门 + 错误边界（mock fetch/EventSource）；CI 全门禁绿。
+- [x] CI 含 web typecheck/lint/test/build；README/架构文档更新；本地前后端联调可走通。
+
+> **Sprint 09 完成。** S9-T1–T8 全部合并到 main（PR #56–#58 + 本 PR）。`apps/web` Vite+React SPA 上线：6 条路由（研究/工作区/Surfaces/Agent&Cowork/自动化/设置）+ 登录门，全部消费 BFF HTTP/SSE。Web 测试 16 项（vitest+jsdom+RTL），随 CI 跑；root eval 维持 34 项。本地：`pnpm dev`（BFF）+ `pnpm dev:web`（前端 :5173，代理到 BFF）。
 
 ## 风险与提示（给代理）
 - **纯客户端，别旁路 BFF**：所有数据/流式经 BFF HTTP/SSE；前端不直连模型/库、不持密钥；鉴权走会话 cookie。

@@ -2,11 +2,11 @@
 
 面向个人知识工作的 AI 工作台，采用 **Harness 架构**：模型是可替换、持续变强的能力提供者；平台只做路由、上下文、工具、记忆、安全、评测、交付。模型变强 → 平台能力自动变强。
 
-> 文档：[架构总纲](docs/ARCHITECTURE.md) · [PRD](docs/PRD.md) · [开发计划](docs/DEVELOPMENT_PLAN.md) · Sprint [01](docs/SPRINT_01.md)–[08](docs/SPRINT_08.md) · 代理约定 [AGENTS.md](AGENTS.md) / [CLAUDE.md](CLAUDE.md)
+> 文档：[架构总纲](docs/ARCHITECTURE.md) · [PRD](docs/PRD.md) · [开发计划](docs/DEVELOPMENT_PLAN.md) · Sprint [01](docs/SPRINT_01.md)–[09](docs/SPRINT_09.md) · 代理约定 [AGENTS.md](AGENTS.md) / [CLAUDE.md](CLAUDE.md)
 
 ## 状态
 
-**Sprint 01–08 完成** —— 从研究→成品骨架，升级为持久化、多用户、有记忆、技能可复用、支持多模态成品（文生图/视频）、具备工具生态与低风险执行（MCP + Agent + 分级确认 + 审计）、能主动运行（定时任务 + 后台 Job + 通知）、具备 Cowork 集成式自治（角色化 Plugins + 子代理并行编排 + 澄清机制）、拥有版本化项目文件区（文件感知工具 + Writer + Cowork 文件协作）、并提供 **文本产品面（翻译 / 表格 / 会议纪要，基于工作区的结构化文档变换）**的工作台。
+**Sprint 01–09 完成** —— 从研究→成品骨架，升级为持久化、多用户、有记忆、技能可复用、支持多模态成品（文生图/视频）、具备工具生态与低风险执行（MCP + Agent + 分级确认 + 审计）、能主动运行（定时任务 + 后台 Job + 通知）、具备 Cowork 集成式自治（角色化 Plugins + 子代理并行编排 + 澄清机制）、拥有版本化项目文件区（文件感知工具 + Writer + Cowork 文件协作）、提供文本产品面（翻译 / 表格 / 会议纪要）、并配有 **生产级 Web 前端（`apps/web`：Vite + React SPA，消费 BFF HTTP/SSE）**的工作台。
 - **Harness Core**：Model Router（failover/多密钥）、Prompt Registry、Tool Runtime（Web Search）、Safety & Policy（三级权限 + 防注入）、Cost Ledger、研究状态机（流式综合）、FeatureGate 运行时。
 - **持久化与账号**：Postgres（接口的 PG 实现）、最小 Auth、Projects。
 - **个人化**：Memory（FTS 检索 + 用户模型 + 注入研究流）。
@@ -17,7 +17,8 @@
 - **Cowork 模式（Sprint 06）**：**角色化 Plugins**（打包 skills + 所需连接器 + 命令，按 owner 安装即生效；官方包一键装）、**子代理并行编排**（Coordinator 把目标 fan-out 给有界子代理——各为一次完整 agent 运行、继承 Safety 三级 + 审计——并发/总量封顶后汇总）、**澄清机制**（不确定时主动提问；后台无人 → 安全降级、**绝不自答**）；Cowork 作为 Job 前台/后台/定时运行。
 - **Workspace & Files（Sprint 07）**：**版本化项目文件区**（写入追加新版本 / 历史 / 读旧版 / 回滚；按 owner-project 隔离；**路径规范化 + 越界拒绝**）、**文件感知工具**（`fs_read`/`fs_list` 自动 + `fs_write` 低风险，读到的内容走 untrusted 数据通道）、**Writer**（对工作区文档 AI 编辑产出新版本）、**Cowork 文件协作**（子代理各写 `sections/*` → 汇总读回拼 `brief.md`，受 fs_write 授权约束）；写入计入**配额 + 落审计**。
 - **文本产品面（Sprint 08）**：声明式 **Surface substrate**（capability-as-config：输入类型 + 参数 + promptRef + 输出 mime + executor，新增面 ≈ 配置 + executor）+ 三个面 —— **翻译**（保 Markdown 结构）、**表格**（结构化表 zod 校验 + AI 加列产新版本）、**会议纪要**（转写 → 结构化摘要/决策/行动项）；产物经工作区 guard（路径/配额/审计），输入走 untrusted 数据通道，结构化输出 zod 校验失败安全降级。
-- **Demo**：`apps/bff` —— 登录 → 研究/Agent → 存为定时任务 → 后台运行 → 历史+通知 → 导出；连接 MCP → 跑 Agent → 低风险写入弹确认 → 审计；装 Plugin → 跑 Cowork → 子代理 fan-out → 汇总；研究 → 存为 `report.md` → Writer 编辑 → 回滚 → 下载；**粘转写 → 会议纪要 `notes.md`；翻译 `report.md` → `report.en.md`；生成对比表 `table.csv` → 加列 → 新版本**。
+- **生产前端（Sprint 09）**：`apps/web`（Vite + React + TS strict）—— 设计系统 + 应用外壳 + 路由 + 鉴权（受保护路由）、**类型化 API 客户端 + SSE hook**（卸载清理）；五大产品页：研究（流式）/工作区+Writer/Surfaces/Agent+Cowork+Plugins/自动化+设置，全部消费 BFF 现有 HTTP/SSE 接口（前端为纯客户端，不旁路后端）；Markdown 安全渲染、错误边界、响应式。
+- **Demo**：`apps/bff` 内联工作台（零配置兜底）—— 登录 → 研究/Agent → 定时任务 → 后台 → 历史+通知 → 导出；MCP → Agent → 确认 → 审计；Plugin → Cowork → fan-out → 汇总；`report.md` → Writer → 回滚 → 下载；会议纪要/翻译/表格。生产体验见 `apps/web`。
 
 ## 快速开始
 
@@ -36,23 +37,34 @@ export DATABASE_URL=postgres://postgres:postgres@localhost:5432/apolla
 pnpm dev          # BFF 自动迁移 + 切到 Postgres，数据重启后仍在
 ```
 
+**生产前端（`apps/web`）**：在另一个终端起前端，Vite dev 把 `/api`·`/media` 代理到 BFF：
+
+```bash
+pnpm dev          # 终端 A：BFF（http://localhost:3000）
+pnpm dev:web      # 终端 B：Web 前端（http://localhost:5173）
+```
+
+打开 `http://localhost:5173` → 登录 → 侧栏在 研究 / 工作区 / Surfaces / Agent & Cowork / 自动化 / 设置 间切换。前端是纯 API 客户端，所有数据/流式都经 BFF。`apps/bff` 的内联工作台仍可在 `:3000` 作为零配置兜底。
+
 **接真实模型/搜索/媒体**：复制 `.env.example` 为 `.env`，填 `OPENAI_API_KEY` + `ANTHROPIC_API_KEY`（LLM，`OPENAI_API_KEY` 同时用于文生图）、`TAVILY_API_KEY`（搜索）、`SEEDANCE_API_KEY` + `SEEDANCE_BASE_URL`（文生视频）。会话签名 `SESSION_SECRET`；本地媒体存储目录 `MEDIA_DIR`；连接器密钥加密 `SECRETS_KEY`；本地 MCP server 经连接器的 stdio transport 接入。无对应 key 时该模态/工具自动回退到确定性 stub。
 
 ## 命令
 
 | 命令 | 作用 |
 |---|---|
-| `pnpm dev` | 启动 Demo BFF（`apps/bff`，热重载） |
-| `pnpm typecheck` | 全包 TS 类型检查 |
+| `pnpm dev` | 启动 BFF（`apps/bff`，热重载） |
+| `pnpm dev:web` | 启动 Web 前端（`apps/web`，Vite dev，代理到 BFF） |
+| `pnpm typecheck` | 全包 TS 类型检查（含 `apps/web`） |
 | `pnpm lint` | ESLint |
-| `pnpm test` | vitest 单测（含离线端到端 demo 测试） |
-| `pnpm build` | 各包 tsc 产物 |
+| `pnpm test` | vitest 单测（node 包；`apps/web` 见下） |
+| `pnpm test:web` | Web 前端组件/客户端测试（vitest + jsdom + RTL） |
+| `pnpm build` | 各包 tsc 产物 + Web 前端 vite build |
 | `pnpm eval` | 34 项：研究 + 记忆/Skill/个性化 + 媒体 + 执行(MCP/确认/注入/审计) + 自治(调度/后台重放/通知/后台安全) + Cowork(Plugin/子代理封顶/澄清门控/端到端/安全继承) + Workspace(版本/文件工具安全/越界/Writer/Cowork文件协作) + Surfaces(翻译/表格/会议纪要/落工作区/结构化校验) |
 | `pnpm contract-test` | Provider 契约测试 |
 | `pnpm db:up` / `db:down` | 启停本地 Postgres（docker） |
 | `pnpm db:migrate` | 迁移 schema（读 `DATABASE_URL`） |
 
-要求：Node ≥ 20，pnpm 9。CI（`.github/workflows/ci.yml`）对每个 PR 跑 typecheck · lint · test · build · **eval** 全门禁。
+要求：Node ≥ 20，pnpm 9。CI（`.github/workflows/ci.yml`）对每个 PR 跑 typecheck · lint · test · **test:web** · build · **eval** 全门禁。
 
 ## 仓库布局（详见 [ARCHITECTURE §7](docs/ARCHITECTURE.md)）
 
@@ -63,7 +75,8 @@ packages/
   harness-core/     # ★ Harness：Router · Prompt Registry · Tool Runtime · Safety · Cost · Orchestrator
   adapters/
     llm/{openai,anthropic}/    search/{stub,tavily}/
-apps/bff/           # Demo：研究→成品 API(SSE) + 三栏工作台（组合根）
+apps/bff/           # BFF：研究→成品 API(SSE) + 内联工作台（组合根；唯一后端）
+apps/web/           # ★ 生产前端：Vite + React SPA，消费 BFF HTTP/SSE（Sprint 09）
 evals/              # 研究 golden + 引用/成本回归门禁
 workers/            # （后续）
 ```

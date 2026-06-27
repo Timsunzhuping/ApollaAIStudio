@@ -214,6 +214,14 @@ interface Orchestrator {
 - **集成式 `CoworkOrchestrator`**：规划 subgoals（LLM 结构化）→ 驱动 Coordinator。`cowork` 是一种 `JobKind`，因此 Cowork 直接复用 Sprint 05 的 JobRunner（前台 SSE / 后台 / 定时）+ 通知 + 配额闸（`JobRunner.canRun`）。
 - **澄清**（`clarify(question)` 解析器，贯穿 Agent→Coordinator→Cowork）：不确定/不可逆前主动提问；**后台无人 → 返回 null → 安全降级（best-effort），绝不自答**。
 
+**Workspace & Files（Sprint 07，已落地）** —— 把一次性产出升级为持久、可版本、可编辑、可组合的工作产物（虚拟 FS，非裸机目录）：
+- **版本化文件区**（`WorkspaceRepository`，内存 + Postgres）：写入**追加新版本**（只增不改），读最新/指定版、列文件树、历史、回滚（= 用旧版内容产生新版本，保留完整历史）；按 **owner+project 隔离**。
+- **路径安全**（`normalizeWorkspacePath`，工具层 + repo 层双重）：拒 `..`、绝对路径、控制字符/反斜杠、跨 scope——**路径遍历是文件区头号风险**。
+- **文件感知工具**（`fs_read`/`fs_list` = read，`fs_write` = low_write）：接入 ToolRuntime，受 Safety 三级 + Agent/Cowork 的 approve/allowlist 约束；**读到的文件内容进 untrusted 数据通道**（与工具输出一视同仁，不当指令）。
+- **Writer**（`WriterOrchestrator`）：读工作区文档（数据通道）→ LLM 按指令编辑 → 写新版本（旧版保留 → 可回滚）。
+- **Cowork 文件协作**：`Coordinator` 可选挂 workspace——授权时（镜像 fs_write allowlist，后台安全）子代理各节落 `cowork/<id>/sections/<i>.md`，汇总读回拼 `cowork/<id>/brief.md`。
+- **配额 + 审计**（`GuardedWorkspaceRepository` 装饰器）：每 owner 文件数 + 总字节上限，超限拒写；**每次写入（含越界拒绝）落审计**。
+
 ### 3.10 Eval Harness（升级安全网）
 五类回归（每次模型/Prompt/工具/媒体变更必跑）：
 1. Golden set 质量回归 2. Citation correctness 3. Cost regression 4. Tool success regression 5. 安全（prompt 注入对抗 / 沙箱逃逸 / 越权动作）。

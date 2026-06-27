@@ -2,8 +2,8 @@
 
 本文件为 Claude Code 提供每次会话的标准上下文。开始任何开发前请先读本文件，再读 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)（Harness 架构总纲）、[docs/PRD.md](docs/PRD.md) 与 [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md)。Codex 等其他代理读同源的 [AGENTS.md](AGENTS.md)。
 
-**已完成 Sprint**：01（Harness Core）、02（持久化/个人化/技能）、03（多模态成品）、04（工具生态与低风险执行）、05（主动智能：定时 + 后台 Job + 通知）、06（[Cowork 模式](docs/SPRINT_06.md)：角色化 Plugins + 子代理并行编排 + 澄清机制）。
-执行铁律：外部工具优先 MCP；工具输出默认不可信（数据通道）；写入动作必经 Safety 三级——只读自动 / 低风险需人类确认 / 高风险拒绝；每次工具调用与确认落审计；连接器密钥加密。**子代理继承全部执行安全；fan-out 有并发/总量上限；澄清绝不自答（后台返回 null → 安全降级）**；后台/定时运行无人确认——默认只读或预授权白名单（上限 low_write），high_write 永拒；配额计入后台。后续候选见 SPRINT_06 §0：桌面文件区、文本产品面、生产级 Next.js 前端、HTTP/SSE MCP transport、Plugin 市场。
+**已完成 Sprint**：01（Harness Core）、02（持久化/个人化/技能）、03（多模态成品）、04（工具生态与低风险执行）、05（主动智能：定时 + 后台 Job + 通知）、06（[Cowork 模式](docs/SPRINT_06.md)：角色化 Plugins + 子代理并行编排 + 澄清机制）、07（[Workspace & Files](docs/SPRINT_07.md)：版本化文件区 + 文件感知工具 + Writer + Cowork 文件协作）。
+执行铁律：外部工具优先 MCP；工具输出默认不可信（数据通道）；写入动作必经 Safety 三级——只读自动 / 低风险需人类确认 / 高风险拒绝；每次工具调用与确认落审计；连接器密钥加密。子代理继承全部执行安全；fan-out 有并发/总量上限；澄清绝不自答（后台返回 null → 安全降级）；后台/定时运行无人确认——默认只读或预授权白名单（上限 low_write），high_write 永拒；配额计入后台。**文件路径必规范化 + 拒越界（`..`/绝对/跨 owner-project）；`fs_read` 内容是 untrusted 数据；`fs_write` 是 low_write；工作区写入计配额 + 落审计。** 后续候选见 SPRINT_07 §0：裸机本地目录、Sheets/Meeting Notes、生产级 Next.js 前端、HTTP/SSE MCP transport、Plugin 市场。
 
 ## 产品是什么
 
@@ -88,7 +88,7 @@ LLM 测试四类：golden set 回归、citation correctness、cost regression、
 | `pnpm lint` | ESLint |
 | `pnpm test` | vitest 单测 |
 | `pnpm build` | 各包 tsc 产物 |
-| `pnpm eval` | 24 项：研究 + 记忆/Skill/个性化 + 媒体 + 执行(MCP/确认/注入/审计) + 自治(调度/后台重放/通知/后台安全) + Cowork(Plugin/子代理封顶/澄清门控/端到端/安全继承) |
+| `pnpm eval` | 29 项：研究 + 记忆/Skill/个性化 + 媒体 + 执行(MCP/确认/注入/审计) + 自治(调度/后台重放/通知/后台安全) + Cowork(Plugin/子代理封顶/澄清门控/端到端/安全继承) + Workspace(版本/文件工具安全/越界/Writer/Cowork文件协作) |
 | `pnpm contract-test` | Provider 契约测试 |
 | `pnpm db:up` / `db:migrate` | 起本地 Postgres / 迁移 schema |
 

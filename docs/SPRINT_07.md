@@ -97,14 +97,16 @@ S7-T1(Workspace 存储) ─ S7-T2(文件工具) ─┬─ S7-T3(Writer)
 - **建议 PR 分组**：A(T1+T2) · B(T3+T4) · C(T5+T6) · D(T7+T8)。
 
 ## Sprint 07 Definition of Done（整体验收）
-- [ ] 工作区：文件写入版本化（递增/历史/读旧版/回滚）；按 owner/project 隔离、持久化（Postgres 重启仍在）。
-- [ ] 文件工具：`fs_read`/`fs_list`（read 自动）+ `fs_write`（低风险确认 / 后台白名单 / high 永拒）；读内容走数据通道。
-- [ ] 路径安全：规范化 + 拒 `..`/绝对/跨 scope；越界写入被拒并审计。
-- [ ] Writer：把成品存为工作区文档 → AI 编辑产出新版本 → 可回滚。
-- [ ] Cowork 文件协作：子代理写 `sections/*` → 汇总读回拼 `brief.md`；写入受白名单约束。
-- [ ] 配额：文件数/总字节上限，超限拒写；写入落审计。
-- [ ] `pnpm eval` 含 版本/工具门控/越界/Writer/Cowork 文件协作（29 项）；CI 全门禁绿。
-- [ ] README/命令/架构文档一致更新；Demo 端到端走通（离线可演示）。
+- [x] 工作区：文件写入版本化（递增/历史/读旧版/回滚）；按 owner/project 隔离、持久化（Postgres 重启仍在）。
+- [x] 文件工具：`fs_read`/`fs_list`（read 自动）+ `fs_write`（低风险确认 / 后台白名单 / high 永拒）；读内容走数据通道。
+- [x] 路径安全：规范化 + 拒 `..`/绝对/跨 scope；越界写入被拒并审计。
+- [x] Writer：把成品存为工作区文档 → AI 编辑产出新版本 → 可回滚。
+- [x] Cowork 文件协作：子代理写 `sections/*` → 汇总读回拼 `brief.md`；写入受白名单约束。
+- [x] 配额：文件数/总字节上限，超限拒写；写入落审计。
+- [x] `pnpm eval` 含 版本/工具门控/越界/Writer/Cowork 文件协作（29 项）；CI 全门禁绿。
+- [x] README/命令/架构文档一致更新；Demo 端到端走通（离线可演示）。
+
+> **Sprint 07 完成。** S7-T1–T8 全部合并到 main（PR #46–#48 + 本 PR）。29 项 eval 全绿（研究 6 + 媒体 4 + 执行 5 + 自治 4 + Cowork 5 + Workspace 5）。离线端到端验证：研究 → 存 `report.md` → Writer 编辑 → v2 → 回滚；Cowork（fs_write 授权）→ `sections/1..3.md` + `brief.md` 落盘。
 
 ## 风险与提示（给代理）
 - **路径遍历是头号风险**：所有 path 在工具层与 repo 层双重规范化（resolve 后必须仍在 `owner/project/` 前缀内），拒绝 `..`、绝对路径、符号越界；越界即审计 + 拒绝，不静默裁剪。

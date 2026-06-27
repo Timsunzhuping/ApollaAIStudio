@@ -1,0 +1,9 @@
+{
+  "id": "sheet",
+  "title": "Sheets",
+  "inputKind": "text",
+  "params": { "mode": "generate" },
+  "promptRef": "surface.sheet",
+  "outputMime": "text/csv",
+  "executor": "sheet"
+}

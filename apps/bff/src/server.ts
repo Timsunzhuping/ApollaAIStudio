@@ -239,9 +239,13 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     if (!outputPath) {
       if (surface.inputKind === 'doc' && body.sourcePath) {
         const src = String(body.sourcePath);
-        const dot = src.lastIndexOf('.');
-        const tag = surface.id === 'translate' ? String(params.targetLang ?? 'out').toLowerCase().slice(0, 5) : surface.id;
-        outputPath = dot > 0 ? `${src.slice(0, dot)}.${tag}${src.slice(dot)}` : `${src}.${tag}`;
+        if (surface.id === 'translate') {
+          const dot = src.lastIndexOf('.');
+          const tag = String(params.targetLang ?? 'out').toLowerCase().slice(0, 5);
+          outputPath = dot > 0 ? `${src.slice(0, dot)}.${tag}${src.slice(dot)}` : `${src}.${tag}`;
+        } else {
+          outputPath = src; // in-place edit → new version (e.g. sheet add-column)
+        }
       } else {
         outputPath = `surface-${surface.id}.md`;
       }

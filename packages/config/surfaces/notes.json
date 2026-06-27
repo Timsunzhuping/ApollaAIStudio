@@ -1,0 +1,9 @@
+{
+  "id": "notes",
+  "title": "Meeting Notes",
+  "inputKind": "text",
+  "params": {},
+  "promptRef": "surface.notes",
+  "outputMime": "text/markdown",
+  "executor": "notes"
+}

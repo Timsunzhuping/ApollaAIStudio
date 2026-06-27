@@ -28,6 +28,11 @@ export class PostgresJobRepository implements JobRepository {
     return rows.map((r) => Job.parse(r.data));
   }
 
+  async listNonTerminal(): Promise<JobT[]> {
+    const rows = await this.sql<{ data: unknown }[]>`SELECT data FROM jobs WHERE status IN ('queued', 'running') ORDER BY created_at`;
+    return rows.map((r) => Job.parse(r.data));
+  }
+
   async appendEvent(jobId: string, event: unknown): Promise<void> {
     await this.sql`INSERT INTO job_events (job_id, data) VALUES (${jobId}, ${this.sql.json(event as never)})`;
   }

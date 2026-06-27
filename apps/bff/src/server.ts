@@ -6,6 +6,8 @@ import { hashPassword, verifyPassword } from '@apolla/harness-core';
 import { buildHarness, type Harness } from './harness';
 import { readSession, startSession, endSession } from './auth';
 import { applySecurityHeaders, applyCors, clientIp, limiters, isExpensive, MAX_BODY_BYTES } from './security';
+import { observe, metrics, type ObservedResponse } from './obs';
+import { reconcileJobs } from '@apolla/harness-core';
 import { UI_HTML } from './ui';
 
 // Assigned by the entry point (or by tests via setHarness) — keeps handlers free of a build-at-import
@@ -44,8 +46,12 @@ export async function handle(req: IncomingMessage, res: ServerResponse): Promise
   const { pathname } = url;
   const method = req.method ?? 'GET';
 
+  observe(req, res);
   applySecurityHeaders(res);
   if (applyCors(req, res)) return; // handled preflight
+
+  // Operational metrics (aggregate numbers only — no secrets/PII). Unauthenticated by design.
+  if (method === 'GET' && pathname === '/metrics') return json(res, 200, metrics.snapshot());
 
   // Per-IP rate limit (protects login/register + overall). Fail-closed with 429 + Retry-After.
   const ip = clientIp(req);
@@ -132,6 +138,7 @@ export async function handle(req: IncomingMessage, res: ServerResponse): Promise
     return user ? json(res, 200, user) : json(res, 401, { error: 'not authenticated' });
   }
   if (!ownerId) return json(res, 401, { error: 'not authenticated' });
+  (res as ObservedResponse).__ownerId = ownerId; // for the structured access log (id, not PII)
 
   // Strict per-owner limit on expensive (LLM/media) endpoints (S10-T3).
   if (isExpensive(method, pathname) && !limiters.owner().allow(ownerId)) {
@@ -707,16 +714,32 @@ export async function handle(req: IncomingMessage, res: ServerResponse): Promise
 
 // Entry point — skipped under vitest so tests can import { handle, setHarness } without listening.
 if (!process.env.VITEST) {
-  setHarness(await buildHarness());
+  const built = await buildHarness();
+  setHarness(built);
+  // Startup reconciliation: any job still queued/running from a previous process is dead (S10-T6).
+  const reconciled = await reconcileJobs(built.jobRepo).catch(() => 0);
+  if (reconciled) console.log(`Reconciled ${reconciled} interrupted job(s) from a prior run`);
+
   const PORT = Number(process.env.PORT ?? 3000);
-  createServer((req, res) => {
+  const server = createServer((req, res) => {
     handle(req, res).catch((e) => json(res, 500, { error: e instanceof Error ? e.message : String(e) }));
   }).listen(PORT, () => {
-    console.log(`Apolla BFF [${harness.mode}/${harness.persistence}] → http://localhost:${PORT}`);
+    console.log(`Apolla BFF [${built.mode}/${built.persistence}] → http://localhost:${PORT}`);
   });
 
   // In-process cron tick (S5-T3). Production would use a durable queue/worker instead.
-  setInterval(() => {
-    harness.scheduler.tick(new Date()).catch(() => {});
+  const cron = setInterval(() => {
+    built.scheduler.tick(new Date()).catch(() => {});
   }, 30_000);
+
+  // Graceful shutdown: stop accepting, stop the cron, close DB pool, exit.
+  const shutdown = () => {
+    clearInterval(cron);
+    server.close(() => {
+      void built.close?.().finally(() => process.exit(0));
+    });
+    setTimeout(() => process.exit(0), 5000).unref(); // hard cap if connections linger
+  };
+  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', shutdown);
 }

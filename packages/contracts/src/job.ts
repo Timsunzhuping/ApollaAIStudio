@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const JobKind = z.enum(['research', 'agent', 'skill', 'media', 'cowork']);
 export type JobKind = z.infer<typeof JobKind>;
 
-export const JobStatus = z.enum(['queued', 'running', 'done', 'failed']);
+export const JobStatus = z.enum(['queued', 'running', 'done', 'failed', 'interrupted']);
 export type JobStatus = z.infer<typeof JobStatus>;
 
 /** What to run in the background — kind + free-form input consumed by the resolver. */

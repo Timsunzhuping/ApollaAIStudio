@@ -14,5 +14,6 @@ export * from './tool';
 export * from './task';
 export * from './skill';
 export * from './usage';
+export * from './workspace';
 export { jsonSchemas } from './schema';
 export type { JsonSchemaName } from './schema';

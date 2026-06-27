@@ -14,6 +14,7 @@ export { PostgresJobRepository } from './job';
 export { PostgresScheduledTaskRepository } from './schedule';
 export { PostgresNotificationRepository } from './notification';
 export { PostgresPluginRepository } from './plugin';
+export { PostgresWorkspaceRepository } from './workspace';
 
 /** Open a connection pool. Reads DATABASE_URL by default. */
 export function createSql(url = process.env.DATABASE_URL): Sql {
@@ -146,6 +147,17 @@ CREATE TABLE IF NOT EXISTS plugins (
   PRIMARY KEY (owner_id, name)
 );
 CREATE INDEX IF NOT EXISTS plugins_owner_idx ON plugins (owner_id);
+
+CREATE TABLE IF NOT EXISTS workspace_files (
+  owner_id    text NOT NULL,
+  project_id  text NOT NULL DEFAULT '',
+  path        text NOT NULL,
+  version     integer NOT NULL,
+  data        jsonb NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (owner_id, project_id, path, version)
+);
+CREATE INDEX IF NOT EXISTS workspace_scope_idx ON workspace_files (owner_id, project_id, path);
 `;
 
 export async function migrate(sql: Sql): Promise<void> {

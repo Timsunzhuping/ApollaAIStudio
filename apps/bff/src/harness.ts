@@ -29,6 +29,7 @@ import {
   Coordinator,
   CoworkOrchestrator,
   InMemoryWorkspaceRepository,
+  GuardedWorkspaceRepository,
   makeWorkspaceTools,
   WriterOrchestrator,
   JobRunner,
@@ -209,6 +210,9 @@ export async function buildHarness(): Promise<Harness> {
     workspaceRepo = new InMemoryWorkspaceRepository();
     persistence = 'memory';
   }
+
+  // Guard all workspace writes: per-owner quota + audit every write (incl. traversal rejections).
+  workspaceRepo = new GuardedWorkspaceRepository({ base: workspaceRepo, audit: (e) => auditRepo.record(e) });
 
   const ledger = new InMemoryCostLedger(pricing);
   const prompts = new PromptRegistry();

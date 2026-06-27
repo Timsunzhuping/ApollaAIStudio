@@ -66,6 +66,8 @@ export type { CoordinatorDeps, CoordinatorInput, CoworkEvent, SubAgentResult } f
 export { CoworkOrchestrator } from './cowork/orchestrator';
 export type { CoworkDeps, CoworkInput } from './cowork/orchestrator';
 export { InMemoryWorkspaceRepository } from './workspace/memory';
+export { GuardedWorkspaceRepository } from './workspace/guard';
+export type { WorkspaceGuardLimits, WorkspaceGuardDeps } from './workspace/guard';
 export { normalizeWorkspacePath, PathError } from './workspace/path';
 export type { WorkspaceRepository, WorkspaceWriteInput, WorkspaceScope } from './workspace/types';
 export { FsReadTool, FsListTool, FsWriteTool, makeWorkspaceTools } from './tools/fs';

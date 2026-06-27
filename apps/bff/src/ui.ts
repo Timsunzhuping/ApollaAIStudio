@@ -61,7 +61,7 @@ export const UI_HTML = `<!doctype html>
     <div class="col">
       <h3>Sources</h3><div id="sources" class="muted">—</div>
       <h3 style="margin-top:1rem">Cost</h3><div class="cost" id="cost">$0.0000</div>
-      <div class="exp" id="exp" style="display:none"><button class="ghost" data-fmt="md">Export .md</button><button class="ghost" data-fmt="html">Export .html</button><button class="ghost" id="saveSkill">★ Save as skill</button><button class="ghost" id="genImage">🖼 Cover</button><button class="ghost" id="genVideo">🎬 Video</button></div>
+      <div class="exp" id="exp" style="display:none"><button class="ghost" data-fmt="md">Export .md</button><button class="ghost" data-fmt="html">Export .html</button><button class="ghost" id="saveSkill">★ Save as skill</button><button class="ghost" id="saveWs">💾 To workspace</button><button class="ghost" id="genImage">🖼 Cover</button><button class="ghost" id="genVideo">🎬 Video</button></div>
       <div id="media" style="margin-top:.6rem"></div>
     </div>
   </div>
@@ -101,6 +101,20 @@ export const UI_HTML = `<!doctype html>
     <div class="col"><h3>Cowork trace (sub-agent fan-out)</h3><div id="coworkTrace" class="muted">—</div></div>
     <div class="col"><h3>Deliverable</h3><div id="coworkOut" class="muted">—</div></div>
   </div>
+  <div class="bar" style="border-top:1px solid var(--bd)">
+    <b>Workspace</b>
+    <button class="ghost" id="refreshWs">↻ Files</button>
+    <input id="wrPath" placeholder="file path, e.g. report.md" style="max-width:14rem" />
+    <input id="wrInstr" placeholder="Writer instruction, e.g. translate the conclusion to English" />
+    <button id="runWriter">Edit</button>
+  </div>
+  <div class="grid" style="grid-template-columns:1fr 2fr">
+    <div class="col"><h3>Files</h3><div id="wsTree" class="muted">—</div></div>
+    <div class="col"><h3>File <span id="wsTitle" class="muted"></span></h3>
+      <div id="wsBar" style="margin-bottom:.4rem"></div>
+      <pre id="wsView" class="muted" style="white-space:pre-wrap;margin:0">select a file</pre>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -116,7 +130,7 @@ async function boot() {
 function showApp(u) {
   $('login').style.display='none'; $('app').style.display='block';
   $('who').textContent = u.email; $('logout').style.display='inline-block';
-  loadProjects(); loadSkills(); loadConnectors(); loadPlugins(); refreshInbox();
+  loadProjects(); loadSkills(); loadConnectors(); loadPlugins(); loadWorkspace(); refreshInbox();
 }
 function btn(label, cls, fn){ const b=document.createElement('button'); b.textContent=label; if(cls)b.className=cls; b.onclick=fn; b.style.marginRight='.3rem'; return b; }
 async function refreshInbox(){ loadSchedules(); loadJobs(); loadNotifs(); }
@@ -188,7 +202,8 @@ $('runCowork').onclick = async () => {
     else if(ev.type==='subagent-result') line.textContent='✓ #'+(ev.index+1)+' done ('+ev.result.toolCalls+' tool calls)';
     else if(ev.type==='clarify') line.textContent='❓ '+ev.question+(ev.answered?' (answered)':' (no answer — proceeding safely)');
     else if(ev.type==='synthesize'){ $('coworkOut').className=''; $('coworkOut').textContent=ev.text; line.textContent='🧩 synthesized deliverable'; }
-    else if(ev.type==='done'){ es.close(); loadJobs(); }
+    else if(ev.type==='file-written'){ line.textContent='📄 wrote '+ev.path+' v'+ev.version; }
+    else if(ev.type==='done'){ es.close(); loadJobs(); loadWorkspace(); }
     else if(ev.type==='error'){ line.textContent='error: '+ev.message; es.close(); }
     $('coworkTrace').appendChild(line);
   };
@@ -199,6 +214,43 @@ $('scheduleCowork').onclick = async () => {
   const cron=prompt('Cron (UTC), default daily 08:00','0 8 * * *')||'0 8 * * *';
   await fetch('/api/schedules',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:'Cowork: '+goal.slice(0,30),cron,kind:'cowork',input:{goal}})});
   loadSchedules();
+};
+// --- Workspace (S7): versioned files + Writer ---
+async function loadWorkspace(){
+  const files = await fetch('/api/workspace').then(r=>r.json());
+  const box=$('wsTree'); box.innerHTML='';
+  if(!files.length){ box.className='muted'; box.textContent='no files'; return; } box.className='';
+  for(const f of files){ const d=document.createElement('div'); d.className='step';
+    const a=document.createElement('a'); a.href='#'; a.textContent='📄 '+f.path+' (v'+f.version+')';
+    a.onclick=(e)=>{ e.preventDefault(); viewFile(f.path); }; d.appendChild(a); box.appendChild(d);
+  }
+}
+async function viewFile(path, version){
+  const hist = await fetch('/api/workspace/history?path='+encodeURIComponent(path)).then(r=>r.json());
+  const url='/api/workspace/file?path='+encodeURIComponent(path)+(version?'&version='+version:'');
+  const file = await fetch(url).then(r=>r.json());
+  $('wsTitle').textContent = path+' · v'+file.version+'/'+hist.length;
+  $('wsView').className=''; $('wsView').textContent = file.content;
+  const bar=$('wsBar'); bar.innerHTML='';
+  const sel=document.createElement('select');
+  sel.innerHTML = hist.map(h=>'<option value="'+h.version+'"'+(h.version===file.version?' selected':'')+'>v'+h.version+'</option>').join('');
+  sel.onchange=()=>viewFile(path, Number(sel.value)); bar.appendChild(sel);
+  bar.appendChild(btn('⏮ rollback to this','ghost', async()=>{ await fetch('/api/workspace/rollback',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({path,version:file.version})}); loadWorkspace(); viewFile(path); }));
+  bar.appendChild(btn('⬇ download','ghost', ()=>{ window.location=url+(url.includes('?')?'&':'?')+'download=1'; }));
+}
+$('refreshWs').onclick = loadWorkspace;
+$('saveWs').onclick = async () => {
+  const content=$('report').textContent||''; if(!content.trim()) return;
+  const path=prompt('Save report to workspace as:', 'report.md'); if(!path) return;
+  const r=await fetch('/api/workspace/save-artifact',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({path,content})});
+  if(r.ok){ loadWorkspace(); viewFile(path); } else alert('save failed: '+(await r.json()).error);
+};
+$('runWriter').onclick = async () => {
+  const path=$('wrPath').value.trim(), instruction=$('wrInstr').value.trim();
+  if(!path||!instruction) return;
+  const r=await fetch('/api/writer',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({path,instruction})});
+  const b=await r.json();
+  if(r.ok){ loadWorkspace(); viewFile(path); } else alert('writer failed: '+b.error);
 };
 let agentId = null;
 async function loadConnectors(){

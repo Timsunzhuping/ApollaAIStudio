@@ -22,6 +22,8 @@ export interface JobRunnerDeps {
   idGen?: () => string;
   /** Tracer for the job.run span + cross-process trace continuation (S17). Defaults to Noop. */
   tracer?: Tracer;
+  /** SLO metrics hook (S17): called on terminal with (`job:<kind>`, durationMs, ok). */
+  onMetric?: (name: string, ms: number, ok: boolean) => void;
   /**
    * Execution substrate (S16). Omit → an internal InProcessJobQueue is created + the consumer is
    * auto-registered (standalone/test convenience). Pass one → the CALLER registers the consumer
@@ -94,6 +96,7 @@ export class JobRunner {
     if (job.status === 'interrupted') await this.d.repo.clearEvents(job.id);
     job.status = 'running';
     await this.d.repo.save(job);
+    const startedMs = Date.now();
     try {
       const spec: JobSpec = { kind: job.kind, input: job.input, allowTools: job.allowTools ?? [] };
       // job.run span continues the originating trace (web → worker); orchestrator/LLM spans nest.
@@ -120,6 +123,7 @@ export class JobRunner {
       job.status = 'failed';
       job.error = message;
     }
+    this.d.onMetric?.(`job:${job.kind}`, Date.now() - startedMs, job.status === 'done');
     await this.d.repo.save(job);
     await this.d.onComplete?.(job);
   }

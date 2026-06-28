@@ -96,6 +96,7 @@ import { OpenAIImageAdapter } from '@apolla/media-openai';
 import { SeedanceVideoAdapter } from '@apolla/media-seedance';
 import { StdioMCPClient, HttpMCPClient } from '@apolla/mcp-stdio';
 import { LocalObjectStore } from './object-store';
+import { metrics } from './obs';
 import { OpenAIAdapter } from '@apolla/adapter-openai';
 import { AnthropicAdapter } from '@apolla/adapter-anthropic';
 import { StubSearchProvider } from '@apolla/search-stub';
@@ -452,6 +453,7 @@ export async function buildHarness(): Promise<Harness> {
     canRun: (id) => quota.check(id).then((q) => q.ok),
     queue: jobQueue,
     tracer,
+    onMetric: (name, ms, ok) => metrics.operation(name, ms, ok), // SLO view (S17)
   });
   // In-process mode: the web consumes its own queue. Distributed mode: the web enqueues only and a
   // standalone worker registers the consumer (see workers/job-worker).

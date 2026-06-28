@@ -33,11 +33,17 @@ import {
   InMemorySubscriptionRepository,
   StubPaymentProvider,
   resolveEntitlements,
+  StubOAuthProvider,
+  InMemoryIdentityRepository,
+  InMemoryOAuthStateStore,
   decryptSecret,
   type SessionRepository,
   type ApiTokenRepository,
   type SubscriptionRepository,
   type PaymentProvider,
+  type IdentityRepository,
+  type OAuthStateStore,
+  type AuthProvider,
   InMemoryWorkspaceRepository,
   GuardedWorkspaceRepository,
   makeWorkspaceTools,
@@ -78,6 +84,7 @@ import {
 } from '@apolla/harness-core';
 import { getRoute, loadSkills, loadPlugins, loadSurfaces, loadConnectorCatalog, loadPlans, loadFeatureGates, getMediaRoute } from '@apolla/config';
 import { StripePaymentProvider } from '@apolla/payment-stripe';
+import { GoogleOAuthProvider, GitHubOAuthProvider } from '@apolla/auth-oauth';
 import type { ModelCaps } from '@apolla/contracts';
 import { OpenAIImageAdapter } from '@apolla/media-openai';
 import { SeedanceVideoAdapter } from '@apolla/media-seedance';
@@ -106,8 +113,17 @@ import {
   PostgresSessionRepository,
   PostgresApiTokenRepository,
   PostgresSubscriptionRepository,
+  PostgresIdentityRepository,
 } from '@apolla/db-postgres';
 import { DemoLLMAdapter } from './demo-adapter';
+
+/** Identity providers (S14): stub always (offline default); Google/GitHub only when env-keyed. */
+function buildAuthProviders(): Map<string, AuthProvider> {
+  const providers = new Map<string, AuthProvider>([['stub', new StubOAuthProvider()]]);
+  if (process.env.GOOGLE_CLIENT_ID) providers.set('google', new GoogleOAuthProvider());
+  if (process.env.GITHUB_CLIENT_ID) providers.set('github', new GitHubOAuthProvider());
+  return providers;
+}
 
 export interface Harness {
   orchestrator: ResearchOrchestrator;
@@ -118,6 +134,9 @@ export interface Harness {
   subscriptions: SubscriptionRepository;
   payment: PaymentProvider;
   plans: () => import('@apolla/contracts').PlanDef[];
+  identities: IdentityRepository;
+  authProviders: Map<string, AuthProvider>;
+  oauthStates: OAuthStateStore;
   projects: ProjectRepository;
   memory: Memory;
   skills: SkillRuntime;
@@ -190,6 +209,7 @@ export async function buildHarness(): Promise<Harness> {
   let sessions: SessionRepository;
   let apiTokens: ApiTokenRepository;
   let subscriptions: SubscriptionRepository;
+  let identities: IdentityRepository;
   let projects: ProjectRepository;
   let memory: Memory;
   let skillRepo: SkillRepository;
@@ -212,6 +232,7 @@ export async function buildHarness(): Promise<Harness> {
     sessions = new PostgresSessionRepository(sql);
     apiTokens = new PostgresApiTokenRepository(sql);
     subscriptions = new PostgresSubscriptionRepository(sql);
+    identities = new PostgresIdentityRepository(sql);
     projects = new PostgresProjectRepository(sql);
     memory = new PostgresMemory(sql);
     skillRepo = new PostgresSkillRepository(sql);
@@ -233,6 +254,7 @@ export async function buildHarness(): Promise<Harness> {
     sessions = new InMemorySessionRepository();
     apiTokens = new InMemoryApiTokenRepository();
     subscriptions = new InMemorySubscriptionRepository();
+    identities = new InMemoryIdentityRepository();
     projects = new InMemoryProjectRepository();
     memory = new InMemoryMemory();
     skillRepo = new InMemorySkillRepository();
@@ -431,6 +453,10 @@ export async function buildHarness(): Promise<Harness> {
     subscriptions,
     payment: process.env.STRIPE_SECRET_KEY ? new StripePaymentProvider() : new StubPaymentProvider(),
     plans: loadPlans,
+    identities,
+    // Identity providers: stub always (offline default); real providers when env-keyed (缺 key 不注册).
+    authProviders: buildAuthProviders(),
+    oauthStates: new InMemoryOAuthStateStore(),
     projects,
     memory,
     skills,

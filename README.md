@@ -1,4 +1,6 @@
-# Apolla AI
+# Apolla AI · v1.0
+
+> **🎉 1.0 已发布** —— 完整、可生产部署的产品（Sprint 01–24 全部完成）。见 [发布说明](RELEASE_NOTES.md) · [变更日志](CHANGELOG.md) · [安全策略](SECURITY.md)。
 
 面向个人知识工作的 AI 工作台，采用 **Harness 架构**：模型是可替换、持续变强的能力提供者；平台只做路由、上下文、工具、记忆、安全、评测、交付。模型变强 → 平台能力自动变强。
 
@@ -52,6 +54,8 @@ pnpm dev:web      # 终端 B：Web 前端（http://localhost:5173）
 **接真实模型/搜索/媒体**：复制 `.env.example` 为 `.env`，填 `OPENAI_API_KEY` + `ANTHROPIC_API_KEY`（LLM，`OPENAI_API_KEY` 同时用于文生图）、`TAVILY_API_KEY`（搜索）、`SEEDANCE_API_KEY` + `SEEDANCE_BASE_URL`（文生视频）。会话签名 `SESSION_SECRET`；本地媒体存储目录 `MEDIA_DIR`；连接器密钥加密 `SECRETS_KEY`；本地 MCP server 经连接器的 stdio transport 接入。无对应 key 时该模态/工具自动回退到确定性 stub。
 
 **变现 / 计费（Sprint 13）**：套餐声明在 `packages/config/plans/*.json`（free/pro/team：`taskLimit` + `features` + 价格），新增套餐无需改业务代码。支付走可插拔 **PaymentProvider**——默认 **Stub**（离线确定性，Checkout 立即激活，便于本地/CI 演示），配 `STRIPE_SECRET_KEY` 时切到 **Stripe**（托管 Checkout，无 SDK），`STRIPE_WEBHOOK_SECRET` 校验 Webhook 签名，`STRIPE_PRICE_<PLAN>`（如 `STRIPE_PRICE_PRO`）映射套餐→Stripe Price。**卡号永不经我方服务器**（provider 托管 Checkout，我方只存 `providerRef` + 订阅状态）；Webhook 必验签 + 幂等；权益解析失败回落 free。Web **Billing** 页查看当前套餐/用量、升级、取消；stub 模式可端到端演示升级→pro 权益解锁→取消回落。
+
+**发布加固 / 1.0（Sprint 24）**：发布收尾。**生产启动对错误配置 fail-fast**——缺/用 dev 默认 `SESSION_SECRET` 直接拒绝启动(而非用公开密钥签会话)、真生产缺 `DATABASE_URL` 拒启动;运维探针 `GET /api/version`(版本/模式,不泄密钥/连接串)+ `GET /api/ready`(PG 探活,供 LB/k8s);前端显示版本;`CHANGELOG.md`/`SECURITY.md`/`RELEASE_NOTES.md` 就位,版本统一 `1.0.0`。**项目至此达到 1.0**。
 
 **运营 / 管理控制台（Sprint 23）**：运营一个已部署产品的最小管理面。管理员(由 `ADMIN_EMAILS` 环境变量白名单判定,**不可自我提权**)能进入"运营台"——看**全站指标**(用户/项目/任务/job 各状态/订阅各计划计数)、**最近活动审计流**(跨 owner)、**用户列表**(邮箱搜索 + 元数据 + 计划),并能为某用户**授予/变更计划**(客服/运营用,走既有 entitlements、落审计)。`/api/admin/*` 一律 **非管理员 403 fail-closed**;管理员只看**聚合 + 元数据**,**绝不**看他人私有内容(工作区正文/研究结果/密钥);Admin 导航仅管理员可见。
 

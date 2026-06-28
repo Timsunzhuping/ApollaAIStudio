@@ -64,13 +64,15 @@
 - **DoD**：文档自洽;1.0 宣告就位。
 
 ## Sprint 24 DoD
-- [ ] `validateConfig` 生产 fail-fast(缺 `SESSION_SECRET` 拒启动)+ warnings。
-- [ ] 版本单源 + `/api/version` + health.version(不泄敏感)。
-- [ ] `/api/ready` 就绪探针(PG 探活)。
-- [ ] 前端版本展示。
-- [ ] `CHANGELOG.md` + `SECURITY.md` + `RELEASE_NOTES.md` + 版本 `1.0.0`。
-- [ ] `pnpm test`+`test:web`+`e2e`+`eval` 全绿 hermetic。
-- [ ] 文档 + 1.0 宣告。
+- [x] `validateConfig` 生产 fail-fast(缺 `SESSION_SECRET` 拒启动)+ warnings。
+- [x] 版本单源 + `/api/version` + health.version(不泄敏感)。
+- [x] `/api/ready` 就绪探针(PG 探活)。
+- [x] 前端版本展示。
+- [x] `CHANGELOG.md` + `SECURITY.md` + `RELEASE_NOTES.md` + 版本 `1.0.0`。
+- [x] `pnpm test`+`test:web`+`e2e`+`eval` 全绿 hermetic。
+- [x] 文档 + 1.0 宣告。
+
+> **Sprint 24 完成 —— 项目达到 1.0**（PR [#131](https://github.com/Timsunzhuping/ApollaAIStudio/pull/131) A · [#132](https://github.com/Timsunzhuping/ApollaAIStudio/pull/132) B · [#133](https://github.com/Timsunzhuping/ApollaAIStudio/pull/133) C · D 本次）。发布加固:`validateConfig`(生产缺/默认 `SESSION_SECRET` → `enforceConfigOrExit` 退出码 1 拒启动;真生产缺 `DATABASE_URL` 拒启动;warnings 提示降级模式)接入 BFF + worker 启动;`version.ts` 单源 + `GET /api/version`(版本/模式,无密钥)+ `GET /api/ready`(`harness.ping`→`SELECT 1`,503 on fail)+ health.version;前端侧栏版本徽标;`CHANGELOG.md`(01→24)+ `SECURITY.md`(威胁模型 + 各域铁律汇总)+ `RELEASE_NOTES.md`;22 个 package.json 版本 → `1.0.0`。新增 eval `release-readiness`(46 total)。341 root + 32 web + 9 e2e 绿。`DATABASE_URL` 错误仅在真生产触发,故 hermetic e2e(password 模式 + 内存)仍可启动。**后续(post-1.0)**:WebAuthn/passkeys、流式语音、完整 MV3 浏览器 e2e、桌面宿主。
 
 ## 风险与提示
 - **别破坏离线体验**：校验只在生产收紧;dev/demo/e2e 仍零配置(e2e 跑内存模式,validateConfig 在非生产返回 0 errors)。

@@ -56,6 +56,9 @@ importers:
       '@apolla/media-seedance':
         specifier: workspace:*
         version: link:../../packages/adapters/media/seedance
+      '@apolla/payment-stripe':
+        specifier: workspace:*
+        version: link:../../packages/adapters/payment/stripe
       '@apolla/search-stub':
         specifier: workspace:*
         version: link:../../packages/adapters/search/stub
@@ -231,6 +234,15 @@ importers:
         version: link:../../../harness-core
 
   packages/adapters/media/seedance:
+    dependencies:
+      '@apolla/contracts':
+        specifier: workspace:*
+        version: link:../../../contracts
+      '@apolla/harness-core':
+        specifier: workspace:*
+        version: link:../../../harness-core
+
+  packages/adapters/payment/stripe:
     dependencies:
       '@apolla/contracts':
         specifier: workspace:*

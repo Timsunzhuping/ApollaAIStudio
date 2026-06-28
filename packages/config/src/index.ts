@@ -16,6 +16,8 @@ import {
   type Surface as SurfaceT,
   ConnectorCatalogEntry,
   type ConnectorCatalogEntry as ConnectorCatalogEntryT,
+  PlanDef,
+  type PlanDef as PlanDefT,
   type RouteConfig as RouteConfigT,
   type FeatureGate as FeatureGateT,
   type PromptVersion as PromptVersionT,
@@ -115,6 +117,16 @@ export function loadSurfaces(): SurfaceT[] {
     .readdirSync(dir)
     .filter((f) => f.endsWith('.json'))
     .map((f) => Surface.parse(JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))));
+}
+
+/** Load declarative billing plans from packages/config/plans/*.json (S13-T2). */
+export function loadPlans(): PlanDefT[] {
+  const dir = path.join(pkgRoot, 'plans');
+  if (!fs.existsSync(dir)) return [];
+  return fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith('.json'))
+    .map((f) => PlanDef.parse(JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))));
 }
 
 /** Load the connector marketplace catalog from packages/config/connectors/*.json (S11-T3). */

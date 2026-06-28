@@ -30,9 +30,14 @@ import {
   CoworkOrchestrator,
   InMemorySessionRepository,
   InMemoryApiTokenRepository,
+  InMemorySubscriptionRepository,
+  StubPaymentProvider,
+  resolveEntitlements,
   decryptSecret,
   type SessionRepository,
   type ApiTokenRepository,
+  type SubscriptionRepository,
+  type PaymentProvider,
   InMemoryWorkspaceRepository,
   GuardedWorkspaceRepository,
   makeWorkspaceTools,
@@ -71,7 +76,8 @@ import {
   type Memory,
   type SkillRepository,
 } from '@apolla/harness-core';
-import { getRoute, loadSkills, loadPlugins, loadSurfaces, loadConnectorCatalog, loadFeatureGates, getMediaRoute } from '@apolla/config';
+import { getRoute, loadSkills, loadPlugins, loadSurfaces, loadConnectorCatalog, loadPlans, loadFeatureGates, getMediaRoute } from '@apolla/config';
+import { StripePaymentProvider } from '@apolla/payment-stripe';
 import type { ModelCaps } from '@apolla/contracts';
 import { OpenAIImageAdapter } from '@apolla/media-openai';
 import { SeedanceVideoAdapter } from '@apolla/media-seedance';
@@ -99,6 +105,7 @@ import {
   PostgresWorkspaceRepository,
   PostgresSessionRepository,
   PostgresApiTokenRepository,
+  PostgresSubscriptionRepository,
 } from '@apolla/db-postgres';
 import { DemoLLMAdapter } from './demo-adapter';
 
@@ -108,6 +115,9 @@ export interface Harness {
   users: UserRepository;
   sessions: SessionRepository;
   apiTokens: ApiTokenRepository;
+  subscriptions: SubscriptionRepository;
+  payment: PaymentProvider;
+  plans: () => import('@apolla/contracts').PlanDef[];
   projects: ProjectRepository;
   memory: Memory;
   skills: SkillRuntime;
@@ -179,6 +189,7 @@ export async function buildHarness(): Promise<Harness> {
   let users: UserRepository;
   let sessions: SessionRepository;
   let apiTokens: ApiTokenRepository;
+  let subscriptions: SubscriptionRepository;
   let projects: ProjectRepository;
   let memory: Memory;
   let skillRepo: SkillRepository;
@@ -200,6 +211,7 @@ export async function buildHarness(): Promise<Harness> {
     users = new PostgresUserRepository(sql);
     sessions = new PostgresSessionRepository(sql);
     apiTokens = new PostgresApiTokenRepository(sql);
+    subscriptions = new PostgresSubscriptionRepository(sql);
     projects = new PostgresProjectRepository(sql);
     memory = new PostgresMemory(sql);
     skillRepo = new PostgresSkillRepository(sql);
@@ -220,6 +232,7 @@ export async function buildHarness(): Promise<Harness> {
     users = new InMemoryUserRepository();
     sessions = new InMemorySessionRepository();
     apiTokens = new InMemoryApiTokenRepository();
+    subscriptions = new InMemorySubscriptionRepository();
     projects = new InMemoryProjectRepository();
     memory = new InMemoryMemory();
     skillRepo = new InMemorySkillRepository();
@@ -269,9 +282,12 @@ export async function buildHarness(): Promise<Harness> {
     agenticReliability: 0.8,
   };
   const features = new FeatureGates(loadFeatureGates(), caps);
-  // Quota counts both research and media tasks (PRD §13 / S3-T7).
-  const quota = new Quota((ownerId) =>
-    Promise.all([repo.list(ownerId), mediaRepo.list(ownerId)]).then(([a, b]) => a.length + b.length),
+  // Quota counts both research and media tasks (PRD §13 / S3-T7); the plan is resolved from the
+  // owner's subscription → entitlements (S13). Fail-closed to free when there is no active sub.
+  const plans = loadPlans();
+  const quota = new Quota(
+    (ownerId) => Promise.all([repo.list(ownerId), mediaRepo.list(ownerId)]).then(([a, b]) => a.length + b.length),
+    async (ownerId) => resolveEntitlements(await subscriptions.get(ownerId), plans),
   );
 
   // Media: stub always registered (offline default); real providers when keyed.
@@ -412,6 +428,9 @@ export async function buildHarness(): Promise<Harness> {
     users,
     sessions,
     apiTokens,
+    subscriptions,
+    payment: process.env.STRIPE_SECRET_KEY ? new StripePaymentProvider() : new StubPaymentProvider(),
+    plans: loadPlans,
     projects,
     memory,
     skills,

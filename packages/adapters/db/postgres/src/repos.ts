@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { User, Project, SkillDef, Session, ApiToken, type User as UserT, type Project as ProjectT, type SkillDef as SkillDefT, type Session as SessionT, type ApiToken as ApiTokenT } from '@apolla/contracts';
-import type { UserRepository, ProjectRepository, SkillRepository, SessionRepository, ApiTokenRepository } from '@apolla/harness-core';
+import { User, Project, SkillDef, Session, ApiToken, Subscription, type User as UserT, type Project as ProjectT, type SkillDef as SkillDefT, type Session as SessionT, type ApiToken as ApiTokenT, type Subscription as SubscriptionT } from '@apolla/contracts';
+import type { UserRepository, ProjectRepository, SkillRepository, SessionRepository, ApiTokenRepository, SubscriptionRepository } from '@apolla/harness-core';
 import type { Sql } from './index';
 
 export class PostgresUserRepository implements UserRepository {
@@ -138,5 +138,26 @@ export class PostgresApiTokenRepository implements ApiTokenRepository {
   }
   async touch(id: string, at: string): Promise<void> {
     await this.sql`UPDATE api_tokens SET data = jsonb_set(data, '{lastUsedAt}', to_jsonb(${at}::text)) WHERE id = ${id}`;
+  }
+}
+
+export class PostgresSubscriptionRepository implements SubscriptionRepository {
+  constructor(private readonly sql: Sql) {}
+
+  async get(ownerId: string): Promise<SubscriptionT | undefined> {
+    const rows = await this.sql<{ data: unknown }[]>`SELECT data FROM subscriptions WHERE owner_id = ${ownerId}`;
+    return rows[0] ? Subscription.parse(rows[0].data) : undefined;
+  }
+  async save(sub: SubscriptionT): Promise<void> {
+    await this.sql`
+      INSERT INTO subscriptions (owner_id, data) VALUES (${sub.ownerId}, ${this.sql.json(sub)})
+      ON CONFLICT (owner_id) DO UPDATE SET data = EXCLUDED.data
+    `;
+  }
+  async markEventProcessed(eventId: string): Promise<boolean> {
+    const rows = await this.sql<{ id: string }[]>`
+      INSERT INTO billing_events (id) VALUES (${eventId}) ON CONFLICT (id) DO NOTHING RETURNING id
+    `;
+    return rows.length > 0;
   }
 }

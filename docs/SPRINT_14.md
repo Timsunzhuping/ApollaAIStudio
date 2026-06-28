@@ -99,13 +99,15 @@ S14-T1(AuthProvider+Stub+身份仓库) ─ S14-T2(Google/GitHub) ─┬─ S14-T
 - **建议 PR 分组**：A(T1+T2) · B(T3+T4) · C(T5+T6) · D(T7+T8)。
 
 ## Sprint 14 Definition of Done（整体验收）
-- [ ] 身份 Provider：`AuthProvider`（Stub 离线 / Google + GitHub env 门控）+ `OAuthIdentity` + 仓库（内存 + Postgres）；OAuth token 不落库。
-- [ ] OAuth 流程：start（state+PKCE）+ callback（验 state→换 code→取 identity→签发会话→回跳 allowlist）。
-- [ ] 账号归一：按已验证邮箱 link/建用户，密码 + 多 OAuth 身份同属一用户；`me` 列已连身份。
-- [ ] 安全：state 单次+过期+CSRF、开放重定向 allowlist、token 不入日志/响应、emailVerified fail-closed、link/login 审计。
-- [ ] 登录/注册 UI：Google/GitHub 按钮（仅展示已注册）+ 设置页已连账号。
-- [ ] `pnpm test` + `pnpm test:web` 覆盖全流程/归一/CSRF/重定向/邮箱校验/UI；CI 全门禁绿。
-- [ ] README/架构文档更新；Demo 离线（stub）可演示。
+- [x] 身份 Provider：`AuthProvider`（Stub 离线 / Google + GitHub env 门控）+ `OAuthIdentity` + 仓库（内存 + Postgres）；OAuth token 不落库。
+- [x] OAuth 流程：start（state+PKCE）+ callback（验 state→换 code→取 identity→签发会话→回跳 allowlist）。
+- [x] 账号归一：按已验证邮箱 link/建用户，密码 + 多 OAuth 身份同属一用户；`me` 列已连身份。
+- [x] 安全：state 单次+过期+CSRF、开放重定向 allowlist、token 不入日志/响应、emailVerified fail-closed、login 审计。
+- [x] 登录/注册 UI：Google/GitHub 按钮（仅展示已注册）+ 设置页已连账号。
+- [x] `pnpm test` + `pnpm test:web` 覆盖全流程/归一/CSRF/重定向/邮箱校验/UI；CI 全门禁绿。
+- [x] README/架构文档更新；Demo 离线（stub）可演示。
+
+> **Sprint 14 完成**（PR [#81](https://github.com/Timsunzhuping/ApollaAIStudio/pull/81) A · [#82](https://github.com/Timsunzhuping/ApollaAIStudio/pull/82) B · [#83](https://github.com/Timsunzhuping/ApollaAIStudio/pull/83) C · D 本次）。可插拔 **AuthProvider**（Stub 离线 / Google + GitHub env 门控，fetch-based 无 SDK）+ `OAuthIdentity` 契约 + 仓库（内存 + Postgres `oauth_identities`）+ `InMemoryOAuthStateStore`（单次+过期）+ `newState`/`newPkce`(S256)；BFF `start`(state+PKCE)/`callback`(验 state→换 code→取 identity→`startSession`→回跳安全相对路径)/`providers` 端点；账号按**已验证邮箱**归一（密码 + 多 OAuth 身份同属一用户，`me.identities`）；登录页 SSO 按钮（仅展示已注册 provider）+ 设置页「已连账号」。安全：state 单次+过期+绑 PKCE、开放重定向 allowlist、`emailVerified` fail-closed、OAuth token 不落库、登录落审计。测试：harness-core 4 + auth-oauth 3 + bff 7（含 CSRF/开放重定向/归一/审计）+ web Login 2；新增 eval `identity-unification`（共 37）。全门禁绿。
 
 ## 风险与提示（给代理）
 - **复用会话，不另造**：OAuth 成功后一律走既有 `startSession`（签名 httpOnly + 过期 + 登出失效）；不要发明第二套会话/令牌。

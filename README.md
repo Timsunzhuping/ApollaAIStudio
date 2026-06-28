@@ -6,7 +6,7 @@
 
 ## 状态
 
-**Sprint 01–13 完成** —— 从研究→成品骨架，升级为持久化、多用户、有记忆、技能可复用、多模态成品、工具生态与低风险执行（MCP + Agent + 分级确认 + 审计）、主动运行（定时 + 后台 Job + 通知）、Cowork 集成式自治、版本化文件区（+ Writer + Cowork 文件协作）、文本产品面（翻译/表格/会议纪要）、生产级 Web 前端、生产硬化与安全、开放工具生态（HTTP/SSE MCP + 连接器市场）、浏览器扩展（MV3 划词 + 侧边栏 + API token）、并完成 **变现（可插拔支付 Provider + 套餐/权益 + Checkout/Webhook + 套餐门禁）**的工作台。
+**Sprint 01–14 完成** —— 从研究→成品骨架，升级为持久化、多用户、有记忆、技能可复用、多模态成品、工具生态与低风险执行（MCP + Agent + 分级确认 + 审计）、主动运行（定时 + 后台 Job + 通知）、Cowork 集成式自治、版本化文件区（+ Writer + Cowork 文件协作）、文本产品面（翻译/表格/会议纪要）、生产级 Web 前端、生产硬化与安全、开放工具生态（HTTP/SSE MCP + 连接器市场）、浏览器扩展（MV3 划词 + 侧边栏 + API token）、变现（可插拔支付 Provider + 套餐/权益 + Checkout/Webhook + 套餐门禁）、并完成 **身份与注册（可插拔 OAuth/SSO：Google + GitHub + Stub，按邮箱归一账号）**的工作台。
 - **Harness Core**：Model Router（failover/多密钥）、Prompt Registry、Tool Runtime（Web Search）、Safety & Policy（三级权限 + 防注入）、Cost Ledger、研究状态机（流式综合）、FeatureGate 运行时。
 - **持久化与账号**：Postgres（接口的 PG 实现）、最小 Auth、Projects。
 - **个人化**：Memory（FTS 检索 + 用户模型 + 注入研究流）。
@@ -52,6 +52,8 @@ pnpm dev:web      # 终端 B：Web 前端（http://localhost:5173）
 **接真实模型/搜索/媒体**：复制 `.env.example` 为 `.env`，填 `OPENAI_API_KEY` + `ANTHROPIC_API_KEY`（LLM，`OPENAI_API_KEY` 同时用于文生图）、`TAVILY_API_KEY`（搜索）、`SEEDANCE_API_KEY` + `SEEDANCE_BASE_URL`（文生视频）。会话签名 `SESSION_SECRET`；本地媒体存储目录 `MEDIA_DIR`；连接器密钥加密 `SECRETS_KEY`；本地 MCP server 经连接器的 stdio transport 接入。无对应 key 时该模态/工具自动回退到确定性 stub。
 
 **变现 / 计费（Sprint 13）**：套餐声明在 `packages/config/plans/*.json`（free/pro/team：`taskLimit` + `features` + 价格），新增套餐无需改业务代码。支付走可插拔 **PaymentProvider**——默认 **Stub**（离线确定性，Checkout 立即激活，便于本地/CI 演示），配 `STRIPE_SECRET_KEY` 时切到 **Stripe**（托管 Checkout，无 SDK），`STRIPE_WEBHOOK_SECRET` 校验 Webhook 签名，`STRIPE_PRICE_<PLAN>`（如 `STRIPE_PRICE_PRO`）映射套餐→Stripe Price。**卡号永不经我方服务器**（provider 托管 Checkout，我方只存 `providerRef` + 订阅状态）；Webhook 必验签 + 幂等；权益解析失败回落 free。Web **Billing** 页查看当前套餐/用量、升级、取消；stub 模式可端到端演示升级→pro 权益解锁→取消回落。
+
+**身份 / OAuth 登录（Sprint 14）**：登录走可插拔 **AuthProvider**——默认 **Stub**（离线确定性，授权即回调，便于本地/CI 演示），配 `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`、`GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET` 时注册 **Google / GitHub**（fetch-based、无 SDK；缺 key 不注册）。登录页只展示后端实际注册的 provider。流程：`/api/auth/oauth/:provider/start`（state + PKCE → 302 到授权页）→ `/callback`（**验 state** → 换 code → 取 identity → **按已验证邮箱归一账号** → 复用签名会话）。**账号归一**：同邮箱的密码账号与多个 OAuth 身份属于同一用户（`me.identities` 可见，设置页「已连账号」）。安全：state **单次 + 过期 + 绑 PKCE**、回跳**开放重定向 allowlist**（仅安全相对路径）、`emailVerified=false` **fail-closed 拒**、**OAuth token 不落库**（只存 providerId + email）、登录落审计。真实 provider 需在其控制台配置回调 `…/api/auth/oauth/:provider/callback`。stub 模式可离线端到端演示。
 
 **生产硬化（Sprint 10）**：默认是 **demo 模式**（邮箱即登录，零配置）。上生产前设：
 - `AUTH_MODE=password`（或 `NODE_ENV=production`）：登录/注册要求密码（scrypt 哈希）；会话为签名 httpOnly cookie（生产带 `Secure`），`SESSION_SECRET` 必须设强随机值。

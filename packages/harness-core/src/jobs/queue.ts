@@ -1,5 +1,11 @@
+/** Delivery context for a consume attempt (drives retry/terminal decisions, S16-T5). */
+export interface JobRunContext {
+  attempt: number;
+  maxAttempts: number;
+}
+
 /** Consumes a queued job (by id) and runs it to a terminal state. */
-export type JobHandler = (jobId: string) => Promise<void>;
+export type JobHandler = (jobId: string, ctx?: JobRunContext) => Promise<void>;
 
 /**
  * Swappable execution substrate (S16): InProcess by default / Redis(BullMQ) in prod — the same
@@ -52,5 +58,10 @@ export class InProcessJobQueue implements JobQueue {
   /** Await all in-flight runs (used by tests + graceful drain). */
   async idle(): Promise<void> {
     while (this.inflight.size) await Promise.all([...this.inflight]);
+  }
+
+  /** Graceful drain: wait for in-flight runs to finish. */
+  async close(): Promise<void> {
+    await this.idle();
   }
 }

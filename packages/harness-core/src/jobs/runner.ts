@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Job, JobSpec } from '@apolla/contracts';
 import type { JobRepository, JobResolver } from './types';
-import { InProcessJobQueue, type JobQueue } from './queue';
+import { InProcessJobQueue, type JobQueue, type JobRunContext } from './queue';
 
 export interface JobRunnerDeps {
   repo: JobRepository;
@@ -60,8 +60,10 @@ export class JobRunner {
   /**
    * Execute a queued (or reconciled/interrupted) job to terminal state. Idempotent: a job that is
    * already running or terminal is skipped, so redelivery / reconcile re-enqueue never double-runs.
+   * On failure with attempts remaining (`ctx.maxAttempts > 1`, Redis path) it resets the job to
+   * `interrupted` + re-throws so the queue retries with backoff; the last attempt marks `failed`.
    */
-  async run(jobId: string): Promise<void> {
+  async run(jobId: string, ctx: JobRunContext = { attempt: 1, maxAttempts: 1 }): Promise<void> {
     const job = await this.d.repo.get(jobId);
     if (!job) return;
     if (job.status !== 'queued' && job.status !== 'interrupted') return; // idempotent consume
@@ -73,20 +75,50 @@ export class JobRunner {
       await this.d.onComplete?.(job);
       return;
     }
+    // A retry (re-enqueued interrupted job) re-emits from the start — drop the partial run-log first.
+    if (job.status === 'interrupted') await this.d.repo.clearEvents(job.id);
     job.status = 'running';
     await this.d.repo.save(job);
     try {
       const spec: JobSpec = { kind: job.kind, input: job.input, allowTools: job.allowTools ?? [] };
-      for await (const ev of this.d.resolve(job.ownerId, spec, job.id)) {
-        await this.d.repo.appendEvent(job.id, ev);
-      }
+      await this.withTimeout(
+        (async () => {
+          for await (const ev of this.d.resolve(job.ownerId, spec, job.id)) {
+            await this.d.repo.appendEvent(job.id, ev);
+          }
+        })(),
+      );
       job.status = 'done';
     } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      if (ctx.attempt < ctx.maxAttempts) {
+        // Leave it re-runnable + signal the queue to retry with backoff.
+        job.status = 'interrupted';
+        job.error = message;
+        await this.d.repo.save(job);
+        throw e;
+      }
       job.status = 'failed';
-      job.error = e instanceof Error ? e.message : String(e);
+      job.error = message;
     }
     await this.d.repo.save(job);
     await this.d.onComplete?.(job);
+  }
+
+  /** Optional wall-clock cap on a job run (JOB_TIMEOUT_MS, 0 = off). The orchestrator can't be
+   * cancelled, but the job is marked failed/retried so it never hangs the queue. */
+  private async withTimeout<T>(work: Promise<T>): Promise<T> {
+    const ms = Number(process.env.JOB_TIMEOUT_MS ?? 0);
+    if (!ms) return work;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error('job timeout')), ms);
+    });
+    try {
+      return await Promise.race([work, timeout]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   }
 
   /** Await all in-flight in-process runs (tests + graceful drain). No-op for non-in-process queues. */

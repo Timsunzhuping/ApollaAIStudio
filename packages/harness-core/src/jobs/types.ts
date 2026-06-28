@@ -12,6 +12,8 @@ export interface JobRepository {
   appendEvent(jobId: string, event: unknown): Promise<void>;
   /** The run-log in order (for reconnect/replay). */
   events(jobId: string): Promise<unknown[]>;
+  /** Drop the run-log (a clean retry re-emits from the start — avoids duplicated events, S16-T5). */
+  clearEvents(jobId: string): Promise<void>;
 }
 
 /** Resolves a JobSpec to the orchestrator event stream that fulfills it (composition root). */

@@ -41,4 +41,8 @@ export class PostgresJobRepository implements JobRepository {
     const rows = await this.sql<{ data: unknown }[]>`SELECT data FROM job_events WHERE job_id = ${jobId} ORDER BY seq`;
     return rows.map((r) => r.data);
   }
+
+  async clearEvents(jobId: string): Promise<void> {
+    await this.sql`DELETE FROM job_events WHERE job_id = ${jobId}`;
+  }
 }

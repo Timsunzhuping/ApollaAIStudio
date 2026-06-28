@@ -11,3 +11,4 @@ packages:
   - 'apps/*'
   - 'workers/*'
   - 'evals'
+  - 'e2e'

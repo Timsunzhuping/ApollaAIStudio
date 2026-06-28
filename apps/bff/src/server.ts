@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { randomUUID } from 'node:crypto';
-import { exportArtifact, autoDraftSkill, embedMedia, encryptSecret, decryptSecret, inferRisk, AgentOrchestrator, nextRun, resolveEntitlements, hasFeature } from '@apolla/harness-core';
+import { exportArtifact, autoDraftSkill, embedMedia, encryptSecret, decryptSecret, inferRisk, AgentOrchestrator, nextRun, resolveEntitlements, hasFeature, newState, newPkce } from '@apolla/harness-core';
+import type { ResolvedIdentity } from '@apolla/harness-core';
 import type { Connector, Subscription, WebhookEvent, PlanDef } from '@apolla/contracts';
 import { hashPassword, verifyPassword, newApiToken } from '@apolla/harness-core';
 import { buildHarness, type Harness } from './harness';
@@ -46,6 +47,25 @@ async function readRawBody(req: IncomingMessage): Promise<string> {
   const chunks: Buffer[] = [];
   for await (const c of req) chunks.push(c as Buffer);
   return Buffer.concat(chunks).toString('utf8');
+}
+
+/** A safe in-app landing target — relative path only (blocks open redirects to other origins). */
+function isSafeRelativePath(p: string): boolean {
+  return p.startsWith('/') && !p.startsWith('//') && !p.includes('://') && !p.includes('\\');
+}
+
+/**
+ * Resolve (or create + link) the user for a verified OAuth identity (S14-T4). Account unification is
+ * by VERIFIED email: an unverified email is rejected fail-closed; an existing same-email user is
+ * linked rather than duplicated (UserRepository.upsertByEmail dedups by email).
+ */
+async function resolveOAuthUser(ident: ResolvedIdentity, provider: string): Promise<string> {
+  if (!ident.emailVerified) throw new Error('email not verified');
+  const existing = await harness.identities.findByProvider(provider, ident.providerId);
+  if (existing) return existing.userId;
+  const user = await harness.users.upsertByEmail(ident.email.trim().toLowerCase());
+  await harness.identities.link({ userId: user.id, provider, providerId: ident.providerId, email: user.email, createdAt: new Date().toISOString() });
+  return user.id;
 }
 
 /** The owner's effective plan (entitlements), resolved from their subscription (fail-closed to free). */
@@ -249,12 +269,57 @@ export async function handle(req: IncomingMessage, res: ServerResponse): Promise
     return json(res, 200, { ok: true });
   }
 
+  // OAuth/SSO (S14): public. start → state+PKCE → 302 to provider; callback → verify → link → session.
+  const oauthStart = pathname.match(/^\/api\/auth\/oauth\/([^/]+)\/start$/);
+  if (method === 'GET' && oauthStart) {
+    const provider = oauthStart[1]!;
+    const prov = harness.authProviders.get(provider);
+    if (!prov) return json(res, 404, { error: 'unknown provider' });
+    const next = url.searchParams.get('next') ?? '/';
+    if (!isSafeRelativePath(next)) return json(res, 400, { error: 'invalid redirect' });
+    const proto = (req.headers['x-forwarded-proto'] as string) ?? 'http';
+    const redirectUri = `${proto}://${req.headers.host}/api/auth/oauth/${provider}/callback`;
+    const state = newState();
+    const { verifier, challenge } = newPkce();
+    await harness.oauthStates.put(state, { provider, pkceVerifier: verifier, redirectUri, next, expiresAt: Date.now() + 10 * 60 * 1000 });
+    res.statusCode = 302;
+    res.setHeader('Location', prov.authorizeUrl({ state, pkceChallenge: challenge, redirectUri }));
+    res.end();
+    return;
+  }
+  const oauthCb = pathname.match(/^\/api\/auth\/oauth\/([^/]+)\/callback$/);
+  if (method === 'GET' && oauthCb) {
+    const provider = oauthCb[1]!;
+    const prov = harness.authProviders.get(provider);
+    if (!prov) return json(res, 404, { error: 'unknown provider' });
+    const entry = await harness.oauthStates.consume(url.searchParams.get('state') ?? '');
+    if (!entry || entry.provider !== provider) return json(res, 400, { error: 'invalid state' });
+    let userId: string;
+    try {
+      const tokens = await prov.exchangeCode({ code: url.searchParams.get('code') ?? '', pkceVerifier: entry.pkceVerifier, redirectUri: entry.redirectUri });
+      userId = await resolveOAuthUser(await prov.fetchIdentity(tokens), provider);
+    } catch {
+      return json(res, 401, { error: 'oauth sign-in failed' });
+    }
+    await startSession(res, harness.sessions, userId);
+    await harness.audit.record({ id: randomUUID(), ownerId: userId, taskId: 'auth', tool: 'oauth', risk: 'low_write', decision: 'allow', status: 'executed', summary: `login via ${provider}` });
+    res.statusCode = 302;
+    res.setHeader('Location', entry.next ?? '/');
+    res.end();
+    return;
+  }
+  if (method === 'GET' && pathname === '/api/auth/providers') {
+    return json(res, 200, { providers: [...harness.authProviders.keys()] });
+  }
+
   // Everything below requires a session (browser) OR an API token (extension/CLI, S12).
   const ownerId = (await readSession(req, harness.sessions)) ?? (await readBearer(req, harness.apiTokens));
   if (method === 'GET' && pathname === '/api/auth/me') {
     if (!ownerId) return json(res, 401, { error: 'not authenticated' });
     const user = await harness.users.get(ownerId);
-    return user ? json(res, 200, user) : json(res, 401, { error: 'not authenticated' });
+    if (!user) return json(res, 401, { error: 'not authenticated' });
+    const identities = (await harness.identities.listByUser(ownerId)).map((i) => ({ provider: i.provider }));
+    return json(res, 200, { ...user, identities });
   }
   if (!ownerId) return json(res, 401, { error: 'not authenticated' });
   (res as ObservedResponse).__ownerId = ownerId; // for the structured access log (id, not PII)

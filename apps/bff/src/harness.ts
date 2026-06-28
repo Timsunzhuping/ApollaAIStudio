@@ -29,6 +29,7 @@ import {
   Coordinator,
   CoworkOrchestrator,
   InMemorySessionRepository,
+  decryptSecret,
   type SessionRepository,
   InMemoryWorkspaceRepository,
   GuardedWorkspaceRepository,
@@ -72,7 +73,7 @@ import { getRoute, loadSkills, loadPlugins, loadSurfaces, loadFeatureGates, getM
 import type { ModelCaps } from '@apolla/contracts';
 import { OpenAIImageAdapter } from '@apolla/media-openai';
 import { SeedanceVideoAdapter } from '@apolla/media-seedance';
-import { StdioMCPClient } from '@apolla/mcp-stdio';
+import { StdioMCPClient, HttpMCPClient } from '@apolla/mcp-stdio';
 import { LocalObjectStore } from './object-store';
 import { OpenAIAdapter } from '@apolla/adapter-openai';
 import { AnthropicAdapter } from '@apolla/adapter-anthropic';
@@ -282,7 +283,19 @@ export async function buildHarness(): Promise<Harness> {
 
   // MCP: a shared in-process stub client (offline default) + a stdio client for local servers.
   const stubMcp = new StubMCPClient();
-  const mcpClientFor = (transport: string): MCPClient => (transport === 'stdio' ? new StdioMCPClient() : stubMcp);
+  const mcpClientFor = (transport: string): MCPClient =>
+    transport === 'stdio' ? new StdioMCPClient() : transport === 'http' ? new HttpMCPClient() : stubMcp;
+
+  // Build resolved (decrypted) auth headers for an http connector — sent only to its url's host.
+  const httpHeadersFor = (c: { transport: string; secrets: Record<string, string> }): Record<string, string> | undefined => {
+    if (c.transport !== 'http') return undefined;
+    const dec = (n: string): string | undefined => (c.secrets[n] ? decryptSecret(c.secrets[n]!) : undefined);
+    const authz = dec('authorization');
+    const token = dec('token');
+    if (authz) return { Authorization: authz };
+    if (token) return { Authorization: `Bearer ${token}` };
+    return undefined;
+  };
 
   // Build the agent's tool set for an owner: built-in web_search + enabled connector tools.
   const agentToolsFor = async (ownerId: string): Promise<ToolRuntime> => {
@@ -300,6 +313,8 @@ export async function buildHarness(): Promise<Harness> {
           args: c.args,
           url: c.url,
           readOnlyTools: c.readOnlyTools,
+          headers: httpHeadersFor(c),
+          timeoutMs: 10_000,
         });
         for (const t of registered) {
           if (c.disabledTools.includes(t.name.slice(c.name.length + 1))) rt.unregister(t.name);

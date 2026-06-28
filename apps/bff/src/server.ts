@@ -27,6 +27,10 @@ export function setHarness(h: Harness): void {
 // the SPA + assets so the frontend is same-origin (cookies + SSE just work). Off when unset (the
 // inline UI_HTML + JSON-404 behavior is unchanged).
 const WEB_DIST = process.env.WEB_DIST;
+// Speech (S19): audio uploads are bigger than the default body cap; decoded audio + TTS text are bounded.
+const SPEECH_MAX_BODY_BYTES = Number(process.env.SPEECH_MAX_BODY_BYTES ?? 12_000_000); // ~9MB audio b64-encoded
+const SPEECH_MAX_AUDIO_BYTES = Number(process.env.SPEECH_MAX_AUDIO_BYTES ?? 9_000_000);
+const SPEECH_MAX_TEXT_LEN = Number(process.env.SPEECH_MAX_TEXT_LEN ?? 5000);
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.ico': 'image/x-icon',
@@ -257,8 +261,9 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
     res.setHeader('Retry-After', String(limiters.ip().retryAfterSec(ip)));
     return json(res, 429, { error: 'rate limit exceeded' });
   }
-  // Body size limit for write methods.
-  if ((method === 'POST' || method === 'PUT' || method === 'PATCH') && Number(req.headers['content-length'] ?? 0) > MAX_BODY_BYTES) {
+  // Body size limit for write methods (speech audio uploads get a larger cap, S19).
+  const bodyLimit = pathname === '/api/speech/transcribe' ? SPEECH_MAX_BODY_BYTES : MAX_BODY_BYTES;
+  if ((method === 'POST' || method === 'PUT' || method === 'PATCH') && Number(req.headers['content-length'] ?? 0) > bodyLimit) {
     return json(res, 413, { error: 'payload too large' });
   }
 
@@ -423,6 +428,40 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
     }
     mcpServer ??= new McpServer(buildCapabilityTools(harness));
     return json(res, 200, await mcpServer.handle(rpc, ownerId));
+  }
+
+  // --- Speech (S19): voice in (transcribe) / out (synthesize). Owner-scoped, rate-limited, audited,
+  // size-bounded. The transcription is UNTRUSTED DATA — it is returned to fill an input the user
+  // submits; it never triggers an action server-side. Audio bytes are never logged.
+  if (method === 'POST' && pathname === '/api/speech/transcribe') {
+    if (!limiters.owner().allow(ownerId)) {
+      res.setHeader('Retry-After', String(limiters.owner().retryAfterSec(ownerId)));
+      return json(res, 429, { error: 'rate limit exceeded — slow down' });
+    }
+    const body = await readBody(req);
+    const bytes = Buffer.from(String(body.audio ?? ''), 'base64');
+    const mime = String(body.mime ?? 'audio/webm');
+    if (bytes.length === 0) return json(res, 400, { error: 'empty or invalid audio' });
+    if (bytes.length > SPEECH_MAX_AUDIO_BYTES) return json(res, 413, { error: 'audio too large' });
+    const { text } = await harness.speech.transcribe(new Uint8Array(bytes), { mime });
+    await harness.audit.record({ id: randomUUID(), ownerId, taskId: 'speech', tool: 'speech.transcribe', risk: 'read', decision: 'allow', status: 'executed', summary: `transcribed ${bytes.length} bytes` });
+    return json(res, 200, { text });
+  }
+  if (method === 'POST' && pathname === '/api/speech/synthesize') {
+    if (!limiters.owner().allow(ownerId)) {
+      res.setHeader('Retry-After', String(limiters.owner().retryAfterSec(ownerId)));
+      return json(res, 429, { error: 'rate limit exceeded — slow down' });
+    }
+    const body = await readBody(req);
+    const text = String(body.text ?? '').trim();
+    const voice = body.voice ? String(body.voice) : undefined;
+    if (!text) return json(res, 400, { error: 'text required' });
+    if (text.length > SPEECH_MAX_TEXT_LEN) return json(res, 413, { error: 'text too long' });
+    const { bytes, mime } = await harness.speech.synthesize(text, { voice });
+    const ext = mime.includes('mpeg') ? 'mp3' : mime.includes('wav') ? 'wav' : 'bin';
+    const { uri } = await harness.objectStore.put(`speech/${randomUUID()}.${ext}`, bytes, mime);
+    await harness.audit.record({ id: randomUUID(), ownerId, taskId: 'speech', tool: 'speech.synthesize', risk: 'read', decision: 'allow', status: 'executed', summary: `synthesized ${text.length} chars` });
+    return json(res, 200, { uri });
   }
 
   // --- API tokens (S12): cross-origin auth for the extension / CLI ---

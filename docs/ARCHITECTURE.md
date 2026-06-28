@@ -152,6 +152,8 @@ interface ToolRuntime {
 ```
 - 外部工具/数据源优先 MCP（[PRD §12.C](./PRD.md)）。内部工具也以 Tool 接口注册。
 - 工具调用受 §3.8 沙箱与权限约束。
+- **MCP transport 矩阵**：`stub`（进程内，离线默认）· `stdio`（本地子进程，`StdioMCPClient`）· **`http`（托管 MCP 服务，Streamable HTTP；`HttpMCPClient`：JSON-RPC over HTTP POST，JSON+SSE 响应、超时、`Mcp-Session-Id`；S11）**。`MCPClient`/`MCPSession` 是 transport 无关接口，`wrapMCPTool`/`inferRisk`/ToolRuntime/Safety 复用——加一种 transport 不改执行通道。
+- **连接器市场（S11）**：声明式目录 `config/connectors/*.json` + 一键添加（填 URL/secrets）。远程工具：输出走数据通道、风险来自声明（远程默认 low_write、绝不自动 high_write）、token 加密只发往配置 host、不可达隔离、计入限流/审计、健康探针 + 指标。
 
 ### 3.5 Media Adapter（图像/视频，含 Seedance 2.0）
 ```ts

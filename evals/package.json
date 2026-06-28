@@ -10,7 +10,8 @@
   },
   "dependencies": {
     "@apolla/contracts": "workspace:*",
-    "@apolla/harness-core": "workspace:*"
+    "@apolla/harness-core": "workspace:*",
+    "@apolla/mcp-stdio": "workspace:*"
   },
   "devDependencies": {
     "tsx": "^4.19.2"

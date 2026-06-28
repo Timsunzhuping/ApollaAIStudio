@@ -6,6 +6,7 @@ packages:
   - 'packages/adapters/media/*'
   - 'packages/adapters/db/*'
   - 'packages/adapters/payment/*'
+  - 'packages/adapters/auth/*'
   - 'packages/adapters/mcp'
   - 'apps/*'
   - 'workers/*'

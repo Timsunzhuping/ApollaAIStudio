@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { User, Project, SkillDef, Session, ApiToken, Subscription, type User as UserT, type Project as ProjectT, type SkillDef as SkillDefT, type Session as SessionT, type ApiToken as ApiTokenT, type Subscription as SubscriptionT } from '@apolla/contracts';
-import type { UserRepository, ProjectRepository, SkillRepository, SessionRepository, ApiTokenRepository, SubscriptionRepository } from '@apolla/harness-core';
+import { User, Project, SkillDef, Session, ApiToken, Subscription, OAuthIdentity, type User as UserT, type Project as ProjectT, type SkillDef as SkillDefT, type Session as SessionT, type ApiToken as ApiTokenT, type Subscription as SubscriptionT, type OAuthIdentity as OAuthIdentityT } from '@apolla/contracts';
+import type { UserRepository, ProjectRepository, SkillRepository, SessionRepository, ApiTokenRepository, SubscriptionRepository, IdentityRepository } from '@apolla/harness-core';
 import type { Sql } from './index';
 
 export class PostgresUserRepository implements UserRepository {
@@ -159,5 +159,29 @@ export class PostgresSubscriptionRepository implements SubscriptionRepository {
       INSERT INTO billing_events (id) VALUES (${eventId}) ON CONFLICT (id) DO NOTHING RETURNING id
     `;
     return rows.length > 0;
+  }
+}
+
+export class PostgresIdentityRepository implements IdentityRepository {
+  constructor(private readonly sql: Sql) {}
+
+  async findByProvider(provider: string, providerId: string): Promise<OAuthIdentityT | undefined> {
+    const rows = await this.sql<{ data: unknown }[]>`
+      SELECT data FROM oauth_identities WHERE provider = ${provider} AND provider_id = ${providerId}
+    `;
+    return rows[0] ? OAuthIdentity.parse(rows[0].data) : undefined;
+  }
+  async link(identity: OAuthIdentityT): Promise<void> {
+    await this.sql`
+      INSERT INTO oauth_identities (provider, provider_id, user_id, data)
+      VALUES (${identity.provider}, ${identity.providerId}, ${identity.userId}, ${this.sql.json(identity)})
+      ON CONFLICT (provider, provider_id) DO UPDATE SET user_id = EXCLUDED.user_id, data = EXCLUDED.data
+    `;
+  }
+  async listByUser(userId: string): Promise<OAuthIdentityT[]> {
+    const rows = await this.sql<{ data: unknown }[]>`
+      SELECT data FROM oauth_identities WHERE user_id = ${userId} ORDER BY created_at
+    `;
+    return rows.map((r) => OAuthIdentity.parse(r.data));
   }
 }

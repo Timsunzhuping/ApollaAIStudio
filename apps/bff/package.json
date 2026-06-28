@@ -12,6 +12,7 @@
   "dependencies": {
     "@apolla/adapter-anthropic": "workspace:*",
     "@apolla/adapter-openai": "workspace:*",
+    "@apolla/auth-oauth": "workspace:*",
     "@apolla/config": "workspace:*",
     "@apolla/contracts": "workspace:*",
     "@apolla/db-postgres": "workspace:*",

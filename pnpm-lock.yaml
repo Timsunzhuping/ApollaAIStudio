@@ -35,6 +35,9 @@ importers:
       '@apolla/adapter-openai':
         specifier: workspace:*
         version: link:../../packages/adapters/llm/openai
+      '@apolla/auth-oauth':
+        specifier: workspace:*
+        version: link:../../packages/adapters/auth/oauth
       '@apolla/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -183,6 +186,15 @@ importers:
       tsx:
         specifier: ^4.19.2
         version: 4.22.4
+
+  packages/adapters/auth/oauth:
+    dependencies:
+      '@apolla/contracts':
+        specifier: workspace:*
+        version: link:../../../contracts
+      '@apolla/harness-core':
+        specifier: workspace:*
+        version: link:../../../harness-core
 
   packages/adapters/db/postgres:
     dependencies:

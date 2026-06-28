@@ -64,6 +64,8 @@ export { InMemorySessionRepository } from './auth/session';
 export type { SessionRepository } from './auth/session';
 export { newApiToken, parseApiToken, InMemoryApiTokenRepository } from './auth/token';
 export type { ApiTokenRepository } from './auth/token';
+export { StubOAuthProvider, InMemoryIdentityRepository, InMemoryOAuthStateStore, newState, newPkce } from './auth/oauth';
+export type { AuthProvider, OAuthTokens, ResolvedIdentity, IdentityRepository, OAuthStateStore, OAuthStateEntry } from './auth/oauth';
 export { StubPaymentProvider, InMemorySubscriptionRepository } from './billing/stub';
 export { resolveEntitlements, hasFeature } from './billing/entitlements';
 export type { PaymentProvider, SubscriptionRepository, CheckoutInput } from './billing/types';

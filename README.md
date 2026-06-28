@@ -6,7 +6,7 @@
 
 ## 状态
 
-**Sprint 01–15 完成** —— 从研究→成品骨架，升级为持久化、多用户、有记忆、技能可复用、多模态成品、工具生态与低风险执行（MCP + Agent + 分级确认 + 审计）、主动运行（定时 + 后台 Job + 通知）、Cowork 集成式自治、版本化文件区（+ Writer + Cowork 文件协作）、文本产品面（翻译/表格/会议纪要）、生产级 Web 前端、生产硬化与安全、开放工具生态（HTTP/SSE MCP + 连接器市场）、浏览器扩展（MV3 划词 + 侧边栏 + API token）、变现（可插拔支付 Provider + 套餐/权益 + Checkout/Webhook + 套餐门禁）、身份与注册（可插拔 OAuth/SSO：Google + GitHub + Stub，按邮箱归一账号）、并完成 **端到端测试与发布就绪（Playwright 真实浏览器 e2e + BFF 单源托管 SPA + 部署 runbook）**的工作台。
+**Sprint 01–15 完成** —— 从研究→成品骨架，升级为持久化、多用户、有记忆、技能可复用、多模态成品、工具生态与低风险执行（MCP + Agent + 分级确认 + 审计）、主动运行（定时 + 后台 Job + 通知）、Cowork 集成式自治、版本化文件区（+ Writer + Cowork 文件协作）、文本产品面（翻译/表格/会议纪要）、生产级 Web 前端、生产硬化与安全、开放工具生态（HTTP/SSE MCP + 连接器市场）、浏览器扩展（MV3 划词 + 侧边栏 + API token）、变现（可插拔支付 Provider + 套餐/权益 + Checkout/Webhook + 套餐门禁）、身份与注册（可插拔 OAuth/SSO：Google + GitHub + Stub，按邮箱归一账号）、端到端测试与发布就绪（Playwright 真实浏览器 e2e + BFF 单源托管 SPA + 部署 runbook）、并完成 **规模与可靠性（可插拔任务队列：进程内默认 / Redis-BullMQ 分布式 + 独立 Worker 进程 + 重试/超时/优雅排空）**的工作台。
 - **Harness Core**：Model Router（failover/多密钥）、Prompt Registry、Tool Runtime（Web Search）、Safety & Policy（三级权限 + 防注入）、Cost Ledger、研究状态机（流式综合）、FeatureGate 运行时。
 - **持久化与账号**：Postgres（接口的 PG 实现）、最小 Auth、Projects。
 - **个人化**：Memory（FTS 检索 + 用户模型 + 注入研究流）。
@@ -52,6 +52,8 @@ pnpm dev:web      # 终端 B：Web 前端（http://localhost:5173）
 **接真实模型/搜索/媒体**：复制 `.env.example` 为 `.env`，填 `OPENAI_API_KEY` + `ANTHROPIC_API_KEY`（LLM，`OPENAI_API_KEY` 同时用于文生图）、`TAVILY_API_KEY`（搜索）、`SEEDANCE_API_KEY` + `SEEDANCE_BASE_URL`（文生视频）。会话签名 `SESSION_SECRET`；本地媒体存储目录 `MEDIA_DIR`；连接器密钥加密 `SECRETS_KEY`；本地 MCP server 经连接器的 stdio transport 接入。无对应 key 时该模态/工具自动回退到确定性 stub。
 
 **变现 / 计费（Sprint 13）**：套餐声明在 `packages/config/plans/*.json`（free/pro/team：`taskLimit` + `features` + 价格），新增套餐无需改业务代码。支付走可插拔 **PaymentProvider**——默认 **Stub**（离线确定性，Checkout 立即激活，便于本地/CI 演示），配 `STRIPE_SECRET_KEY` 时切到 **Stripe**（托管 Checkout，无 SDK），`STRIPE_WEBHOOK_SECRET` 校验 Webhook 签名，`STRIPE_PRICE_<PLAN>`（如 `STRIPE_PRICE_PRO`）映射套餐→Stripe Price。**卡号永不经我方服务器**（provider 托管 Checkout，我方只存 `providerRef` + 订阅状态）；Webhook 必验签 + 幂等；权益解析失败回落 free。Web **Billing** 页查看当前套餐/用量、升级、取消；stub 模式可端到端演示升级→pro 权益解锁→取消回落。
+
+**规模与可靠性 / 任务队列（Sprint 16）**：后台任务（研究/媒体/Cowork/定时）走可插拔 **JobQueue**——默认 **进程内**（Web 自执行 + 进程内 cron，零配置、离线确定性、当前行为不变），配 `REDIS_URL` 切到 **Redis(BullMQ) 分布式**：Web **只入队**、独立 **Worker 进程**（`@apolla/job-worker`）消费执行、**单点**跑调度（杜绝多实例重复 tick）。任务先落库再入队 → Web/Worker 重启后存活（`reconcileJobs` 重入队）；**幂等消费**（按 job 状态门控，重投不二次执行）；失败**重试 + 指数退避 + 上限→failed**、`JOB_TIMEOUT_MS` 超时、SIGTERM **优雅排空在途**；配额/安全在 Worker 路径同样强制。SSE 仍尾随持久 run-log → 跨进程实时出流，无需改动。起法见 [docs/DEPLOY.md](docs/DEPLOY.md)（`docker compose up redis` + Web + `pnpm --filter @apolla/job-worker start`）。默认（无 Redis）下 root 测试 + e2e 全程 hermetic；CI 用 Redis service 跑门控集成测试。
 
 **端到端测试 / 发布（Sprint 15）**：`pnpm e2e` —— **Playwright（chromium）**真实浏览器跑通核心旅程（注册/登录/Stub SSO、研究**真实 SSE**、计费升级/取消、Surface→工作区），打的是**真实整合栈**（构建后的 web → 真实 BFF over HTTP/SSE），**不是 mock fetch**——这是它区别于组件测试的价值。完全 **hermetic & 离线**：内存模式 BFF（不设 `DATABASE_URL`）+ 全 stub provider，CI 不出网。BFF 现可 **单源托管 SPA**（`WEB_DIST` 指向 `apps/web/dist`，带 SPA fallback）——cookie/SSE 天然生效，也是真实的单源可部署改进；部署见 [docs/DEPLOY.md](docs/DEPLOY.md)。CI 有独立 `e2e` job（装 chromium、失败留 trace/截图）。本地需先 `pnpm --filter @apolla/e2e exec playwright install chromium`。扩展为 MV3 manifest 构建冒烟（完整 side panel/SW 浏览器 e2e 暂列已知缺口）。
 

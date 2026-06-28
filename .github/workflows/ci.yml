@@ -20,6 +20,15 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -33,6 +42,11 @@ jobs:
       - run: pnpm test
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/apolla_test
+      # Gated RedisJobQueue integration tests (S16) — only this package, with REDIS_URL set, so the
+      # main suite above stays hermetic/in-process.
+      - run: npx vitest run packages/adapters/queue/redis
+        env:
+          REDIS_URL: redis://localhost:6379
       - run: pnpm --filter @apolla/web test
       - run: pnpm --filter @apolla/extension test
       - run: pnpm build

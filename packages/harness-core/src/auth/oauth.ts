@@ -90,6 +90,8 @@ export interface OAuthStateEntry {
   provider: string;
   pkceVerifier: string;
   redirectUri: string;
+  /** Validated safe relative path to land on after login (open-redirect guarded at /start). */
+  next?: string;
   expiresAt: number;
 }
 

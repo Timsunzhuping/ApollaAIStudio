@@ -6,6 +6,7 @@ import { api } from '../lib/api';
 const NAV = [
   { to: '/research', label: 'Research' },
   { to: '/workspace', label: 'Workspace' },
+  { to: '/collab', label: 'Collab' },
   { to: '/surfaces', label: 'Surfaces' },
   { to: '/agent', label: 'Agent & Cowork' },
   { to: '/automation', label: 'Automation' },

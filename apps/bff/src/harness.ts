@@ -135,6 +135,7 @@ import {
   PostgresCollabAccessRepository,
 } from '@apolla/db-postgres';
 import { DemoLLMAdapter } from './demo-adapter';
+import { buildAdminApi, type AdminApi } from './admin';
 
 /** Identity providers (S14): stub always (offline default); Google/GitHub only when env-keyed. */
 function buildAuthProviders(): Map<string, AuthProvider> {
@@ -159,6 +160,8 @@ export interface Harness {
   collabAccess: CollabAccessRepository;
   /** Irreversibly cascade-delete all of an owner's data (S22). Present only with a real database. */
   purgeOwner?: (ownerId: string) => Promise<void>;
+  /** Operator-console aggregations (S23). Present only with a real database. */
+  admin?: AdminApi;
   plans: () => import('@apolla/contracts').PlanDef[];
   identities: IdentityRepository;
   authProviders: Map<string, AuthProvider>;
@@ -254,6 +257,7 @@ export async function buildHarness(): Promise<Harness> {
   let persistence: Harness['persistence'];
   let close = async (): Promise<void> => {};
   let purgeOwner: Harness['purgeOwner'];
+  let admin: Harness['admin'];
 
   if (process.env.DATABASE_URL) {
     const sql = createSql();
@@ -293,6 +297,7 @@ export async function buildHarness(): Promise<Harness> {
         await tx`DELETE FROM users WHERE id = ${ownerId}`;
       });
     };
+    admin = buildAdminApi(sql);
   } else {
     repo = new InMemoryTaskRepository();
     users = new InMemoryUserRepository();
@@ -520,6 +525,7 @@ export async function buildHarness(): Promise<Harness> {
     collab: new InMemoryCollabRepository(),
     collabAccess,
     purgeOwner,
+    admin,
     plans: loadPlans,
     identities,
     // Identity providers: stub always (offline default); real providers when env-keyed (缺 key 不注册).

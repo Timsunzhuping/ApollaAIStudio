@@ -3,6 +3,7 @@ export * from './speech';
 export * from './mfa';
 export * from './collab';
 export * from './account';
+export * from './admin';
 export * from './audit';
 export * from './billing';
 export * from './common';

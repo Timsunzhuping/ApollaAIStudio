@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { User, Project, SkillDef, Session, ApiToken, Subscription, OAuthIdentity, type User as UserT, type Project as ProjectT, type SkillDef as SkillDefT, type Session as SessionT, type ApiToken as ApiTokenT, type Subscription as SubscriptionT, type OAuthIdentity as OAuthIdentityT } from '@apolla/contracts';
-import type { UserRepository, ProjectRepository, SkillRepository, SessionRepository, ApiTokenRepository, SubscriptionRepository, IdentityRepository } from '@apolla/harness-core';
+import type { UserRepository, ProjectRepository, SkillRepository, SessionRepository, ApiTokenRepository, SubscriptionRepository, IdentityRepository, MagicLinkRepository } from '@apolla/harness-core';
 import type { Sql } from './index';
 
 export class PostgresUserRepository implements UserRepository {
@@ -183,5 +183,16 @@ export class PostgresIdentityRepository implements IdentityRepository {
       SELECT data FROM oauth_identities WHERE user_id = ${userId} ORDER BY created_at
     `;
     return rows.map((r) => OAuthIdentity.parse(r.data));
+  }
+}
+
+export class PostgresMagicLinkRepository implements MagicLinkRepository {
+  constructor(private readonly sql: Sql) {}
+
+  async consume(jti: string): Promise<boolean> {
+    const rows = await this.sql<{ jti: string }[]>`
+      INSERT INTO magic_links (jti) VALUES (${jti}) ON CONFLICT (jti) DO NOTHING RETURNING jti
+    `;
+    return rows.length > 0;
   }
 }

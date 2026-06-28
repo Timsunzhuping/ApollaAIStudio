@@ -20,8 +20,22 @@ export function App({ facade = realChrome }: { facade?: ChromeFacade }) {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [question, setQuestion] = useState('');
+  const [recent, setRecent] = useState<{ label: string; path?: string; at: number }[]>([]);
 
   const api = createApi(facade);
+
+  const addRecent = async (entry: { label: string; path?: string; at: number }) => {
+    const { recent: prev } = await facade.storageGet(['recent']);
+    const next = [entry, ...((prev as typeof recent) ?? [])].slice(0, 10);
+    await facade.storageSet({ recent: next });
+    setRecent(next);
+  };
+  const saveResearch = async () => {
+    const path = `clips/research-${Date.now()}.md`;
+    await api.saveArtifact(path, report);
+    setSavedPath(path);
+    await addRecent({ label: label ?? 'Research', path, at: Date.now() });
+  };
 
   const run = async (plan: Plan) => {
     setError(null); setRunning(true); setReport(''); setSources([]); setSavedPath(null); setLabel(plan.label);
@@ -37,6 +51,7 @@ export function App({ facade = realChrome }: { facade?: ChromeFacade }) {
         const file = await api.workspaceFile(r.path);
         setReport(file.content);
         setSavedPath(r.path);
+        await addRecent({ label: plan.label, path: r.path, at: Date.now() });
       }
     } catch {
       setError('request failed — check your connection settings');
@@ -49,6 +64,8 @@ export function App({ facade = realChrome }: { facade?: ChromeFacade }) {
     void (async () => {
       const cfg = await readConfig(facade);
       setBase(cfg.base); setToken(cfg.token);
+      const { recent: r } = await facade.storageGet(['recent']);
+      if (Array.isArray(r)) setRecent(r as typeof recent);
       if (!cfg.token) { setShowSettings(true); return; }
       const { pendingAction } = await facade.storageGet(['pendingAction']);
       const pa = pendingAction as { action: string; context: PageContext } | undefined;
@@ -79,6 +96,7 @@ export function App({ facade = realChrome }: { facade?: ChromeFacade }) {
           <input type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder="apolla_…" style={{ marginTop: '0.4rem' }} />
           <div className="row" style={{ marginTop: '0.5rem' }}>
             <button onClick={() => void saveSettings()}>Save</button>
+            <button className="ghost" onClick={() => { setToken(''); void writeConfig(facade, { token: '' }); }}>Clear token</button>
             {saved && <span className="ok">saved</span>}
           </div>
           <div className="muted" style={{ marginTop: '0.4rem' }}>Create a token in Apolla → Settings → API tokens.</div>
@@ -96,7 +114,8 @@ export function App({ facade = realChrome }: { facade?: ChromeFacade }) {
         <div className="card">
           <div className="row" style={{ justifyContent: 'space-between' }}>
             <h2>{label}{running ? '…' : ''}</h2>
-            {savedPath && <span className="badge">saved {savedPath}</span>}
+            {savedPath ? <span className="badge">saved {savedPath}</span>
+              : (!running && report && <button className="ghost" onClick={() => void saveResearch()}>Save to workspace</button>)}
           </div>
           {error ? <div className="error">{error}</div> : report ? <div className="markdown"><ReactMarkdown>{report}</ReactMarkdown></div> : <div className="muted">working…</div>}
           {sources.length > 0 && (
@@ -104,6 +123,12 @@ export function App({ facade = realChrome }: { facade?: ChromeFacade }) {
               {sources.map((s) => <div key={s.id} className="muted"><span className="badge">[{s.id}]</span> {s.title}</div>)}
             </div>
           )}
+        </div>
+      )}
+      {recent.length > 0 && (
+        <div className="card">
+          <h2>Recent</h2>
+          {recent.map((r) => <div key={r.at} className="muted">📄 {r.label}{r.path ? ` · ${r.path}` : ''}</div>)}
         </div>
       )}
       <div className="muted">Select text on any page → right-click → “Research / Translate / Summarize with Apolla”.</div>

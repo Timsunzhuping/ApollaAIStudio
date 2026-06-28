@@ -23,6 +23,7 @@
     "@apolla/harness-core": "workspace:*",
     "@apolla/mcp-stdio": "workspace:*",
     "@apolla/payment-stripe": "workspace:*",
+    "@apolla/queue-redis": "workspace:*",
     "@apolla/media-openai": "workspace:*",
     "@apolla/media-seedance": "workspace:*",
     "@apolla/search-stub": "workspace:*",

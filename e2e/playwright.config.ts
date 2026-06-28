@@ -31,7 +31,8 @@ export default defineConfig({
       WEB_DIST: path.resolve(__dirname, '../apps/web/dist'),
       SESSION_SECRET: 'e2e-secret-not-for-prod',
       DATABASE_URL: '', // force the hermetic in-memory harness
-      NODE_ENV: 'test', // not production → no Secure cookie over http
+      AUTH_MODE: 'password', // prod-like: no zero-config email-only login
+      NODE_ENV: 'test', // not production → no Secure cookie over http (e2e runs on http)
     },
   },
 });

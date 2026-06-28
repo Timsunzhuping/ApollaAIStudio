@@ -77,7 +77,7 @@ export class GitHubOAuthProvider implements AuthProvider {
     });
     return `https://github.com/login/oauth/authorize?${q.toString()}`;
   }
-  async exchangeCode(input: { code: string; redirectUri: string }): Promise<OAuthTokens> {
+  async exchangeCode(input: { code: string; pkceVerifier: string; redirectUri: string }): Promise<OAuthTokens> {
     const res = await this.fetch('https://github.com/login/oauth/access_token', {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json' },

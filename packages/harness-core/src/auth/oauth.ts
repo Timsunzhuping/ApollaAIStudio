@@ -48,12 +48,12 @@ export class StubOAuthProvider implements AuthProvider {
     this.name = name;
     this.defaultEmail = defaultEmail;
   }
-  authorizeUrl(input: { state: string; redirectUri: string }): string {
+  authorizeUrl(input: { state: string; pkceChallenge: string; redirectUri: string }): string {
     const code = `stub:${this.defaultEmail}:stub-1`;
     const sep = input.redirectUri.includes('?') ? '&' : '?';
     return `${input.redirectUri}${sep}code=${encodeURIComponent(code)}&state=${encodeURIComponent(input.state)}`;
   }
-  async exchangeCode(input: { code: string }): Promise<OAuthTokens> {
+  async exchangeCode(input: { code: string; pkceVerifier: string; redirectUri: string }): Promise<OAuthTokens> {
     return { accessToken: input.code };
   }
   async fetchIdentity(tokens: OAuthTokens): Promise<ResolvedIdentity> {

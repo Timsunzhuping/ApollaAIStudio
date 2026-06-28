@@ -7,6 +7,9 @@ export function Settings() {
   const [style, setStyle] = useState('');
   const [saved, setSaved] = useState(false);
 
+  // Linked sign-in identities (S14)
+  const [identities, setIdentities] = useState<{ provider: string }[]>([]);
+
   // API tokens (browser extension / CLI)
   const [tokens, setTokens] = useState<{ id: string; name: string }[]>([]);
   const [tokenName, setTokenName] = useState('');
@@ -25,6 +28,7 @@ export function Settings() {
       setStyle(String((m as { style?: string }).style ?? ''));
     }).catch(() => {});
     void loadTokens();
+    void api.me().then((u) => setIdentities(u.identities ?? [])).catch(() => {});
   }, []);
 
   const save = async () => {
@@ -43,6 +47,14 @@ export function Settings() {
           <button onClick={() => void save()}>Save preferences</button>
           {saved && <span className="badge">✓ saved</span>}
         </div>
+      </Card>
+      <Card title="Linked accounts">
+        <span className="muted">Single sign-on identities connected to your account.</span>
+        {identities.length === 0 ? (
+          <span className="muted">No SSO providers linked.</span>
+        ) : (
+          <div className="row">{identities.map((i) => <span key={i.provider} className="badge">{i.provider}</span>)}</div>
+        )}
       </Card>
       <Card title="API tokens">
         <span className="muted">For the browser extension / CLI. The token is shown once — copy it now.</span>

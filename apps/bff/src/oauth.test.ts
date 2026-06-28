@@ -85,4 +85,12 @@ describe('OAuth/SSO (S14)', () => {
     const r = (await (await fetch(`${base}/api/auth/providers`)).json()) as { providers: string[] };
     expect(r.providers).toContain('stub');
   });
+
+  it('audits the OAuth sign-in (S14-T6)', async () => {
+    const authUrl = await start();
+    const res = await callback('stub', authUrl.searchParams.get('state')!, `stub:${uniqEmail()}:${uniqPid()}`);
+    const cookie = cookieOf(res);
+    const audit = (await (await fetch(`${base}/api/audit`, { headers: { cookie } })).json()) as { tool: string }[];
+    expect(audit.some((e) => e.tool === 'oauth')).toBe(true);
+  });
 });

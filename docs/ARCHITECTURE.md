@@ -72,6 +72,8 @@ flowchart TB
 
 **前端触点层（Sprint 09，已落地 Web App）**：`apps/web`（Vite + React + TS SPA）是面向用户的生产前端——纯 API 客户端，通过类型化客户端 + SSE hook 消费 BFF 的 HTTP/SSE 接口，**不旁路 BFF、不直连模型/库、不持密钥**（鉴权走会话 cookie），Markdown 安全渲染。BFF（`apps/bff`，刻意独立的 Node 服务）仍是唯一后端与组合根；其内联工作台保留为零配置兜底。SSR/营销站、桌面宿主、移动端为后续触点。
 
+**身份 / OAuth 登录（Sprint 14，已落地）**：又一个可换挡适配器——`AuthProvider`（OAuth 2.0/OIDC，**Stub 离线 / Google + GitHub 生产**，env 门控、缺 key 不注册，与 LLM/媒体/搜索/支付适配器同构）。数据流：`GET /api/auth/oauth/:provider/start`（生成 **state + PKCE**、存单次态 → 302 到授权页）→ `GET /callback`（**consume state** → `exchangeCode` → `fetchIdentity` → 按**已验证邮箱**归一/建用户 → 复用 `startSession` 签发签名会话 → 302 回安全相对路径）。`IdentityRepository` 存 `provider+providerId→userId`（内存 + Postgres `oauth_identities`），账号归一靠 `UserRepository.upsertByEmail`（密码 + 多 OAuth 身份同属一用户）。安全：state 单次+过期+绑 PKCE、回跳开放重定向 allowlist、`emailVerified=false` fail-closed、**OAuth token 不落库**（只存 providerId+email）、登录落审计、demo 用 stub/真 provider env 门控。
+
 **变现 / 计费（Sprint 13，已落地）**：又一个可换挡适配器——`PaymentProvider`（**Stub 离线 / Stripe 生产**，env 门控、缺 key 回退 stub，与 LLM/媒体/搜索适配器同构）。套餐声明在 `config/plans/*.json`（`taskLimit`+`features`+价格）；`resolveEntitlements(sub, plans)` 由订阅解析权益，**fail-closed 回落 free**；`Quota.planOf` 异步读订阅。数据流：`POST /api/billing/checkout` → provider 托管 Checkout URL（stub 立即激活，演示可端到端）；`POST /api/billing/webhook`（**公开端点**，按 provider 签名验**原始请求体** + 按 event id **幂等** → 更新订阅）；门禁用权益做**功能门**（cowork/media 为 pro）+ `Quota` **配额门**（超限 402）。**卡号永不经我方服务器**（provider 托管，我方只存 `providerRef` + 状态）；支付 secret 从 env、不入日志/响应；订阅变更落审计。
 
 **浏览器扩展触点（Sprint 12，已落地）**：`apps/extension`（MV3 + Vite + React）把研究/翻译/总结带到任意网页——又一个纯 BFF 客户端。跨源鉴权用 **API token**（`apolla_<id>_<secret>`，scrypt 哈希、仅展示一次；Bearer 与会话并存、owner 隔离 + 限流），流式用 **SSE-over-fetch**（EventSource 不能带 Bearer 头）。**最小权限**：`activeTab` + `scripting`（无 `<all_urls>`、无静态 content script，采集按用户手势注入）；token 仅 `chrome.storage`、绝不进页面 DOM；页面内容 untrusted（安全 Markdown）。content/background 逻辑经 chrome.* facade 注入，离线可测。
@@ -265,6 +267,7 @@ interface Orchestrator {
 | 新增一个 Skill | 写 `SkillDef` Markdown + Prompt Registry 条目 | Golden 用例 |
 | 新增媒体 provider（如新视频模型）| 实现 `MediaAdapter` + 媒体别名映射 | Media contract + 成本/审核 eval |
 | 接入一个支付 provider（Sprint 13）| 实现 `PaymentProvider`（Stub/Stripe，env 门控）| billing-entitlements + webhook 验签/幂等 eval |
+| 接入一个登录 provider（Sprint 14）| 实现 `AuthProvider`（Stub/Google/GitHub，env 门控）| identity-unification + state/开放重定向/邮箱校验回归 |
 | 新增套餐 / 调整权益（Sprint 13）| 加 `config/plans/*.json`（`taskLimit`+`features`），零业务代码 | 权益解析 + 套餐门禁回归 |
 | 模型变强后退役脚手架 | 关闭对应 `FeatureGate.scaffold` 开关；探针确认 `caps` 达标 | 回归无退化 |
 | 新增 Plugin（Cowork）| 声明 Skills+连接器+命令+子代理 捆绑 + 权限清单 | 安装授权流 + 安全 eval |

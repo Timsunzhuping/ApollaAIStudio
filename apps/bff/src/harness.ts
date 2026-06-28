@@ -34,6 +34,9 @@ import {
   StubPaymentProvider,
   StubSpeechProvider,
   type SpeechProvider,
+  InMemoryMagicLinkRepository,
+  StubMagicLinkDelivery,
+  type MagicLinkRepository,
   resolveEntitlements,
   StubOAuthProvider,
   InMemoryIdentityRepository,
@@ -124,6 +127,7 @@ import {
   PostgresApiTokenRepository,
   PostgresSubscriptionRepository,
   PostgresIdentityRepository,
+  PostgresMagicLinkRepository,
 } from '@apolla/db-postgres';
 import { DemoLLMAdapter } from './demo-adapter';
 
@@ -144,6 +148,8 @@ export interface Harness {
   subscriptions: SubscriptionRepository;
   payment: PaymentProvider;
   speech: SpeechProvider;
+  magicLinks: MagicLinkRepository;
+  magicLinkDelivery: StubMagicLinkDelivery;
   plans: () => import('@apolla/contracts').PlanDef[];
   identities: IdentityRepository;
   authProviders: Map<string, AuthProvider>;
@@ -223,6 +229,7 @@ export async function buildHarness(): Promise<Harness> {
   let apiTokens: ApiTokenRepository;
   let subscriptions: SubscriptionRepository;
   let identities: IdentityRepository;
+  let magicLinks: MagicLinkRepository;
   let projects: ProjectRepository;
   let memory: Memory;
   let skillRepo: SkillRepository;
@@ -246,6 +253,7 @@ export async function buildHarness(): Promise<Harness> {
     apiTokens = new PostgresApiTokenRepository(sql);
     subscriptions = new PostgresSubscriptionRepository(sql);
     identities = new PostgresIdentityRepository(sql);
+    magicLinks = new PostgresMagicLinkRepository(sql);
     projects = new PostgresProjectRepository(sql);
     memory = new PostgresMemory(sql);
     skillRepo = new PostgresSkillRepository(sql);
@@ -268,6 +276,7 @@ export async function buildHarness(): Promise<Harness> {
     apiTokens = new InMemoryApiTokenRepository();
     subscriptions = new InMemorySubscriptionRepository();
     identities = new InMemoryIdentityRepository();
+    magicLinks = new InMemoryMagicLinkRepository();
     projects = new InMemoryProjectRepository();
     memory = new InMemoryMemory();
     skillRepo = new InMemorySkillRepository();
@@ -479,6 +488,9 @@ export async function buildHarness(): Promise<Harness> {
     payment: process.env.STRIPE_SECRET_KEY ? new StripePaymentProvider() : new StubPaymentProvider(),
     // Speech (S19): OpenAI (Whisper + TTS) when keyed, else the offline Stub provider.
     speech: OpenAiSpeechProvider.isConfigured() ? new OpenAiSpeechProvider() : new StubSpeechProvider(),
+    // Magic-link (S20): single-use store + offline Stub delivery (real email is a deploy concern).
+    magicLinks,
+    magicLinkDelivery: new StubMagicLinkDelivery(),
     plans: loadPlans,
     identities,
     // Identity providers: stub always (offline default); real providers when env-keyed (缺 key 不注册).

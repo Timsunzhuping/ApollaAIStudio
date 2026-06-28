@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { User, Project, SkillDef, Session, ApiToken, Subscription, OAuthIdentity, type User as UserT, type Project as ProjectT, type SkillDef as SkillDefT, type Session as SessionT, type ApiToken as ApiTokenT, type Subscription as SubscriptionT, type OAuthIdentity as OAuthIdentityT } from '@apolla/contracts';
-import type { UserRepository, ProjectRepository, SkillRepository, SessionRepository, ApiTokenRepository, SubscriptionRepository, IdentityRepository, MagicLinkRepository } from '@apolla/harness-core';
+import type { UserRepository, ProjectRepository, SkillRepository, SessionRepository, ApiTokenRepository, SubscriptionRepository, IdentityRepository, MagicLinkRepository, MfaRecord } from '@apolla/harness-core';
 import type { Sql } from './index';
 
 export class PostgresUserRepository implements UserRepository {
@@ -36,6 +36,21 @@ export class PostgresUserRepository implements UserRepository {
   async get(id: string): Promise<UserT | undefined> {
     const rows = await this.sql<{ id: string; email: string }[]>`SELECT id, email FROM users WHERE id = ${id}`;
     return rows[0] ? User.parse(rows[0]) : undefined;
+  }
+
+  async getMfa(userId: string): Promise<MfaRecord | undefined> {
+    const rows = await this.sql<{ totp_secret: string | null; recovery_codes: unknown; mfa_enabled: boolean }[]>`
+      SELECT totp_secret, recovery_codes, mfa_enabled FROM users WHERE id = ${userId}
+    `;
+    const r = rows[0];
+    if (!r) return undefined;
+    return { secret: r.totp_secret, recoveryHashes: (r.recovery_codes as string[]) ?? [], enabled: r.mfa_enabled };
+  }
+  async saveMfa(userId: string, mfa: MfaRecord): Promise<void> {
+    await this.sql`
+      UPDATE users SET totp_secret = ${mfa.secret}, recovery_codes = ${this.sql.json(mfa.recoveryHashes)}, mfa_enabled = ${mfa.enabled}
+      WHERE id = ${userId}
+    `;
   }
 }
 

@@ -6,6 +6,7 @@ import type { NotificationRepository } from '../notify/notify';
 import type {
   TaskRepository,
   UserRepository,
+  MfaRecord,
   ProjectRepository,
   ConnectorRepository,
   AuditRepository,
@@ -80,6 +81,15 @@ export class InMemoryUserRepository implements UserRepository {
   async get(id: string): Promise<User | undefined> {
     const u = this.byId.get(id);
     return u ? structuredClone(u) : undefined;
+  }
+
+  private readonly mfaByOwner = new Map<string, MfaRecord>();
+  async getMfa(userId: string): Promise<MfaRecord | undefined> {
+    const m = this.mfaByOwner.get(userId);
+    return m ? structuredClone(m) : undefined;
+  }
+  async saveMfa(userId: string, mfa: MfaRecord): Promise<void> {
+    this.mfaByOwner.set(userId, structuredClone(mfa));
   }
 }
 

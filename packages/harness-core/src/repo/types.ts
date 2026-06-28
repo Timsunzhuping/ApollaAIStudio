@@ -16,6 +16,17 @@ export interface UserRepository {
   register(email: string, passwordHash: string): Promise<User>;
   /** Look up a user + their stored password hash by email (hash is null for passwordless demo users). */
   findCredentialByEmail(email: string): Promise<{ user: User; passwordHash: string | null } | undefined>;
+  /** MFA state (S20): TOTP secret is encrypted at rest, recovery codes scrypt-hashed. */
+  getMfa(userId: string): Promise<MfaRecord | undefined>;
+  saveMfa(userId: string, mfa: MfaRecord): Promise<void>;
+}
+
+export interface MfaRecord {
+  /** Encrypted TOTP secret (SECRETS_KEY), or null when MFA is not set up. */
+  secret: string | null;
+  /** scrypt hashes of one-time recovery codes. */
+  recoveryHashes: string[];
+  enabled: boolean;
 }
 
 export interface ProjectRepository {

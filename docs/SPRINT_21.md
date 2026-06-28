@@ -97,14 +97,16 @@ S21-T1(RGA CRDT) ─ S21-T2(会话+仓库) ─ S21-T3(SSE op 同步) ─┬─ S
 - **建议 PR 分组**：A(T1+T2) · B(T3+T4) · C(T5+T6) · D(T7+T8)。
 
 ## Sprint 21 Definition of Done（整体验收）
-- [ ] RGA 文本 CRDT（确定性收敛、同位排序、幂等）+ `CollabOp` 契约。
-- [ ] `CollabSession`（op 日志 + opsSince + presence）+ 仓库（内存 + workspace 快照）。
-- [ ] SSE op 同步端点（上行 ops / 下行 SSE），owner/share 访问受控 + 限流 + 审计 + 追踪。
-- [ ] 文档分享（签名 share-link + accept + 访问仓库），跨用户 fail-closed。
-- [ ] Web 实时编辑面 + presence + 分享 UI（两端实时同步）。
-- [ ] 安全：CRDT 收敛、访问 fail-closed、op 是数据、share token 签名不入日志。
-- [ ] `pnpm test` + `pnpm test:web` + `pnpm e2e` 全绿且 hermetic（进程内两客户端）。
-- [ ] README/架构文档更新。
+- [x] RGA 文本 CRDT（确定性收敛、同位排序、幂等）+ `CollabOp` 契约。
+- [x] `CollabSession`（op 日志 + opsSince + presence + snapshot/restore）+ 仓库（内存）。
+- [x] SSE op 同步端点（上行 ops / 下行 SSE / 拉取），owner/share 访问受控 + 限流 + 审计 + 追踪。
+- [x] 文档分享（签名 share-link + accept + `CollabAccessRepository` 内存+Postgres），跨用户 fail-closed。
+- [x] Web 实时编辑面 + presence + 分享 UI（两端实时同步）。
+- [x] 安全：CRDT 收敛、访问 fail-closed、op 是数据、share token 签名不入日志。
+- [x] `pnpm test` + `pnpm test:web` + `pnpm e2e` 全绿且 hermetic（进程内两客户端）。
+- [x] README/架构文档更新。
+
+> **Sprint 21 完成**（PR [#116](https://github.com/Timsunzhuping/ApollaAIStudio/pull/116) A · [#117](https://github.com/Timsunzhuping/ApollaAIStudio/pull/117) B · [#118](https://github.com/Timsunzhuping/ApollaAIStudio/pull/118) C · D 本次）。**RGA 文本 CRDT**（`replica:counter` id、insert-after + 墓碑、并发同位按 id 全序排序、delete-before-insert 处理）——状态是 op 集合纯函数，**任意顺序收敛**；`CollabSession`（CRDT + append-only op 日志 + `opsSince` + presence + snapshot/restore）+ `InMemoryCollabRepository`。同步**复用既有 SSE/HTTP**（无 WebSocket）：`POST …/ops` 上行 / `GET …/events` SSE 下行 / `GET /api/collab/:docId` 拉取。**分享**：owner 签名 share-link（限该 docId、7 天）+ `share/accept` 授权 + `CollabAccessRepository`（内存 + Postgres `collab_access`），**fail-closed**。Web Collab 页（实时编辑面 + presence + 分享）；纯 CRDT 经 `@apolla/harness-core/collab` 子路径供前端。**远端 op 是数据**（绝不触发动作）。新增 eval `collab-convergence`(43)。324 root + 27 web + 9 e2e 绿。富文本/协同光标/离线队列/OT/真实 WebSocket 列为后续。
 
 ## 风险与提示（给代理）
 - **收敛是命脉**：CRDT 必须对**任意 op 顺序**收敛到同一状态——用"两副本交换 op、打乱顺序应用"的测试钉死；同位并发插入用 `id` 全序确定排序（别用时间戳）。

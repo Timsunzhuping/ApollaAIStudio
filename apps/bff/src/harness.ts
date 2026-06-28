@@ -157,6 +157,8 @@ export interface Harness {
   magicLinkDelivery: StubMagicLinkDelivery;
   collab: CollabRepository;
   collabAccess: CollabAccessRepository;
+  /** Irreversibly cascade-delete all of an owner's data (S22). Present only with a real database. */
+  purgeOwner?: (ownerId: string) => Promise<void>;
   plans: () => import('@apolla/contracts').PlanDef[];
   identities: IdentityRepository;
   authProviders: Map<string, AuthProvider>;
@@ -251,6 +253,7 @@ export async function buildHarness(): Promise<Harness> {
   let workspaceRepo: WorkspaceRepository;
   let persistence: Harness['persistence'];
   let close = async (): Promise<void> => {};
+  let purgeOwner: Harness['purgeOwner'];
 
   if (process.env.DATABASE_URL) {
     const sql = createSql();
@@ -277,6 +280,18 @@ export async function buildHarness(): Promise<Harness> {
     persistence = 'postgres';
     close = async () => {
       await sql.end();
+    };
+    // Account deletion (S22): irreversibly cascade-purge ALL of one owner's data in a single
+    // transaction. Owner-keyed tables by owner_id; identity tables by user_id; then the user row.
+    purgeOwner = async (ownerId: string) => {
+      const ownerTables = ['tasks', 'sessions', 'api_tokens', 'subscriptions', 'projects', 'memory_items', 'user_model', 'skills', 'media_tasks', 'connectors', 'audit_log', 'jobs', 'scheduled_tasks', 'notifications', 'plugins', 'workspace_files'];
+      const userTables = ['oauth_identities', 'collab_access'];
+      await sql.begin(async (tx) => {
+        await tx`DELETE FROM job_events WHERE job_id IN (SELECT id FROM jobs WHERE owner_id = ${ownerId})`;
+        for (const t of ownerTables) await tx.unsafe(`DELETE FROM ${t} WHERE owner_id = $1`, [ownerId]);
+        for (const t of userTables) await tx.unsafe(`DELETE FROM ${t} WHERE user_id = $1`, [ownerId]);
+        await tx`DELETE FROM users WHERE id = ${ownerId}`;
+      });
     };
   } else {
     repo = new InMemoryTaskRepository();
@@ -504,6 +519,7 @@ export async function buildHarness(): Promise<Harness> {
     // Collab (S21): in-memory live sessions; access grants persist (Postgres/in-memory).
     collab: new InMemoryCollabRepository(),
     collabAccess,
+    purgeOwner,
     plans: loadPlans,
     identities,
     // Identity providers: stub always (offline default); real providers when env-keyed (缺 key 不注册).

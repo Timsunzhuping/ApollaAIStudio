@@ -990,9 +990,14 @@ export async function handle(req: IncomingMessage, res: ServerResponse): Promise
 if (!process.env.VITEST) {
   const built = await buildHarness();
   setHarness(built);
-  // Startup reconciliation: any job still queued/running from a previous process is dead (S10-T6).
-  const reconciled = await reconcileJobs(built.jobRepo).catch(() => 0);
-  if (reconciled) console.log(`Reconciled ${reconciled} interrupted job(s) from a prior run`);
+  // In distributed mode (Redis queue) the standalone worker owns reconciliation + scheduling; the
+  // web only enqueues. In-process mode keeps doing both here (S16).
+  const ownsExecution = built.jobQueue.inProcess;
+  if (ownsExecution) {
+    // Startup reconciliation: any job still queued/running from a previous process is dead (S10-T6).
+    const reconciled = await reconcileJobs(built.jobRepo).catch(() => 0);
+    if (reconciled) console.log(`Reconciled ${reconciled} interrupted job(s) from a prior run`);
+  }
 
   const PORT = Number(process.env.PORT ?? 3000);
   const server = createServer((req, res) => {
@@ -1001,14 +1006,17 @@ if (!process.env.VITEST) {
     console.log(`Apolla BFF [${built.mode}/${built.persistence}] → http://localhost:${PORT}`);
   });
 
-  // In-process cron tick (S5-T3). Production would use a durable queue/worker instead.
-  const cron = setInterval(() => {
-    built.scheduler.tick(new Date()).catch(() => {});
-  }, 30_000);
+  // In-process cron tick (S5-T3). Distributed mode: the worker owns scheduling (single point — no
+  // double-ticking across web instances), so the web does not tick.
+  const cron = ownsExecution
+    ? setInterval(() => {
+        built.scheduler.tick(new Date()).catch(() => {});
+      }, 30_000)
+    : undefined;
 
   // Graceful shutdown: stop accepting, stop the cron, close DB pool, exit.
   const shutdown = () => {
-    clearInterval(cron);
+    if (cron) clearInterval(cron);
     server.close(() => {
       void built.close?.().finally(() => process.exit(0));
     });

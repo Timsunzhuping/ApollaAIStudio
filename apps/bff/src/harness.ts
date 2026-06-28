@@ -87,6 +87,7 @@ import {
 import { getRoute, loadSkills, loadPlugins, loadSurfaces, loadConnectorCatalog, loadPlans, loadFeatureGates, getMediaRoute } from '@apolla/config';
 import { StripePaymentProvider } from '@apolla/payment-stripe';
 import { GoogleOAuthProvider, GitHubOAuthProvider } from '@apolla/auth-oauth';
+import { RedisJobQueue } from '@apolla/queue-redis';
 import type { ModelCaps } from '@apolla/contracts';
 import { OpenAIImageAdapter } from '@apolla/media-openai';
 import { SeedanceVideoAdapter } from '@apolla/media-seedance';
@@ -434,9 +435,9 @@ export async function buildHarness(): Promise<Harness> {
     })();
   };
   const delivery = process.env.NOTIFY_WEBHOOK_URL ? new WebhookDelivery(process.env.NOTIFY_WEBHOOK_URL) : undefined;
-  // Execution substrate (S16): InProcess by default (web self-executes — unchanged behavior).
-  // A distributed Redis queue + standalone worker slot in here behind the same JobQueue interface.
-  const jobQueue = new InProcessJobQueue();
+  // Execution substrate (S16): InProcess by default (web self-executes — unchanged behavior); a
+  // distributed Redis(BullMQ) queue when REDIS_URL is set, behind the same JobQueue interface.
+  const jobQueue: JobQueue = process.env.REDIS_URL ? new RedisJobQueue() : new InProcessJobQueue();
   const jobs = new JobRunner({
     repo: jobRepo,
     resolve: jobResolve,
@@ -444,7 +445,9 @@ export async function buildHarness(): Promise<Harness> {
     canRun: (id) => quota.check(id).then((q) => q.ok),
     queue: jobQueue,
   });
-  jobQueue.process((id) => jobs.run(id)); // in-process: the web consumes its own queue
+  // In-process mode: the web consumes its own queue. Distributed mode: the web enqueues only and a
+  // standalone worker registers the consumer (see workers/job-worker).
+  if (jobQueue.inProcess) jobQueue.process((id) => jobs.run(id));
   const scheduler = new Scheduler({
     repo: scheduleRepo,
     trigger: (t) => {

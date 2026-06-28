@@ -14,5 +14,17 @@ services:
       timeout: 5s
       retries: 5
 
+  # Distributed job queue broker (S16). Set REDIS_URL=redis://localhost:6379 to run web + worker
+  # in distributed mode; unset → in-process (no Redis needed).
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
 volumes:
   apolla_pg:

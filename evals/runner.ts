@@ -16,6 +16,7 @@ import { runRemoteToolScenarios } from './src/remote-tool-scenarios';
 import { runBillingScenarios } from './src/billing-scenarios';
 import { runIdentityScenarios } from './src/identity-scenarios';
 import { runQueueScenarios } from './src/queue-scenarios';
+import { runTracingScenarios } from './src/tracing-scenarios';
 
 /** Baseline cost for the deterministic golden (mock pricing). Tighten as the loop evolves. */
 const BASELINE_USD = 0.001;
@@ -37,6 +38,7 @@ const results: CheckResult[] = [
   ...(await runBillingScenarios()),
   ...(await runIdentityScenarios()),
   ...(await runQueueScenarios()),
+  ...(await runTracingScenarios()),
 ];
 
 console.log('Apolla eval — research golden\n');

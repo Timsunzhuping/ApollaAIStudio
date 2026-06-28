@@ -72,6 +72,8 @@ flowchart TB
 
 **前端触点层（Sprint 09，已落地 Web App）**：`apps/web`（Vite + React + TS SPA）是面向用户的生产前端——纯 API 客户端，通过类型化客户端 + SSE hook 消费 BFF 的 HTTP/SSE 接口，**不旁路 BFF、不直连模型/库、不持密钥**（鉴权走会话 cookie），Markdown 安全渲染。BFF（`apps/bff`，刻意独立的 Node 服务）仍是唯一后端与组合根；其内联工作台保留为零配置兜底。SSR/营销站、桌面宿主、移动端为后续触点。
 
+**可观测性 / 分布式追踪（Sprint 17，已落地）**：又一个可换挡适配器——`Tracer`（**Noop 默认 / OpenTelemetry 生产**，env 门控 `OTEL_EXPORTER_OTLP_ENDPOINT`，与其余适配器同构）。`Tracer`/`Span` 升级为支持子 span（父上下文）、status/events、W3C traceparent inject/extract、shutdown；`AsyncLocalStorage`（`obs/context.ts` 的 `traced`/`tracedGen`/`currentSpanContext`）让子 span 跨 await/yield 自动嵌套。数据流：`http.request` span 包住每个请求并置 ALS → 编排（research plan/generate）/`llm.complete`/工具 子 span 自动嵌套 → `jobs.start` 自动捕获当前 span 写入 `Job.traceparent` → Worker `job.run` span `extract` 续上 = **Web→队列→Worker 一条 trace**。`/metrics` 增 per-operation SLO（计数/错误率/p50·p95）。安全：span 脱敏（无密钥/PII、owner 哈希）、入站 traceparent 不可信（仅关联）、Noop 零开销、关停 flush。与 metrics/日志互补：metrics 看聚合 SLO、trace 看单请求跨进程因果。
+
 **规模与可靠性 / 任务队列（Sprint 16，已落地）**：又一个可换挡适配器——`JobQueue`（**InProcess 默认 / Redis(BullMQ) 分布式**，env 门控 `REDIS_URL`，与 LLM/媒体/搜索/支付/身份适配器同构）。`JobRunner` 拆为 `start()`（持久化 queued + 配额门 + `enqueue`）与 `run(jobId)`（消费到终态，幂等：仅 queued/interrupted 执行）。数据流：**Web 入队** → **Worker 进程**（`workers/job-worker`）消费 `run` → 每个事件 `appendEvent` 进**持久 run-log** → Web 的 SSE `/api/jobs/:id/events` **轮询尾随该 log** → 跨进程实时出流（生产者/流式天然解耦，无需改 SSE）。可靠性：先落库再入队 + `reconcileJobs` 重入队（崩溃存活）、幂等消费、重试+指数退避+上限→failed（重试前 `clearEvents` 清 run-log 避免重复）、`JOB_TIMEOUT_MS` 超时、SIGTERM 优雅排空；调度**单点**在 Worker（杜绝多实例重复 tick）；配额/安全在 Worker 路径同样强制（同一 `jobResolve`，子代理继承、high_write 永拒、后台白名单、审计）。默认/离线 hermetic（无 Redis）；CI Redis service 跑门控集成测试。
 
 **端到端测试与发布就绪（Sprint 15，已落地）**：测试金字塔——单元/契约（vitest）→ web 组件（jsdom + RTL，mock fetch）→ **e2e 整合网（Playwright/chromium）**。e2e 打**真实整合栈**（构建后的 web SPA → 真实 BFF over HTTP/SSE + 真实会话 cookie），覆盖鉴权/SSO、研究真实 SSE、计费、Surface→工作区等旅程；**hermetic & 离线**（内存 BFF 不设 `DATABASE_URL` + 全 stub provider，无网络/凭证）。配套：BFF **单源托管 SPA**（`WEB_DIST` → `apps/web/dist`，静态资源按路径 + 未命中非 API GET 回退 `index.html`；env 门控、未设则维持内联 UI），消解跨源 cookie 问题且单源可部署（见 `docs/DEPLOY.md`）。e2e 与 **evals（能力网）** 互补：evals 守每类能力的回归，e2e 守整合栈的端到端可用。CI 独立 `e2e` job（装 chromium、失败留 trace）。
@@ -273,6 +275,7 @@ interface Orchestrator {
 | 接入一个支付 provider（Sprint 13）| 实现 `PaymentProvider`（Stub/Stripe，env 门控）| billing-entitlements + webhook 验签/幂等 eval |
 | 接入一个登录 provider（Sprint 14）| 实现 `AuthProvider`（Stub/Google/GitHub，env 门控）| identity-unification + state/开放重定向/邮箱校验回归 |
 | 切换任务执行基座（Sprint 16）| 实现 `JobQueue`（InProcess/Redis-BullMQ，`REDIS_URL` 门控）| job-queue-lifecycle + 幂等/重试/超时 + 门控 Redis 集成测试 |
+| 接入追踪后端（Sprint 17）| 实现 `Tracer`（Noop/OTel，`OTEL_EXPORTER_OTLP_ENDPOINT` 门控）| tracing-propagation + span 树/跨进程/脱敏断言（InMemoryTracer）|
 | 新增套餐 / 调整权益（Sprint 13）| 加 `config/plans/*.json`（`taskLimit`+`features`），零业务代码 | 权益解析 + 套餐门禁回归 |
 | 模型变强后退役脚手架 | 关闭对应 `FeatureGate.scaffold` 开关；探针确认 `caps` 达标 | 回归无退化 |
 | 新增 Plugin（Cowork）| 声明 Skills+连接器+命令+子代理 捆绑 + 权限清单 | 安装授权流 + 安全 eval |

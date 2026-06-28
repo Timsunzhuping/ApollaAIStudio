@@ -10,7 +10,8 @@ import { newTotpSecret, verifyTotp, otpauthUri, newRecoveryCodes, newMagicToken,
 import { buildHarness, type Harness } from './harness';
 import { readSession, readBearer, startSession, endSession, mfaPendingToken, verifyMfaPending, shareToken, verifyShareToken } from './auth';
 import { z } from 'zod';
-import { CollabOp } from '@apolla/contracts';
+import { CollabOp, AccountBundle } from '@apolla/contracts';
+import { buildAccountBundle, importBundle } from './account';
 import { applySecurityHeaders, applyCors, clientIp, limiters, isExpensive, MAX_BODY_BYTES } from './security';
 import { observe, metrics, type ObservedResponse } from './obs';
 import { reconcileJobs, withSpanContext, McpServer, type JsonRpcRequest } from '@apolla/harness-core';
@@ -611,6 +612,37 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
       const since = Number(url.searchParams.get('since') ?? 0);
       return json(res, 200, { docId, ownerId: doc.ownerId, text: doc.session.text(), seq: doc.session.seq, ops: doc.session.opsSince(since), participants: doc.session.participants() });
     }
+  }
+
+  // --- Account & data lifecycle (S22). Strictly owner-scoped; secrets never leave; delete needs
+  // explicit confirmation and is irreversible; import re-owns to the caller. ---
+  if (method === 'GET' && pathname === '/api/account/export') {
+    const me = await harness.users.get(ownerId);
+    const bundle = await buildAccountBundle(harness, ownerId, me?.email ?? '');
+    await harness.audit.record({ id: randomUUID(), ownerId, taskId: 'account', tool: 'account.export', risk: 'read', decision: 'allow', status: 'executed', summary: 'exported account data' });
+    res.setHeader('content-disposition', 'attachment; filename="apolla-account-export.json"');
+    return json(res, 200, bundle);
+  }
+  if (method === 'POST' && pathname === '/api/account/delete') {
+    if (!harness.purgeOwner) return json(res, 503, { error: 'account deletion requires a configured database' });
+    const me = await harness.users.get(ownerId);
+    const body = await readBody(req);
+    // Re-enter the account email to confirm — a deliberate, irreversible action.
+    if (!me || String(body.confirm ?? '').trim().toLowerCase() !== me.email.toLowerCase()) {
+      return json(res, 401, { error: 'confirmation does not match your account email' });
+    }
+    await harness.purgeOwner(ownerId);
+    await harness.audit.record({ id: randomUUID(), ownerId, taskId: 'account', tool: 'account.delete', risk: 'high_write', decision: 'allow', status: 'executed', summary: 'deleted account + all data' });
+    await endSession(req, res, harness.sessions); // revoke the session + clear the cookie
+    return json(res, 200, { deleted: true });
+  }
+  if (method === 'POST' && pathname === '/api/account/import') {
+    const body = await readBody(req);
+    const parsed = AccountBundle.safeParse(body.bundle);
+    if (!parsed.success) return json(res, 400, { error: 'invalid account bundle' });
+    const counts = await importBundle(harness, ownerId, parsed.data);
+    await harness.audit.record({ id: randomUUID(), ownerId, taskId: 'account', tool: 'account.import', risk: 'low_write', decision: 'allow', status: 'executed', summary: `imported ${counts.projects} projects, ${counts.skills} skills, ${counts.workspace} files` });
+    return json(res, 200, counts);
   }
 
   // --- API tokens (S12): cross-origin auth for the extension / CLI ---

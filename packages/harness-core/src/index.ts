@@ -38,6 +38,7 @@ export { InMemoryCostLedger } from './cost/ledger';
 export type { LLMUsageEvent, UsageContext } from './cost/ledger';
 export { NoopTracer, ConsoleTracer, InMemoryTracer, redactAttributes, parseTraceparent, formatTraceparent } from './obs/tracer';
 export type { Tracer, Span, SpanContext, StartSpanOptions, RecordedSpan } from './obs/tracer';
+export { traced, tracedGen, currentSpanContext, withSpanContext } from './obs/context';
 export {
   InMemoryTaskRepository,
   InMemoryUserRepository,

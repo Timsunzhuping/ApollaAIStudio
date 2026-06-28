@@ -44,6 +44,7 @@ async function main(): Promise<void> {
     health?.close();
     void h.jobQueue.close?.()
       .catch(() => {})
+      .then(() => h.tracer.shutdown().catch(() => {})) // flush pending spans
       .then(() => h.close?.())
       .finally(() => process.exit(0));
     setTimeout(() => process.exit(0), 30_000).unref(); // hard cap if in-flight lingers

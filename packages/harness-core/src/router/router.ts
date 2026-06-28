@@ -5,6 +5,8 @@ import { getRoute } from '@apolla/config';
 import type { LLMAdapter, AttemptLog, TokenUsage } from './types';
 import { ModelRouterError } from './types';
 import { resolveKeyPairs } from './keys';
+import { NoopTracer, type Tracer } from '../obs/tracer';
+import { tracedGen } from '../obs/context';
 
 export interface UsageEvent extends TokenUsage {
   alias: ModelAlias;
@@ -23,6 +25,8 @@ export interface RouterDeps {
   onUsage?: (event: UsageEvent) => void;
   /** Corrective retries for json() when output fails schema validation. Default 2. */
   jsonMaxRetries?: number;
+  /** Tracer for an `llm.complete` span per call (S17). Defaults to Noop. */
+  tracer?: Tracer;
 }
 
 function parseModelId(id: string): { provider: string; model: string } {
@@ -54,6 +58,7 @@ export class ModelRouter {
   private readonly routeFor: (alias: ModelAlias) => RouteConfig;
   private readonly onUsage?: (event: UsageEvent) => void;
   private readonly jsonMaxRetries: number;
+  private readonly tracer: Tracer;
 
   constructor(deps: RouterDeps) {
     this.adapters = deps.adapters;
@@ -61,14 +66,19 @@ export class ModelRouter {
     this.routeFor = deps.routeFor ?? getRoute;
     this.onUsage = deps.onUsage;
     this.jsonMaxRetries = deps.jsonMaxRetries ?? 2;
+    this.tracer = deps.tracer ?? new NoopTracer();
   }
 
   private candidates(route: RouteConfig): string[] {
     return [route.primary, ...route.fallbackChain];
   }
 
-  /** Stream a completion, failing over across candidates and keys until one succeeds. */
+  /** Stream a completion (traced as `llm.complete`), failing over across candidates + keys. */
   async *complete(alias: ModelAlias, req: LLMRequest): AsyncIterable<LLMChunk> {
+    yield* tracedGen(this.tracer, 'llm.complete', () => this.completeInner(alias, req), { attributes: { alias } });
+  }
+
+  private async *completeInner(alias: ModelAlias, req: LLMRequest): AsyncIterable<LLMChunk> {
     const route = this.routeFor(alias);
     const attempts: AttemptLog[] = [];
 

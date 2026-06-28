@@ -2,11 +2,11 @@
 
 面向个人知识工作的 AI 工作台，采用 **Harness 架构**：模型是可替换、持续变强的能力提供者；平台只做路由、上下文、工具、记忆、安全、评测、交付。模型变强 → 平台能力自动变强。
 
-> 文档：[架构总纲](docs/ARCHITECTURE.md) · [PRD](docs/PRD.md) · [开发计划](docs/DEVELOPMENT_PLAN.md) · Sprint [01](docs/SPRINT_01.md)–[11](docs/SPRINT_11.md) · 代理约定 [AGENTS.md](AGENTS.md) / [CLAUDE.md](CLAUDE.md)
+> 文档：[架构总纲](docs/ARCHITECTURE.md) · [PRD](docs/PRD.md) · [开发计划](docs/DEVELOPMENT_PLAN.md) · Sprint [01](docs/SPRINT_01.md)–[12](docs/SPRINT_12.md) · 代理约定 [AGENTS.md](AGENTS.md) / [CLAUDE.md](CLAUDE.md)
 
 ## 状态
 
-**Sprint 01–11 完成** —— 从研究→成品骨架，升级为持久化、多用户、有记忆、技能可复用、支持多模态成品（文生图/视频）、具备工具生态与低风险执行（MCP + Agent + 分级确认 + 审计）、能主动运行（定时任务 + 后台 Job + 通知）、具备 Cowork 集成式自治（角色化 Plugins + 子代理并行编排 + 澄清机制）、拥有版本化项目文件区（文件感知工具 + Writer + Cowork 文件协作）、提供文本产品面（翻译 / 表格 / 会议纪要）、配有生产级 Web 前端、完成生产硬化与安全（真实鉴权 + 多租户隔离 + 限流 + 安全头 + 可观测性 + Job 持久恢复）、并开放 **工具生态（HTTP/SSE MCP transport + 连接器市场，可接入托管 MCP 服务）**的工作台。
+**Sprint 01–12 完成** —— 从研究→成品骨架，升级为持久化、多用户、有记忆、技能可复用、多模态成品、工具生态与低风险执行（MCP + Agent + 分级确认 + 审计）、主动运行（定时 + 后台 Job + 通知）、Cowork 集成式自治、版本化项目文件区（+ Writer + Cowork 文件协作）、文本产品面（翻译/表格/会议纪要）、生产级 Web 前端、生产硬化与安全（真实鉴权 + 多租户隔离 + 限流 + 安全头 + 可观测性 + Job 恢复）、开放工具生态（HTTP/SSE MCP + 连接器市场）、并配有 **浏览器扩展（MV3：任意网页划词研究/翻译/总结 + 侧边栏，API token 跨源鉴权）**的工作台。
 - **Harness Core**：Model Router（failover/多密钥）、Prompt Registry、Tool Runtime（Web Search）、Safety & Policy（三级权限 + 防注入）、Cost Ledger、研究状态机（流式综合）、FeatureGate 运行时。
 - **持久化与账号**：Postgres（接口的 PG 实现）、最小 Auth、Projects。
 - **个人化**：Memory（FTS 检索 + 用户模型 + 注入研究流）。
@@ -20,6 +20,7 @@
 - **生产前端（Sprint 09）**：`apps/web`（Vite + React + TS strict）—— 设计系统 + 应用外壳 + 路由 + 鉴权（受保护路由）、**类型化 API 客户端 + SSE hook**（卸载清理）；五大产品页：研究（流式）/工作区+Writer/Surfaces/Agent+Cowork+Plugins/自动化+设置，全部消费 BFF 现有 HTTP/SSE 接口（前端为纯客户端，不旁路后端）；Markdown 安全渲染、错误边界、响应式。
 - **生产硬化与安全（Sprint 10）**：**真实鉴权**（邮箱+密码 scrypt 哈希 + 签名 httpOnly 服务端会话，过期+轮换+登出失效；demo 模式保留零配置登录）、**多租户隔离**（每个 `:id`/SSE/确认端点校验 ownerId，fail-closed；审计修复 4 处 IDOR）、**限流**（per-IP + 昂贵端点 per-owner 令牌桶，429 + Retry-After）、**安全周界**（CSP/nosniff/frame-deny + CORS 白名单 + body 上限）、**可观测性**（脱敏结构化日志 + request-id + `/metrics`）、**Job 持久恢复**（启动对账残留 Job → interrupted）+ 优雅停机。
 - **开放工具生态（Sprint 11）**：**HTTP/SSE MCP transport**（`HttpMCPClient`：JSON-RPC over HTTP，JSON+SSE 响应、超时、Mcp-Session-Id；接入托管 MCP 服务）、**连接器市场**（声明式目录 `config/connectors/*.json` + 一键添加，填 URL/token）、**远程工具安全**（输出走数据通道、风险来自声明不来自输出、远程绝不自动 high_write、token 加密只发往配置 host、不可达隔离、计入限流/审计）、**连接器健康**探针 + 指标 + UI 徽标。复用 `MCPClient`/`wrapMCPTool`/`inferRisk`/ToolRuntime/Safety，不另造执行通道。
+- **浏览器扩展（Sprint 12）**：`apps/extension`（MV3 + Vite + React）—— 任意网页**划词** → 右键/侧边栏「研究/翻译/总结」→ 侧边栏**流式**出结果（SSE-over-fetch）→ 一键**存入工作区**；**API token** 跨源鉴权（`apolla_<id>_<secret>`，scrypt 哈希、仅展示一次，Web 设置页管理）；**最小权限**（`activeTab` + `scripting`，无 `<all_urls>`，无静态 content script，按手势注入采集）；token 仅存 `chrome.storage`、绝不进页面；页面内容 untrusted（安全 Markdown）。纯 BFF 客户端，复用研究/Surface/工作区。
 - **Demo**：`apps/bff` 内联工作台（零配置兜底）—— 登录 → 研究/Agent → 定时任务 → 后台 → 历史+通知 → 导出；MCP → Agent → 确认 → 审计；Plugin → Cowork → fan-out → 汇总；`report.md` → Writer → 回滚 → 下载；会议纪要/翻译/表格。生产体验见 `apps/web`。
 
 ## 快速开始
@@ -58,6 +59,8 @@ pnpm dev:web      # 终端 B：Web 前端（http://localhost:5173）
 
 **远程工具 / 连接器市场（Sprint 11）**：连接器支持 `transport: 'http'`（托管 MCP 服务，Streamable HTTP）。从 Agent 页"连接器"区浏览市场目录（`config/connectors/*.json`）→ 填服务 URL + token（如需）一键添加 → 工具即进入 Agent/Cowork 工具集（远程输出走数据通道、低风险写入需确认）。token 经 `SECRETS_KEY` 加密、仅发往配置的 host；连接器健康可在 UI 探针查看。本地/CI 用内置 stub HTTP MCP server，无需出网。
 
+**浏览器扩展（`apps/extension`，Sprint 12）**：`pnpm --filter @apolla/extension build` → 产出 `apps/extension/dist`（MV3 包）→ Chrome `chrome://extensions` 开发者模式「加载已解压的扩展程序」选 `dist`。打开侧边栏 → 设置里填 BFF URL + 一个 **API token**（在 Web 设置页生成）。然后在任意网页**划词** → 右键「研究/翻译/总结 with Apolla」→ 侧边栏流式出结果 → 可存入工作区。生产部署需把扩展来源加入 `CORS_ORIGIN`，并把 BFF host 写入扩展 manifest 的 `host_permissions`。
+
 ## 命令
 
 | 命令 | 作用 |
@@ -68,13 +71,14 @@ pnpm dev:web      # 终端 B：Web 前端（http://localhost:5173）
 | `pnpm lint` | ESLint |
 | `pnpm test` | vitest 单测（node 包；`apps/web` 见下） |
 | `pnpm test:web` | Web 前端组件/客户端测试（vitest + jsdom + RTL） |
+| `pnpm --filter @apolla/extension test` | 浏览器扩展测试（vitest + jsdom；chrome.* facade mock） |
 | `pnpm build` | 各包 tsc 产物 + Web 前端 vite build |
 | `pnpm eval` | 35 项：研究 + 记忆/Skill/个性化 + 媒体 + 执行 + 自治 + Cowork + Workspace + Surfaces + 远程工具(HTTP MCP 端到端) |
 | `pnpm contract-test` | Provider 契约测试 |
 | `pnpm db:up` / `db:down` | 启停本地 Postgres（docker） |
 | `pnpm db:migrate` | 迁移 schema（读 `DATABASE_URL`） |
 
-要求：Node ≥ 20，pnpm 9。CI（`.github/workflows/ci.yml`）对每个 PR 跑 typecheck · lint · test · **test:web** · build · **eval** 全门禁。
+要求：Node ≥ 20，pnpm 9。CI（`.github/workflows/ci.yml`）对每个 PR 跑 typecheck · lint · test · **test:web** · **extension test** · build · **eval** 全门禁。
 
 ## 仓库布局（详见 [ARCHITECTURE §7](docs/ARCHITECTURE.md)）
 
@@ -87,6 +91,7 @@ packages/
     llm/{openai,anthropic}/    search/{stub,tavily}/
 apps/bff/           # BFF：研究→成品 API(SSE) + 内联工作台（组合根；唯一后端）
 apps/web/           # ★ 生产前端：Vite + React SPA，消费 BFF HTTP/SSE（Sprint 09）
+apps/extension/     # ★ 浏览器扩展：MV3 + Vite + React，API token 跨源消费 BFF（Sprint 12）
 evals/              # 研究 golden + 引用/成本回归门禁
 workers/            # （后续）
 ```

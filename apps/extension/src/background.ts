@@ -1,4 +1,5 @@
 import { capturePageContext } from './content';
+import { handleMenuClick, type BackgroundDeps } from './lib/background-actions';
 
 // Context-menu actions; the side panel reads the pending action from chrome.storage on open.
 const MENU: { id: string; title: string }[] = [
@@ -12,16 +13,17 @@ chrome.runtime.onInstalled.addListener(() => {
   chrome.sidePanel?.setPanelBehavior?.({ openPanelOnActionClick: true }).catch(() => {});
 });
 
-chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-  if (!tab?.id) return;
-  let context = { selection: '', title: tab.title ?? '', url: tab.url ?? '' };
-  try {
-    // activeTab + scripting: capture runs only on this user gesture, no static content script.
-    const [res] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: capturePageContext });
-    if (res?.result) context = res.result as typeof context;
-  } catch {
-    /* page not scriptable (chrome:// etc) — fall back to tab metadata */
-  }
-  await chrome.storage.local.set({ pendingAction: { action: String(info.menuItemId), context, at: Date.now() } });
-  if (chrome.sidePanel?.open) await chrome.sidePanel.open({ tabId: tab.id }).catch(() => {});
+const deps: BackgroundDeps = {
+  // activeTab + scripting: capture runs only on this user gesture, no static content script.
+  capture: async (tabId) => {
+    const [res] = await chrome.scripting.executeScript({ target: { tabId }, func: capturePageContext });
+    return (res?.result as ReturnType<typeof capturePageContext> | undefined) ?? null;
+  },
+  storageSet: (items) => chrome.storage.local.set(items),
+  openSidePanel: async (tabId) => { await chrome.sidePanel?.open?.({ tabId }); },
+  now: () => Date.now(),
+};
+
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  void handleMenuClick(String(info.menuItemId), tab, deps);
 });

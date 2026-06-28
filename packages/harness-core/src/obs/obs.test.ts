@@ -20,7 +20,7 @@ describe('Metrics', () => {
 });
 
 describe('reconcileJobs (S10-T6)', () => {
-  const job = (id: string, status: Job['status']): Job => ({ id, ownerId: 'u', kind: 'research', input: {}, status });
+  const job = (id: string, status: Job['status']): Job => ({ id, ownerId: 'u', kind: 'research', input: {}, allowTools: [], status });
 
   it('marks queued/running jobs interrupted and leaves terminal ones alone', async () => {
     const repo = new InMemoryJobRepository();

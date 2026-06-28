@@ -21,6 +21,8 @@ export const Job = z.object({
   ownerId: z.string(),
   kind: JobKind,
   input: z.record(z.any()).default({}),
+  /** Pre-authorized low_write tools — persisted so a worker can reconstruct the spec (S16). */
+  allowTools: z.array(z.string()).default([]),
   status: JobStatus,
   error: z.string().optional(),
   scheduledTaskId: z.string().optional(),

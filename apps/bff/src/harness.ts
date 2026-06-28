@@ -54,6 +54,7 @@ import {
   sheetExecutor,
   notesExecutor,
   JobRunner,
+  InProcessJobQueue,
   Scheduler,
   notifyJobComplete,
   WebhookDelivery,
@@ -72,6 +73,7 @@ import {
   type AuditRepository,
   type JobRepository,
   type JobResolver,
+  type JobQueue,
   type ScheduledTaskRepository,
   type NotificationRepository,
   type MCPClient,
@@ -150,6 +152,7 @@ export interface Harness {
   audit: AuditRepository;
   jobs: JobRunner;
   jobRepo: JobRepository;
+  jobQueue: JobQueue;
   scheduler: Scheduler;
   scheduleRepo: ScheduledTaskRepository;
   notifications: NotificationRepository;
@@ -431,12 +434,17 @@ export async function buildHarness(): Promise<Harness> {
     })();
   };
   const delivery = process.env.NOTIFY_WEBHOOK_URL ? new WebhookDelivery(process.env.NOTIFY_WEBHOOK_URL) : undefined;
+  // Execution substrate (S16): InProcess by default (web self-executes — unchanged behavior).
+  // A distributed Redis queue + standalone worker slot in here behind the same JobQueue interface.
+  const jobQueue = new InProcessJobQueue();
   const jobs = new JobRunner({
     repo: jobRepo,
     resolve: jobResolve,
     onComplete: (job) => notifyJobComplete(job, { repo: notificationRepo, delivery }),
     canRun: (id) => quota.check(id).then((q) => q.ok),
+    queue: jobQueue,
   });
+  jobQueue.process((id) => jobs.run(id)); // in-process: the web consumes its own queue
   const scheduler = new Scheduler({
     repo: scheduleRepo,
     trigger: (t) => {
@@ -470,6 +478,7 @@ export async function buildHarness(): Promise<Harness> {
     audit: auditRepo,
     jobs,
     jobRepo,
+    jobQueue,
     scheduler,
     scheduleRepo,
     notifications: notificationRepo,

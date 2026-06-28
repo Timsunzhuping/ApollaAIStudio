@@ -41,6 +41,66 @@ async function projectContext(projectId: string | undefined, ownerId: string): P
   return `Project context — "${p.name}": ${p.description}`.trim();
 }
 
+/** Build http auth headers from PLAINTEXT secrets (used at connect-time, before encryption). */
+function httpHeadersFromPlain(transport: string, secrets: Record<string, string>): Record<string, string> | undefined {
+  if (transport !== 'http') return undefined;
+  if (secrets.authorization) return { Authorization: secrets.authorization };
+  if (secrets.token) return { Authorization: `Bearer ${secrets.token}` };
+  return undefined;
+}
+
+interface ConnectorInput {
+  name: string;
+  transport: 'stub' | 'stdio' | 'http';
+  command?: string;
+  args?: string[];
+  url?: string;
+  readOnlyTools?: string[];
+  secrets?: Record<string, string>;
+}
+
+/** Connect once to enumerate tools + infer risk, then persist the connector (secrets encrypted). */
+async function createConnector(ownerId: string, input: ConnectorInput): Promise<Connector | { error: string }> {
+  const plain = input.secrets ?? {};
+  const server = {
+    name: input.name || 'connector',
+    transport: input.transport,
+    command: input.command,
+    args: Array.isArray(input.args) ? input.args : [],
+    url: input.url,
+    readOnlyTools: Array.isArray(input.readOnlyTools) ? input.readOnlyTools : [],
+    headers: httpHeadersFromPlain(input.transport, plain),
+    timeoutMs: 10_000,
+  };
+  let tools: Connector['tools'] = [];
+  try {
+    const session = await harness.mcpClientFor(input.transport).connect(server as never);
+    const defs = await session.listTools();
+    tools = defs.map((d) => ({ name: d.name, risk: inferRisk(d, server as never) }));
+    await session.close();
+  } catch (e) {
+    return { error: `could not connect: ${e instanceof Error ? e.message : String(e)}` };
+  }
+  const secrets: Record<string, string> = {};
+  for (const [k, v] of Object.entries(plain)) secrets[k] = encryptSecret(String(v));
+  const connector: Connector = {
+    id: randomUUID(),
+    ownerId,
+    name: server.name,
+    transport: server.transport,
+    command: server.command,
+    args: server.args,
+    url: server.url,
+    readOnlyTools: server.readOnlyTools,
+    disabledTools: [],
+    enabled: true,
+    tools,
+    secrets,
+  };
+  await harness.connectors.save(connector);
+  return connector;
+}
+
 export async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const url = new URL(req.url ?? '/', 'http://localhost');
   const { pathname } = url;
@@ -477,45 +537,41 @@ export async function handle(req: IncomingMessage, res: ServerResponse): Promise
   }
 
   // --- Connectors (MCP) ---
+  // Marketplace catalog (S11-T3): browse + one-click add.
+  if (method === 'GET' && pathname === '/api/connectors/catalog') {
+    return json(res, 200, harness.connectorCatalog());
+  }
+  if (method === 'POST' && pathname === '/api/connectors/from-catalog') {
+    const body = await readBody(req);
+    const entry = harness.connectorCatalog().find((e) => e.id === String(body.id ?? ''));
+    if (!entry) return json(res, 404, { error: 'unknown catalog entry' });
+    const secrets = (body.secrets ?? {}) as Record<string, string>;
+    const missing = entry.requiredSecrets.filter((s) => !secrets[s]);
+    if (missing.length) return json(res, 400, { error: `missing required secrets: ${missing.join(', ')}` });
+    const result = await createConnector(ownerId, {
+      name: String(body.name ?? '') || entry.name,
+      transport: entry.transport,
+      command: body.command,
+      url: body.url || entry.url,
+      readOnlyTools: entry.readOnlyTools,
+      secrets,
+    });
+    if ('error' in result) return json(res, 400, result);
+    return json(res, 201, { ...result, secrets: Object.keys(result.secrets) });
+  }
   if (method === 'POST' && pathname === '/api/connectors') {
     const body = await readBody(req);
-    const transport = String(body.transport ?? 'stub');
-    const server = {
-      name: String(body.name ?? '').trim() || 'connector',
-      transport: transport as 'stub' | 'stdio' | 'http',
+    const result = await createConnector(ownerId, {
+      name: String(body.name ?? ''),
+      transport: String(body.transport ?? 'stub') as 'stub' | 'stdio' | 'http',
       command: body.command,
-      args: Array.isArray(body.args) ? body.args : [],
+      args: body.args,
       url: body.url,
-      readOnlyTools: Array.isArray(body.readOnlyTools) ? body.readOnlyTools : [],
-    };
-    // Connect once to enumerate the server's tools + infer risk.
-    let tools: Connector['tools'] = [];
-    try {
-      const session = await harness.mcpClientFor(transport).connect(server as never);
-      const defs = await session.listTools();
-      tools = defs.map((d) => ({ name: d.name, risk: inferRisk(d, server as never) }));
-      await session.close();
-    } catch (e) {
-      return json(res, 400, { error: `could not connect: ${e instanceof Error ? e.message : String(e)}` });
-    }
-    const secrets: Record<string, string> = {};
-    for (const [k, v] of Object.entries(body.secrets ?? {})) secrets[k] = encryptSecret(String(v));
-    const connector: Connector = {
-      id: randomUUID(),
-      ownerId,
-      name: server.name,
-      transport: server.transport,
-      command: server.command,
-      args: server.args,
-      url: server.url,
-      readOnlyTools: server.readOnlyTools,
-      disabledTools: [],
-      enabled: true,
-      tools,
-      secrets,
-    };
-    await harness.connectors.save(connector);
-    return json(res, 201, { ...connector, secrets: Object.keys(secrets) });
+      readOnlyTools: body.readOnlyTools,
+      secrets: body.secrets,
+    });
+    if ('error' in result) return json(res, 400, result);
+    return json(res, 201, { ...result, secrets: Object.keys(result.secrets) });
   }
   if (method === 'GET' && pathname === '/api/connectors') {
     const list = await harness.connectors.list(ownerId);

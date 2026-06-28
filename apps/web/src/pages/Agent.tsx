@@ -1,15 +1,30 @@
 import { useEffect, useState } from 'react';
 import { api, type Connector, type AuditEntry } from '../lib/api';
-import type { Plugin } from '@apolla/contracts';
+import type { Plugin, ConnectorCatalogEntry } from '@apolla/contracts';
 import { useSSE } from '../lib/sse';
 import { Card, Empty } from '../components/ui';
 
 type Ev = { type: string } & Record<string, unknown>;
 
 export function Agent() {
-  // connectors
+  // connectors + marketplace
   const [connectors, setConnectors] = useState<Connector[]>([]);
   const loadConnectors = () => api.connectors().then(setConnectors).catch(() => {});
+  const [catalog, setCatalog] = useState<ConnectorCatalogEntry[]>([]);
+  const [catId, setCatId] = useState('');
+  const [catUrl, setCatUrl] = useState('');
+  const [catToken, setCatToken] = useState('');
+  const [catErr, setCatErr] = useState<string | null>(null);
+  const installFromCatalog = async () => {
+    setCatErr(null);
+    try {
+      await api.installFromCatalog(catId, catUrl, catToken ? { token: catToken } : {});
+      setCatUrl(''); setCatToken('');
+      await loadConnectors();
+    } catch (e) {
+      setCatErr(e instanceof Error ? e.message : 'install failed');
+    }
+  };
   // plugins
   const [official, setOfficial] = useState<Plugin[]>([]);
   const [installed, setInstalled] = useState<Plugin[]>([]);
@@ -17,7 +32,11 @@ export function Agent() {
     setOfficial(await api.officialPlugins().catch(() => []));
     setInstalled(await api.installedPlugins().catch(() => []));
   };
-  useEffect(() => { void loadConnectors(); void loadPlugins(); }, []);
+  useEffect(() => {
+    void loadConnectors();
+    void loadPlugins();
+    void api.connectorCatalog().then((c) => { setCatalog(c); setCatId(c[0]?.id ?? ''); }).catch(() => {});
+  }, []);
 
   // agent
   const [goal, setGoal] = useState('');
@@ -73,6 +92,16 @@ export function Agent() {
   return (
     <div className="col">
       <Card title="Connectors" actions={<button className="ghost" onClick={() => void api.addStubConnector().then(loadConnectors)}>+ Demo MCP</button>}>
+        <div className="row" aria-label="Add from catalog">
+          <select aria-label="catalog" value={catId} onChange={(e) => setCatId(e.target.value)}>
+            {catalog.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          <input placeholder="server URL" value={catUrl} onChange={(e) => setCatUrl(e.target.value)} />
+          <input placeholder="token (optional)" value={catToken} onChange={(e) => setCatToken(e.target.value)} />
+          <button onClick={() => void installFromCatalog()} disabled={!catId || !catUrl.trim()}>Add from catalog</button>
+        </div>
+        {catalog.find((c) => c.id === catId)?.description && <div className="muted">{catalog.find((c) => c.id === catId)!.description}</div>}
+        {catErr && <div className="error">{catErr}</div>}
         {connectors.length === 0 ? <Empty>No connectors.</Empty> : connectors.map((c) => (
           <div key={c.id} className="step row" style={{ justifyContent: 'space-between' }}>
             <span>{c.enabled ? '🟢' : '⚪️'} {c.name} <span className="muted">({c.tools.length} tools)</span></span>

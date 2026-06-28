@@ -1,4 +1,4 @@
-import type { Plugin, Surface } from '@apolla/contracts';
+import type { Plugin, Surface, ConnectorCatalogEntry } from '@apolla/contracts';
 
 /** Thrown on any non-2xx response; carries the BFF's error message + status. */
 export class ApiError extends Error {
@@ -90,6 +90,9 @@ export const api = {
   // connectors
   connectors: () => http<Connector[]>('GET', '/api/connectors'),
   addStubConnector: () => http<Connector>('POST', '/api/connectors', { name: 'demo', transport: 'stub', readOnlyTools: ['echo'] }),
+  connectorCatalog: () => http<ConnectorCatalogEntry[]>('GET', '/api/connectors/catalog'),
+  installFromCatalog: (id: string, url: string, secrets: Record<string, string>) =>
+    http<Connector>('POST', '/api/connectors/from-catalog', { id, url, secrets }),
   toggleConnector: (id: string, enabled: boolean) => http<Connector>('POST', `/api/connectors/${id}/toggle`, { enabled }),
   deleteConnector: (id: string) => http<void>('DELETE', `/api/connectors/${id}`),
   // automation

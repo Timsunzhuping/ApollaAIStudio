@@ -69,7 +69,7 @@ import {
   type Memory,
   type SkillRepository,
 } from '@apolla/harness-core';
-import { getRoute, loadSkills, loadPlugins, loadSurfaces, loadFeatureGates, getMediaRoute } from '@apolla/config';
+import { getRoute, loadSkills, loadPlugins, loadSurfaces, loadConnectorCatalog, loadFeatureGates, getMediaRoute } from '@apolla/config';
 import type { ModelCaps } from '@apolla/contracts';
 import { OpenAIImageAdapter } from '@apolla/media-openai';
 import { SeedanceVideoAdapter } from '@apolla/media-seedance';
@@ -128,6 +128,7 @@ export interface Harness {
   officialSurfaces: () => import('@apolla/contracts').Surface[];
   stubMcp: StubMCPClient;
   mcpClientFor: (transport: string) => MCPClient;
+  connectorCatalog: () => import('@apolla/contracts').ConnectorCatalogEntry[];
   llmRouter: ModelRouter;
   prompts: PromptRegistry;
   agentToolsFor: (ownerId: string) => Promise<ToolRuntime>;
@@ -431,6 +432,7 @@ export async function buildHarness(): Promise<Harness> {
     officialSurfaces: loadSurfaces,
     stubMcp,
     mcpClientFor,
+    connectorCatalog: loadConnectorCatalog,
     llmRouter: router,
     prompts,
     agentToolsFor,

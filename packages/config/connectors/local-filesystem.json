@@ -1,0 +1,8 @@
+{
+  "id": "local-filesystem",
+  "name": "Local Filesystem (stdio)",
+  "description": "A local MCP server launched via stdio (e.g. a filesystem server). Provide the command.",
+  "transport": "stdio",
+  "requiredSecrets": [],
+  "homepage": "https://modelcontextprotocol.io"
+}

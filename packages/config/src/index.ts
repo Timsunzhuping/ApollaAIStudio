@@ -14,6 +14,8 @@ import {
   type Plugin as PluginT,
   Surface,
   type Surface as SurfaceT,
+  ConnectorCatalogEntry,
+  type ConnectorCatalogEntry as ConnectorCatalogEntryT,
   type RouteConfig as RouteConfigT,
   type FeatureGate as FeatureGateT,
   type PromptVersion as PromptVersionT,
@@ -113,6 +115,16 @@ export function loadSurfaces(): SurfaceT[] {
     .readdirSync(dir)
     .filter((f) => f.endsWith('.json'))
     .map((f) => Surface.parse(JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))));
+}
+
+/** Load the connector marketplace catalog from packages/config/connectors/*.json (S11-T3). */
+export function loadConnectorCatalog(): ConnectorCatalogEntryT[] {
+  const dir = path.join(pkgRoot, 'connectors');
+  if (!fs.existsSync(dir)) return [];
+  return fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith('.json'))
+    .map((f) => ConnectorCatalogEntry.parse(JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))));
 }
 
 export { parseFrontmatter } from './frontmatter';

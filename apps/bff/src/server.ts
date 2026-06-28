@@ -286,6 +286,8 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
       ok: true,
       mode: harness.mode,
       persistence: harness.persistence,
+      jobQueue: harness.jobQueue.inProcess ? 'in-process' : 'distributed',
+      tracing: process.env.OTEL_EXPORTER_OTLP_ENDPOINT ? 'otel' : 'noop',
       features: { auto_skill_write: harness.features.enabled('auto_skill_write') },
     });
   }

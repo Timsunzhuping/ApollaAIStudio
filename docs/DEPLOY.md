@@ -62,6 +62,8 @@ SIGTERM drains in-flight jobs before exit.
 | `WEB_DIST` | Path to `apps/web/dist` (single-origin SPA) | See §2 |
 | `CORS_ORIGIN` | Comma-separated allowlist for cross-origin clients | e.g. the browser extension origin |
 | `REDIS_URL` | Distributed job queue broker (BullMQ) | Unset → in-process jobs (no broker) |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | OpenTelemetry collector base URL (S17) | Unset → NoopTracer (zero-overhead, no export) |
+| `OTEL_SERVICE_NAME` / `OTEL_TRACES_SAMPLER_ARG` | Trace service name / head sampling ratio (0..1) | Default `apolla` / `1` |
 | `JOB_CONCURRENCY` / `JOB_ATTEMPTS` / `JOB_BACKOFF_MS` / `JOB_TIMEOUT_MS` | Worker tuning (S16) | Concurrency, retry attempts + exponential backoff, per-job timeout (0=off) |
 | `WORKER_PORT` | Worker health endpoint port | Unset → no health server |
 | `SECRETS_KEY` | AES-GCM key for connector secrets (S11) | Required if using connectors with secrets |
@@ -78,8 +80,15 @@ provider console. For Stripe, point the webhook at `https://<your-host>/api/bill
 
 ## 4. Health & observability
 
-- `GET /api/health` — liveness + mode/persistence.
-- `GET /metrics` — aggregate request metrics (no secrets/PII), suitable for a readiness probe.
+- `GET /api/health` — liveness + mode/persistence + jobQueue (in-process/distributed) + tracing (noop/otel).
+- `GET /metrics` — aggregate counters + latency histogram + per-operation SLO view (count, error rate,
+  p50/p95 for `http` and `job:<kind>`). Plain numbers only (no secrets/PII); suitable for a probe.
+- **Distributed tracing (S17).** Set `OTEL_EXPORTER_OTLP_ENDPOINT` (e.g. `http://otel-collector:4318`)
+  to export spans over OTLP/HTTP; unset → NoopTracer (zero overhead). A request that enqueues a job
+  is one end-to-end trace across the web and worker (the traceparent rides on the job). Spans never
+  carry secrets/PII (redacted, owner ids hashed); an inbound `traceparent` is used for correlation
+  only and never for authorization. Tune sampling with `OTEL_TRACES_SAMPLER_ARG`. Both the web and
+  the worker flush spans on SIGTERM. Run any OTLP-compatible collector (Jaeger, Tempo, etc.).
 
 ## 5. End-to-end smoke
 

@@ -20,6 +20,7 @@ export function observe(req: IncomingMessage, res: ObservedResponse): string {
     metrics.observe(ms);
     metrics.inc('http.requests');
     metrics.inc(`http.status.${Math.floor(res.statusCode / 100)}xx`);
+    metrics.operation('http', ms, res.statusCode < 500); // SLO view (S17)
     if (!process.env.VITEST) {
       console.log(
         JSON.stringify({

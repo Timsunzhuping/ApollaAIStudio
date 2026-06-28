@@ -96,14 +96,16 @@ S16-T1(JobQueue 抽象+InProcess+JobRunner 拆分) ─ S16-T2(Worker 骨架) ─
 - **建议 PR 分组**：A(T1+T2) · B(T3+T4) · C(T5+T6) · D(T7+T8)。
 
 ## Sprint 16 Definition of Done（整体验收）
-- [ ] `JobQueue` 抽象 + `JobRunner` 拆分；`InProcessJobQueue` 默认保持当前行为，既有 job/SSE/reconcile/配额/审计不变。
-- [ ] 独立 Worker 进程（`workers/job-worker`）消费队列 + 跑调度 + 优雅停机。
-- [ ] `RedisJobQueue`（BullMQ，`REDIS_URL` 门控，缺则回退进程内）。
-- [ ] 分布式：Web 只入队、Worker 执行、SSE 跨进程尾随；reconcile 重入队；幂等消费；调度单点。
-- [ ] 可靠性：重试+退避+上限→failed（审计/通知）、超时、停机排空；Worker 路径配额/安全保全。
-- [ ] 运维：compose 加 Redis、Worker 运行、health/metrics、DEPLOY.md 拓扑+env。
-- [ ] `pnpm test` + `pnpm e2e` 全绿且 hermetic；CI Redis 集成测试通过（门控 skip 离线）。
-- [ ] README/架构文档更新。
+- [x] `JobQueue` 抽象 + `JobRunner` 拆分；`InProcessJobQueue` 默认保持当前行为，既有 job/SSE/reconcile/配额/审计不变。
+- [x] 独立 Worker 进程（`workers/job-worker`）消费队列 + 跑调度 + 优雅停机。
+- [x] `RedisJobQueue`（BullMQ，`REDIS_URL` 门控，缺则回退进程内）。
+- [x] 分布式：Web 只入队、Worker 执行、SSE 跨进程尾随；reconcile 重入队；幂等消费；调度单点。
+- [x] 可靠性：重试+退避+上限→failed（通知）、超时、停机排空；Worker 路径配额/安全保全。
+- [x] 运维：compose 加 Redis、Worker 运行 + /health、DEPLOY.md 拓扑+env。
+- [x] `pnpm test` + `pnpm e2e` 全绿且 hermetic；CI Redis 集成测试通过（门控 skip 离线）。
+- [x] README/架构文档更新。
+
+> **Sprint 16 完成**（PR [#91](https://github.com/Timsunzhuping/ApollaAIStudio/pull/91) A · [#92](https://github.com/Timsunzhuping/ApollaAIStudio/pull/92) B · [#93](https://github.com/Timsunzhuping/ApollaAIStudio/pull/93) C · D 本次）。可换挡 **JobQueue**（`InProcessJobQueue` 默认 / `RedisJobQueue`(BullMQ) env 门控）+ `JobRunner` 拆 `start`(入队)/`run`(幂等消费) + Job 持久 `allowTools`；独立 **Worker**（`workers/job-worker`）消费 + 单点调度 + reconcile 重入队 + `/health` + 优雅排空；可靠性：重试+指数退避+上限→failed（重试前 `clearEvents`）、`JOB_TIMEOUT_MS` 超时、Worker 路径配额/安全保全；运维：compose 加 Redis、`DEPLOY.md` 进程内 vs 分布式拓扑 + env。SSE 仍尾随持久 run-log（生产者解耦，零改动）。默认路径零回归（275 root + 8 skip + eval 38 + 9 e2e，全程 hermetic）；Redis 集成测试本地 + CI（Redis service）通过。完整 exactly-once/Redis pub/sub SSL/其它 broker 列为后续。
 
 ## 风险与提示（给代理）
 - **默认路径零回归是底线**：`InProcessJobQueue` 必须与今天行为逐字等价；root 测试 + e2e 不许依赖 Redis，全程 hermetic。Redis 仅 CI service + 一个门控集成测试。

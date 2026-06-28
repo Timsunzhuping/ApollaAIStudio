@@ -72,6 +72,8 @@ flowchart TB
 
 **前端触点层（Sprint 09，已落地 Web App）**：`apps/web`（Vite + React + TS SPA）是面向用户的生产前端——纯 API 客户端，通过类型化客户端 + SSE hook 消费 BFF 的 HTTP/SSE 接口，**不旁路 BFF、不直连模型/库、不持密钥**（鉴权走会话 cookie），Markdown 安全渲染。BFF（`apps/bff`，刻意独立的 Node 服务）仍是唯一后端与组合根；其内联工作台保留为零配置兜底。SSR/营销站、桌面宿主、移动端为后续触点。
 
+**规模与可靠性 / 任务队列（Sprint 16，已落地）**：又一个可换挡适配器——`JobQueue`（**InProcess 默认 / Redis(BullMQ) 分布式**，env 门控 `REDIS_URL`，与 LLM/媒体/搜索/支付/身份适配器同构）。`JobRunner` 拆为 `start()`（持久化 queued + 配额门 + `enqueue`）与 `run(jobId)`（消费到终态，幂等：仅 queued/interrupted 执行）。数据流：**Web 入队** → **Worker 进程**（`workers/job-worker`）消费 `run` → 每个事件 `appendEvent` 进**持久 run-log** → Web 的 SSE `/api/jobs/:id/events` **轮询尾随该 log** → 跨进程实时出流（生产者/流式天然解耦，无需改 SSE）。可靠性：先落库再入队 + `reconcileJobs` 重入队（崩溃存活）、幂等消费、重试+指数退避+上限→failed（重试前 `clearEvents` 清 run-log 避免重复）、`JOB_TIMEOUT_MS` 超时、SIGTERM 优雅排空；调度**单点**在 Worker（杜绝多实例重复 tick）；配额/安全在 Worker 路径同样强制（同一 `jobResolve`，子代理继承、high_write 永拒、后台白名单、审计）。默认/离线 hermetic（无 Redis）；CI Redis service 跑门控集成测试。
+
 **端到端测试与发布就绪（Sprint 15，已落地）**：测试金字塔——单元/契约（vitest）→ web 组件（jsdom + RTL，mock fetch）→ **e2e 整合网（Playwright/chromium）**。e2e 打**真实整合栈**（构建后的 web SPA → 真实 BFF over HTTP/SSE + 真实会话 cookie），覆盖鉴权/SSO、研究真实 SSE、计费、Surface→工作区等旅程；**hermetic & 离线**（内存 BFF 不设 `DATABASE_URL` + 全 stub provider，无网络/凭证）。配套：BFF **单源托管 SPA**（`WEB_DIST` → `apps/web/dist`，静态资源按路径 + 未命中非 API GET 回退 `index.html`；env 门控、未设则维持内联 UI），消解跨源 cookie 问题且单源可部署（见 `docs/DEPLOY.md`）。e2e 与 **evals（能力网）** 互补：evals 守每类能力的回归，e2e 守整合栈的端到端可用。CI 独立 `e2e` job（装 chromium、失败留 trace）。
 
 **身份 / OAuth 登录（Sprint 14，已落地）**：又一个可换挡适配器——`AuthProvider`（OAuth 2.0/OIDC，**Stub 离线 / Google + GitHub 生产**，env 门控、缺 key 不注册，与 LLM/媒体/搜索/支付适配器同构）。数据流：`GET /api/auth/oauth/:provider/start`（生成 **state + PKCE**、存单次态 → 302 到授权页）→ `GET /callback`（**consume state** → `exchangeCode` → `fetchIdentity` → 按**已验证邮箱**归一/建用户 → 复用 `startSession` 签发签名会话 → 302 回安全相对路径）。`IdentityRepository` 存 `provider+providerId→userId`（内存 + Postgres `oauth_identities`），账号归一靠 `UserRepository.upsertByEmail`（密码 + 多 OAuth 身份同属一用户）。安全：state 单次+过期+绑 PKCE、回跳开放重定向 allowlist、`emailVerified=false` fail-closed、**OAuth token 不落库**（只存 providerId+email）、登录落审计、demo 用 stub/真 provider env 门控。
@@ -270,6 +272,7 @@ interface Orchestrator {
 | 新增媒体 provider（如新视频模型）| 实现 `MediaAdapter` + 媒体别名映射 | Media contract + 成本/审核 eval |
 | 接入一个支付 provider（Sprint 13）| 实现 `PaymentProvider`（Stub/Stripe，env 门控）| billing-entitlements + webhook 验签/幂等 eval |
 | 接入一个登录 provider（Sprint 14）| 实现 `AuthProvider`（Stub/Google/GitHub，env 门控）| identity-unification + state/开放重定向/邮箱校验回归 |
+| 切换任务执行基座（Sprint 16）| 实现 `JobQueue`（InProcess/Redis-BullMQ，`REDIS_URL` 门控）| job-queue-lifecycle + 幂等/重试/超时 + 门控 Redis 集成测试 |
 | 新增套餐 / 调整权益（Sprint 13）| 加 `config/plans/*.json`（`taskLimit`+`features`），零业务代码 | 权益解析 + 套餐门禁回归 |
 | 模型变强后退役脚手架 | 关闭对应 `FeatureGate.scaffold` 开关；探针确认 `caps` 达标 | 回归无退化 |
 | 新增 Plugin（Cowork）| 声明 Skills+连接器+命令+子代理 捆绑 + 权限清单 | 安装授权流 + 安全 eval |

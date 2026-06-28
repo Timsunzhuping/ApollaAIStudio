@@ -33,6 +33,7 @@ export function createApi(facade: ChromeFacade) {
     runSurface: (surfaceId: string, text: string, params: Record<string, unknown> = {}) =>
       http<{ path: string; version: number; structured?: unknown }>('POST', '/api/surface', { surfaceId, text, params }),
     saveArtifact: (path: string, content: string) => http<{ path: string; version: number }>('POST', '/api/workspace/save-artifact', { path, content }),
+    workspaceFile: (path: string) => http<{ path: string; content: string; version: number }>('GET', `/api/workspace/file?path=${encodeURIComponent(path)}`),
     /** Stream a task's research events via SSE-over-fetch (carries the Bearer token). */
     async streamTask(taskId: string, onEvent: (e: { type: string } & Record<string, unknown>) => void): Promise<void> {
       const { base } = await readConfig(facade);

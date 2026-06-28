@@ -29,8 +29,10 @@ import {
   Coordinator,
   CoworkOrchestrator,
   InMemorySessionRepository,
+  InMemoryApiTokenRepository,
   decryptSecret,
   type SessionRepository,
+  type ApiTokenRepository,
   InMemoryWorkspaceRepository,
   GuardedWorkspaceRepository,
   makeWorkspaceTools,
@@ -96,6 +98,7 @@ import {
   PostgresPluginRepository,
   PostgresWorkspaceRepository,
   PostgresSessionRepository,
+  PostgresApiTokenRepository,
 } from '@apolla/db-postgres';
 import { DemoLLMAdapter } from './demo-adapter';
 
@@ -104,6 +107,7 @@ export interface Harness {
   repo: TaskRepository;
   users: UserRepository;
   sessions: SessionRepository;
+  apiTokens: ApiTokenRepository;
   projects: ProjectRepository;
   memory: Memory;
   skills: SkillRuntime;
@@ -174,6 +178,7 @@ export async function buildHarness(): Promise<Harness> {
   let repo: TaskRepository;
   let users: UserRepository;
   let sessions: SessionRepository;
+  let apiTokens: ApiTokenRepository;
   let projects: ProjectRepository;
   let memory: Memory;
   let skillRepo: SkillRepository;
@@ -194,6 +199,7 @@ export async function buildHarness(): Promise<Harness> {
     repo = new PostgresTaskRepository(sql);
     users = new PostgresUserRepository(sql);
     sessions = new PostgresSessionRepository(sql);
+    apiTokens = new PostgresApiTokenRepository(sql);
     projects = new PostgresProjectRepository(sql);
     memory = new PostgresMemory(sql);
     skillRepo = new PostgresSkillRepository(sql);
@@ -213,6 +219,7 @@ export async function buildHarness(): Promise<Harness> {
     repo = new InMemoryTaskRepository();
     users = new InMemoryUserRepository();
     sessions = new InMemorySessionRepository();
+    apiTokens = new InMemoryApiTokenRepository();
     projects = new InMemoryProjectRepository();
     memory = new InMemoryMemory();
     skillRepo = new InMemorySkillRepository();
@@ -404,6 +411,7 @@ export async function buildHarness(): Promise<Harness> {
     repo,
     users,
     sessions,
+    apiTokens,
     projects,
     memory,
     skills,

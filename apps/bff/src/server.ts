@@ -2,9 +2,9 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { randomUUID } from 'node:crypto';
 import { exportArtifact, autoDraftSkill, embedMedia, encryptSecret, decryptSecret, inferRisk, AgentOrchestrator, nextRun } from '@apolla/harness-core';
 import type { Connector } from '@apolla/contracts';
-import { hashPassword, verifyPassword } from '@apolla/harness-core';
+import { hashPassword, verifyPassword, newApiToken } from '@apolla/harness-core';
 import { buildHarness, type Harness } from './harness';
-import { readSession, startSession, endSession } from './auth';
+import { readSession, readBearer, startSession, endSession } from './auth';
 import { applySecurityHeaders, applyCors, clientIp, limiters, isExpensive, MAX_BODY_BYTES } from './security';
 import { observe, metrics, type ObservedResponse } from './obs';
 import { reconcileJobs } from '@apolla/harness-core';
@@ -211,8 +211,8 @@ export async function handle(req: IncomingMessage, res: ServerResponse): Promise
     return json(res, 200, { ok: true });
   }
 
-  // Everything below requires a session.
-  const ownerId = await readSession(req, harness.sessions);
+  // Everything below requires a session (browser) OR an API token (extension/CLI, S12).
+  const ownerId = (await readSession(req, harness.sessions)) ?? (await readBearer(req, harness.apiTokens));
   if (method === 'GET' && pathname === '/api/auth/me') {
     if (!ownerId) return json(res, 401, { error: 'not authenticated' });
     const user = await harness.users.get(ownerId);
@@ -225,6 +225,24 @@ export async function handle(req: IncomingMessage, res: ServerResponse): Promise
   if (isExpensive(method, pathname) && !limiters.owner().allow(ownerId)) {
     res.setHeader('Retry-After', String(limiters.owner().retryAfterSec(ownerId)));
     return json(res, 429, { error: 'rate limit exceeded — slow down' });
+  }
+
+  // --- API tokens (S12): cross-origin auth for the extension / CLI ---
+  if (method === 'POST' && pathname === '/api/tokens') {
+    const body = await readBody(req);
+    const { id, secret, plaintext } = newApiToken();
+    const name = String(body.name ?? '').slice(0, 80) || 'token';
+    await harness.apiTokens.create({ id, ownerId, name, hashedToken: hashPassword(secret), createdAt: new Date().toISOString() });
+    return json(res, 201, { id, name, token: plaintext }); // plaintext shown exactly once
+  }
+  if (method === 'GET' && pathname === '/api/tokens') {
+    const list = await harness.apiTokens.list(ownerId);
+    return json(res, 200, list.map((t) => ({ id: t.id, name: t.name, createdAt: t.createdAt, lastUsedAt: t.lastUsedAt })));
+  }
+  const tokDelete = pathname.match(/^\/api\/tokens\/([^/]+)$/);
+  if (method === 'DELETE' && tokDelete) {
+    await harness.apiTokens.delete(ownerId, tokDelete[1]!);
+    return json(res, 200, { ok: true });
   }
 
   // --- Projects ---

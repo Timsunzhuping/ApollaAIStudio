@@ -48,6 +48,10 @@ export const api = {
   // projects + memory
   projects: () => http<Project[]>('GET', '/api/projects'),
   createProject: (name: string, description = '') => http<Project>('POST', '/api/projects', { name, description }),
+  // API tokens (for the browser extension / CLI)
+  tokens: () => http<{ id: string; name: string; createdAt?: string; lastUsedAt?: string }[]>('GET', '/api/tokens'),
+  createToken: (name: string) => http<{ id: string; name: string; token: string }>('POST', '/api/tokens', { name }),
+  deleteToken: (id: string) => http<void>('DELETE', `/api/tokens/${id}`),
   getMemoryModel: () => http<Record<string, unknown>>('GET', '/api/memory/model'),
   setMemoryModel: (m: { language?: string; style?: string }) => http<void>('POST', '/api/memory/model', m),
   clearMemory: () => http<void>('DELETE', '/api/memory'),

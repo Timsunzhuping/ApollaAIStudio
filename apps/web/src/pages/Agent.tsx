@@ -15,6 +15,11 @@ export function Agent() {
   const [catUrl, setCatUrl] = useState('');
   const [catToken, setCatToken] = useState('');
   const [catErr, setCatErr] = useState<string | null>(null);
+  const [health, setHealth] = useState<Record<string, string>>({});
+  const checkHealth = async (id: string) => {
+    const h: { ok: boolean; toolCount?: number; ms?: number } = await api.connectorHealth(id).catch(() => ({ ok: false }));
+    setHealth((m) => ({ ...m, [id]: h.ok ? `🟢 ${h.toolCount ?? 0} tools · ${h.ms ?? 0}ms` : '🔴 unreachable' }));
+  };
   const installFromCatalog = async () => {
     setCatErr(null);
     try {
@@ -104,8 +109,9 @@ export function Agent() {
         {catErr && <div className="error">{catErr}</div>}
         {connectors.length === 0 ? <Empty>No connectors.</Empty> : connectors.map((c) => (
           <div key={c.id} className="step row" style={{ justifyContent: 'space-between' }}>
-            <span>{c.enabled ? '🟢' : '⚪️'} {c.name} <span className="muted">({c.tools.length} tools)</span></span>
+            <span>{c.enabled ? '🟢' : '⚪️'} {c.name} <span className="muted">({c.tools.length} tools)</span> {health[c.id] && <span className="badge">{health[c.id]}</span>}</span>
             <span className="row">
+              <button className="ghost" onClick={() => void checkHealth(c.id)}>health</button>
               <button className="ghost" onClick={() => void api.toggleConnector(c.id, !c.enabled).then(loadConnectors)}>{c.enabled ? 'disable' : 'enable'}</button>
               <button className="ghost" onClick={() => void api.deleteConnector(c.id).then(loadConnectors)}>✕</button>
             </span>

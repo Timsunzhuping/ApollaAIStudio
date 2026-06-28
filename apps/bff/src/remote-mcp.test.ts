@@ -58,4 +58,15 @@ describe('remote MCP over HTTP (S11-T2)', () => {
     const rt = await harness.agentToolsFor(owner);
     expect(rt.list().some((t) => t.name.startsWith('remote/'))).toBe(false);
   });
+
+  it('stores the token encrypted at rest (never plaintext) and remote output stays untrusted (S11-T5)', async () => {
+    const owner = (await harness.users.upsertByEmail('rmt4@x.ai')).id;
+    await addHttpConnector(owner, { url, token: 'sekret' });
+    const stored = (await harness.connectors.list(owner)).find((c) => c.transport === 'http')!;
+    expect(stored.secrets.token).toBeTruthy();
+    expect(stored.secrets.token).not.toContain('sekret'); // ciphertext, not plaintext
+    const rt = await harness.agentToolsFor(owner);
+    const r = await rt.invoke('remote/save_note', { text: 'x' });
+    expect(r.data.every((d) => d.kind === 'untrusted')).toBe(true); // output is data, not instructions
+  });
 });

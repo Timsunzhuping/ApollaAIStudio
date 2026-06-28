@@ -61,6 +61,9 @@ export {
 } from './repo/memory';
 export type { PluginRepository } from './plugins/types';
 export { hashPassword, verifyPassword } from './auth/password';
+export { newTotpSecret, generateTotp, verifyTotp, otpauthUri, newRecoveryCodes } from './auth/totp';
+export { newMagicToken, verifyMagicToken, InMemoryMagicLinkRepository } from './auth/magiclink';
+export type { MagicLinkRepository } from './auth/magiclink';
 export { RateLimiter } from './security/ratelimit';
 export type { RateLimiterOptions } from './security/ratelimit';
 export { Metrics } from './obs/metrics';

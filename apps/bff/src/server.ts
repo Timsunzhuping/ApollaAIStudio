@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { randomUUID } from 'node:crypto';
-import { exportArtifact, autoDraftSkill, embedMedia, encryptSecret, decryptSecret, inferRisk, AgentOrchestrator, nextRun } from '@apolla/harness-core';
-import type { Connector } from '@apolla/contracts';
+import { exportArtifact, autoDraftSkill, embedMedia, encryptSecret, decryptSecret, inferRisk, AgentOrchestrator, nextRun, resolveEntitlements, hasFeature } from '@apolla/harness-core';
+import type { Connector, Subscription, WebhookEvent, PlanDef } from '@apolla/contracts';
 import { hashPassword, verifyPassword, newApiToken } from '@apolla/harness-core';
 import { buildHarness, type Harness } from './harness';
 import { readSession, readBearer, startSession, endSession } from './auth';
@@ -39,6 +39,33 @@ async function projectContext(projectId: string | undefined, ownerId: string): P
   const p = await harness.projects.get(projectId);
   if (!p || p.ownerId !== ownerId) return undefined;
   return `Project context — "${p.name}": ${p.description}`.trim();
+}
+
+/** Read the raw request body (for webhook signature verification — must not be JSON-parsed). */
+async function readRawBody(req: IncomingMessage): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const c of req) chunks.push(c as Buffer);
+  return Buffer.concat(chunks).toString('utf8');
+}
+
+/** The owner's effective plan (entitlements), resolved from their subscription (fail-closed to free). */
+async function entitlementsFor(ownerId: string): Promise<PlanDef> {
+  return resolveEntitlements(await harness.subscriptions.get(ownerId), harness.plans());
+}
+
+/** Apply a verified billing webhook to the subscription store (idempotency handled by caller). */
+async function applyWebhookEvent(ev: WebhookEvent): Promise<void> {
+  const existing = await harness.subscriptions.get(ev.ownerId);
+  const sub: Subscription = {
+    ownerId: ev.ownerId,
+    plan: ev.plan ?? existing?.plan ?? (ev.type === 'subscription.canceled' ? 'free' : 'pro'),
+    status: ev.type === 'subscription.canceled' ? 'canceled' : (ev.status ?? 'active'),
+    periodEnd: ev.periodEnd ?? existing?.periodEnd,
+    providerRef: ev.providerRef ?? existing?.providerRef,
+    updatedAt: new Date().toISOString(),
+  };
+  await harness.subscriptions.save(sub);
+  await harness.audit.record({ id: randomUUID(), ownerId: ev.ownerId, taskId: 'billing', tool: 'billing', risk: 'low_write', decision: 'allow', status: 'executed', summary: `${ev.type} → ${sub.plan}/${sub.status}` });
 }
 
 /** Build http auth headers from PLAINTEXT secrets (used at connect-time, before encryption). */
@@ -133,6 +160,17 @@ export async function handle(req: IncomingMessage, res: ServerResponse): Promise
 
   // Operational metrics (aggregate numbers only — no secrets/PII). Unauthenticated by design.
   if (method === 'GET' && pathname === '/metrics') return json(res, 200, metrics.snapshot());
+
+  // Billing webhook (S13): public, authenticated by provider signature over the RAW body + idempotent.
+  if (method === 'POST' && pathname === '/api/billing/webhook') {
+    const raw = await readRawBody(req);
+    const sig = (req.headers['stripe-signature'] ?? req.headers['x-apolla-signature']) as string | undefined;
+    const ev = harness.payment.parseWebhook(raw, sig);
+    if (!ev) return json(res, 401, { error: 'invalid signature' });
+    if (!(await harness.subscriptions.markEventProcessed(ev.id))) return json(res, 200, { ok: true, duplicate: true });
+    await applyWebhookEvent(ev);
+    return json(res, 200, { ok: true });
+  }
 
   // Per-IP rate limit (protects login/register + overall). Fail-closed with 429 + Retry-After.
   const ip = clientIp(req);
@@ -245,6 +283,29 @@ export async function handle(req: IncomingMessage, res: ServerResponse): Promise
     return json(res, 200, { ok: true });
   }
 
+  // --- Billing (S13) ---
+  if (method === 'POST' && pathname === '/api/billing/checkout') {
+    const body = await readBody(req);
+    const plan = String(body.plan ?? '');
+    if (!harness.plans().some((p) => p.id === plan) || plan === 'free') return json(res, 400, { error: 'unknown plan' });
+    const co = await harness.payment.createCheckout({ ownerId, plan });
+    // Stub provider has no real callback — activate immediately so the offline demo works end-to-end.
+    if (harness.payment.name === 'stub') {
+      await applyWebhookEvent({ id: `local_${randomUUID()}`, type: 'subscription.created', ownerId, plan, status: 'active' });
+    }
+    return json(res, 200, { url: co.url, activated: harness.payment.name === 'stub' });
+  }
+  if (method === 'POST' && pathname === '/api/billing/cancel') {
+    const sub = await harness.subscriptions.get(ownerId);
+    await harness.payment.cancel(ownerId, sub?.providerRef);
+    await applyWebhookEvent({ id: `local_${randomUUID()}`, type: 'subscription.canceled', ownerId });
+    return json(res, 200, { ok: true });
+  }
+  if (method === 'GET' && pathname === '/api/billing/subscription') {
+    const [sub, plan, usage] = await Promise.all([harness.subscriptions.get(ownerId), entitlementsFor(ownerId), harness.quota.check(ownerId)]);
+    return json(res, 200, { subscription: sub ?? null, plan, usage, plans: harness.plans() });
+  }
+
   // --- Projects ---
   if (method === 'POST' && pathname === '/api/projects') {
     const body = await readBody(req);
@@ -319,6 +380,7 @@ export async function handle(req: IncomingMessage, res: ServerResponse): Promise
     const body = await readBody(req);
     const goal = String(body.goal ?? '').trim();
     if (!goal) return json(res, 400, { error: 'goal is required' });
+    if (!hasFeature(await entitlementsFor(ownerId), 'cowork')) return json(res, 402, { error: 'Cowork is a Pro feature — upgrade your plan', requiresPlan: 'pro' });
     const q = await harness.quota.check(ownerId);
     if (!q.ok) return json(res, 402, { error: 'quota reached — upgrade your plan', ...q });
     const { job } = await harness.jobs.start(ownerId, {
@@ -645,6 +707,7 @@ export async function handle(req: IncomingMessage, res: ServerResponse): Promise
 
   // --- Media ---
   if (method === 'POST' && pathname === '/api/media') {
+    if (!hasFeature(await entitlementsFor(ownerId), 'media')) return json(res, 402, { error: 'Media generation is a Pro feature — upgrade your plan', requiresPlan: 'pro' });
     const body = await readBody(req);
     const alias = String(body.alias ?? '');
     const prompt = String(body.prompt ?? '').trim();
@@ -715,6 +778,7 @@ export async function handle(req: IncomingMessage, res: ServerResponse): Promise
   // Research → media chaining (S3-T9): stage a media task using the research question as the prompt.
   const taskMedia = pathname.match(/^\/api\/tasks\/([^/]+)\/media$/);
   if (method === 'POST' && taskMedia) {
+    if (!hasFeature(await entitlementsFor(ownerId), 'media')) return json(res, 402, { error: 'Media generation is a Pro feature — upgrade your plan', requiresPlan: 'pro' });
     const task = await harness.repo.get(taskMedia[1]!);
     if (!task || task.ownerId !== ownerId) return json(res, 404, { error: 'unknown task' });
     const body = await readBody(req);

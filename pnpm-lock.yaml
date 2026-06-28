@@ -149,6 +149,9 @@ importers:
       '@apolla/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@apolla/harness-core':
+        specifier: workspace:*
+        version: link:../../packages/harness-core
       '@testing-library/dom':
         specifier: ^10.4.0
         version: 10.4.1

@@ -75,6 +75,12 @@ export const api = {
   billing: () => http<BillingInfo>('GET', '/api/billing/subscription'),
   checkout: (plan: string) => http<{ url: string; activated: boolean }>('POST', '/api/billing/checkout', { plan }),
   cancelBilling: () => http<void>('POST', '/api/billing/cancel', {}),
+  // collab (S21)
+  collabGet: (docId: string, since = 0) => http<{ docId: string; ownerId: string; text: string; seq: number; ops: unknown[]; participants: string[] }>('GET', `/api/collab/${encodeURIComponent(docId)}?since=${since}`),
+  collabPushOps: (docId: string, ops: unknown[]) => http<{ seq: number }>('POST', `/api/collab/${encodeURIComponent(docId)}/ops`, { ops }),
+  collabShare: (docId: string) => http<{ token: string; link: string }>('POST', `/api/collab/${encodeURIComponent(docId)}/share`, {}),
+  collabAccept: (token: string) => http<{ docId: string }>('POST', '/api/collab/share/accept', { token }),
+  collabEventsUrl: (docId: string, since = 0) => `${BASE}/api/collab/${encodeURIComponent(docId)}/events?since=${since}`,
   // speech (S19)
   transcribe: (audio: string, mime: string) => http<{ text: string }>('POST', '/api/speech/transcribe', { audio, mime }),
   synthesize: (text: string, voice?: string) => http<{ uri: string }>('POST', '/api/speech/synthesize', { text, voice }),

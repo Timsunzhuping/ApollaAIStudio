@@ -9,6 +9,7 @@ import { Surfaces } from './pages/Surfaces';
 import { Agent } from './pages/Agent';
 import { Automation } from './pages/Automation';
 import { Billing } from './pages/Billing';
+import { Collab } from './pages/Collab';
 import { Settings } from './pages/Settings';
 import { Loading } from './components/ui';
 
@@ -21,6 +22,8 @@ function Gate() {
       <Route element={<Shell />}>
         <Route path="/research" element={<Research />} />
         <Route path="/workspace" element={<Workspace />} />
+        <Route path="/collab" element={<Collab />} />
+        <Route path="/collab/accept" element={<Collab />} />
         <Route path="/surfaces" element={<Surfaces />} />
         <Route path="/agent" element={<Agent />} />
         <Route path="/automation" element={<Automation />} />

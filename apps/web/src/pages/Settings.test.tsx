@@ -8,8 +8,11 @@ function fakeRes(status: number, payload: unknown) {
 
 describe('Settings page', () => {
   beforeEach(() => {
-    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
-      if (String(url).endsWith('/api/memory/model')) return fakeRes(200, { language: 'English', style: 'concise' });
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      const u = String(url);
+      if (u.endsWith('/api/memory/model')) return fakeRes(200, { language: 'English', style: 'concise' });
+      if (u.endsWith('/api/tokens') && (init?.method ?? 'GET') === 'GET') return fakeRes(200, []);
+      if (u.endsWith('/api/tokens') && init?.method === 'POST') return fakeRes(201, { id: 't1', name: 'ext', token: 'apolla_t1_secret' });
       return fakeRes(200, {});
     }));
   });
@@ -24,5 +27,12 @@ describe('Settings page', () => {
       expect(fetchMock.mock.calls.some((c) => String(c[0]).endsWith('/api/memory/model') && (c[1] as RequestInit)?.method === 'POST')).toBe(true),
     );
     expect(await screen.findByText('✓ saved')).toBeInTheDocument();
+  });
+
+  it('creates an API token and shows the plaintext once', async () => {
+    render(<Settings />);
+    fireEvent.change(await screen.findByPlaceholderText(/token name/i), { target: { value: 'ext' } });
+    fireEvent.click(screen.getByRole('button', { name: /Create token/i }));
+    expect(await screen.findByText('apolla_t1_secret')).toBeInTheDocument();
   });
 });

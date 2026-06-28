@@ -1,6 +1,6 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { SessionRepository } from '@apolla/harness-core';
+import { verifyPassword, parseApiToken, type SessionRepository, type ApiTokenRepository } from '@apolla/harness-core';
 
 const SECRET = process.env.SESSION_SECRET ?? 'dev-insecure-secret-change-me';
 const COOKIE = 'apolla_session';
@@ -39,6 +39,18 @@ export async function readSession(req: IncomingMessage, sessions: SessionReposit
   if (!id) return null;
   const session = await sessions.get(id);
   return session?.ownerId ?? null;
+}
+
+/** Resolve the owner from an `Authorization: Bearer apolla_…` API token (cross-origin clients). */
+export async function readBearer(req: IncomingMessage, tokens: ApiTokenRepository): Promise<string | null> {
+  const h = req.headers.authorization;
+  if (!h?.startsWith('Bearer ')) return null;
+  const parsed = parseApiToken(h.slice('Bearer '.length));
+  if (!parsed) return null;
+  const tok = await tokens.get(parsed.id);
+  if (!tok || !verifyPassword(parsed.secret, tok.hashedToken)) return null;
+  void Promise.resolve(tokens.touch(parsed.id, new Date().toISOString())).catch(() => {});
+  return tok.ownerId;
 }
 
 /** Create a server-side session for `ownerId` and set the signed httpOnly cookie. */

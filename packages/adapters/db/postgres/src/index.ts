@@ -5,7 +5,7 @@ import type { TaskRepository } from '@apolla/harness-core';
 
 export type Sql = postgres.Sql;
 
-export { PostgresUserRepository, PostgresProjectRepository, PostgresSkillRepository, PostgresSessionRepository } from './repos';
+export { PostgresUserRepository, PostgresProjectRepository, PostgresSkillRepository, PostgresSessionRepository, PostgresApiTokenRepository } from './repos';
 export { PostgresMemory } from './memory';
 export { PostgresMediaRepository } from './media';
 export { PostgresConnectorRepository } from './connector';
@@ -51,6 +51,14 @@ CREATE TABLE IF NOT EXISTS sessions (
   created_at  timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS sessions_owner_idx ON sessions (owner_id);
+
+CREATE TABLE IF NOT EXISTS api_tokens (
+  id          text PRIMARY KEY,
+  owner_id    text NOT NULL,
+  data        jsonb NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS api_tokens_owner_idx ON api_tokens (owner_id);
 
 CREATE TABLE IF NOT EXISTS projects (
   id          text PRIMARY KEY,

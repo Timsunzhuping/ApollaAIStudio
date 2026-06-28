@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { User, Project, SkillDef, Session, type User as UserT, type Project as ProjectT, type SkillDef as SkillDefT, type Session as SessionT } from '@apolla/contracts';
-import type { UserRepository, ProjectRepository, SkillRepository, SessionRepository } from '@apolla/harness-core';
+import { User, Project, SkillDef, Session, ApiToken, type User as UserT, type Project as ProjectT, type SkillDef as SkillDefT, type Session as SessionT, type ApiToken as ApiTokenT } from '@apolla/contracts';
+import type { UserRepository, ProjectRepository, SkillRepository, SessionRepository, ApiTokenRepository } from '@apolla/harness-core';
 import type { Sql } from './index';
 
 export class PostgresUserRepository implements UserRepository {
@@ -113,5 +113,30 @@ export class PostgresSkillRepository implements SkillRepository {
 
   async delete(ownerId: string, name: string): Promise<void> {
     await this.sql`DELETE FROM skills WHERE owner_id = ${ownerId} AND name = ${name}`;
+  }
+}
+
+export class PostgresApiTokenRepository implements ApiTokenRepository {
+  constructor(private readonly sql: Sql) {}
+
+  async create(token: ApiTokenT): Promise<void> {
+    await this.sql`
+      INSERT INTO api_tokens (id, owner_id, data) VALUES (${token.id}, ${token.ownerId}, ${this.sql.json(token)})
+      ON CONFLICT (id) DO NOTHING
+    `;
+  }
+  async get(id: string): Promise<ApiTokenT | undefined> {
+    const rows = await this.sql<{ data: unknown }[]>`SELECT data FROM api_tokens WHERE id = ${id}`;
+    return rows[0] ? ApiToken.parse(rows[0].data) : undefined;
+  }
+  async list(ownerId: string): Promise<ApiTokenT[]> {
+    const rows = await this.sql<{ data: unknown }[]>`SELECT data FROM api_tokens WHERE owner_id = ${ownerId} ORDER BY created_at DESC`;
+    return rows.map((r) => ApiToken.parse(r.data));
+  }
+  async delete(ownerId: string, id: string): Promise<void> {
+    await this.sql`DELETE FROM api_tokens WHERE id = ${id} AND owner_id = ${ownerId}`;
+  }
+  async touch(id: string, at: string): Promise<void> {
+    await this.sql`UPDATE api_tokens SET data = jsonb_set(data, '{lastUsedAt}', to_jsonb(${at}::text)) WHERE id = ${id}`;
   }
 }

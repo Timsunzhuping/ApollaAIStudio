@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "Apolla AI",
+  "version": "0.1.0",
+  "description": "Research, translate, and summarize any page with Apolla AI.",
+  "permissions": ["activeTab", "scripting", "storage", "contextMenus", "sidePanel"],
+  "host_permissions": ["http://localhost:3000/*"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "side_panel": { "default_path": "panel.html" },
+  "action": { "default_title": "Apolla AI" }
+}

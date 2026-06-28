@@ -34,5 +34,6 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/apolla_test
       - run: pnpm --filter @apolla/web test
+      - run: pnpm --filter @apolla/extension test
       - run: pnpm build
       - run: pnpm eval

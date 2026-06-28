@@ -62,6 +62,8 @@ export { reconcileJobs } from './jobs/recovery';
 export type { ReconcileOptions } from './jobs/recovery';
 export { InMemorySessionRepository } from './auth/session';
 export type { SessionRepository } from './auth/session';
+export { newApiToken, parseApiToken, InMemoryApiTokenRepository } from './auth/token';
+export type { ApiTokenRepository } from './auth/token';
 export { notifyJobComplete, StubDelivery, WebhookDelivery } from './notify/notify';
 export type { NotificationRepository, NotificationDelivery, NotifyDeps } from './notify/notify';
 export { JobRunner } from './jobs/runner';

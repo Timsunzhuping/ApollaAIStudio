@@ -33,7 +33,7 @@ async function http<T>(method: string, path: string, body?: unknown): Promise<T>
   return (text ? JSON.parse(text) : undefined) as T;
 }
 
-export interface User { id: string; email: string }
+export interface User { id: string; email: string; identities?: { provider: string }[] }
 export interface Project { id: string; name: string; description?: string }
 export interface WorkspaceEntry { path: string; mime: string; version: number; size: number }
 export interface WorkspaceFile { path: string; mime: string; version: number; size: number; content: string }
@@ -51,6 +51,8 @@ export const api = {
   login: (email: string, password?: string) => http<User>('POST', '/api/auth/login', password ? { email, password } : { email }),
   register: (email: string, password: string) => http<User>('POST', '/api/auth/register', { email, password }),
   logout: () => http<void>('POST', '/api/auth/logout'),
+  authProviders: () => http<{ providers: string[] }>('GET', '/api/auth/providers'),
+  oauthStartUrl: (provider: string, next = '/') => `${BASE}/api/auth/oauth/${provider}/start?next=${encodeURIComponent(next)}`,
   health: () => http<{ mode: string; persistence: string }>('GET', '/api/health'),
   // projects + memory
   projects: () => http<Project[]>('GET', '/api/projects'),

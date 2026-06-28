@@ -1,6 +1,9 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useAuth } from '../lib/auth';
+import { api } from '../lib/api';
 import { Card, Field, ErrorMsg } from '../components/ui';
+
+const PROVIDER_LABEL: Record<string, string> = { google: 'Continue with Google', github: 'Continue with GitHub', stub: 'Continue with Demo SSO' };
 
 export function Login() {
   const { login, register } = useAuth();
@@ -9,6 +12,11 @@ export function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [providers, setProviders] = useState<string[]>([]);
+
+  useEffect(() => {
+    api.authProviders().then((r) => setProviders(r.providers ?? [])).catch(() => setProviders([]));
+  }, []);
 
   const run = async (fn: () => Promise<void>) => {
     setError(null);
@@ -51,6 +59,16 @@ export function Login() {
           </div>
           <span className="muted">Demo mode allows passwordless sign-in; production requires a password.</span>
         </form>
+        {providers.length > 0 && (
+          <div className="col" style={{ marginTop: '0.75rem', borderTop: '1px solid var(--border)', paddingTop: '0.75rem' }}>
+            <span className="muted">or</span>
+            {providers.map((p) => (
+              <a key={p} className="button ghost" role="button" href={api.oauthStartUrl(p)}>
+                {PROVIDER_LABEL[p] ?? `Continue with ${p}`}
+              </a>
+            ))}
+          </div>
+        )}
       </Card>
     </div>
   );

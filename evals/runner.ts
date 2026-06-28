@@ -18,6 +18,7 @@ import { runIdentityScenarios } from './src/identity-scenarios';
 import { runQueueScenarios } from './src/queue-scenarios';
 import { runTracingScenarios } from './src/tracing-scenarios';
 import { runMcpScenarios } from './src/mcp-scenarios';
+import { runSpeechScenarios } from './src/speech-scenarios';
 
 /** Baseline cost for the deterministic golden (mock pricing). Tighten as the loop evolves. */
 const BASELINE_USD = 0.001;
@@ -41,6 +42,7 @@ const results: CheckResult[] = [
   ...(await runQueueScenarios()),
   ...(await runTracingScenarios()),
   ...(await runMcpScenarios()),
+  ...(await runSpeechScenarios()),
 ];
 
 console.log('Apolla eval — research golden\n');

@@ -94,12 +94,14 @@ S19-T1(SpeechProvider+Stub) ─ S19-T2(OpenAI) ─ S19-T3(transcribe) ─┬─ 
 - **建议 PR 分组**：A(T1+T2) · B(T3+T4) · C(T5+T6) · D(T7+T8)。
 
 ## Sprint 19 Definition of Done（整体验收）
-- [ ] `SpeechProvider`（Stub 离线 / OpenAI env 门控）+ `Transcript` 契约；transcribe + synthesize。
-- [ ] `POST /api/speech/transcribe`（base64 音频→文本）+ `POST /api/speech/synthesize`（文本→音频/uri），owner-scoped + 限流 + 审计 + 追踪 + 大小/长度限制。
-- [ ] Web 语音输入（mic→转写→回填，不自动提交）+ 报告朗读 + 端到端 demo。
-- [ ] 转写=不可信数据（只回填、绝不自动执行）；音频不入日志；密钥从 env。
-- [ ] `pnpm test` + `pnpm test:web` + `pnpm e2e` 全绿且 hermetic（Stub、无网络/麦克风）。
-- [ ] README/架构文档更新。
+- [x] `SpeechProvider`（Stub 离线 / OpenAI env 门控）+ `Transcript` 契约；transcribe + synthesize。
+- [x] `POST /api/speech/transcribe`（base64 音频→文本）+ `POST /api/speech/synthesize`（文本→音频/uri），owner-scoped + 限流 + 审计 + 追踪 + 大小/长度限制。
+- [x] Web 语音输入（mic→转写→回填，不自动提交）+ 报告朗读 + 端到端 demo。
+- [x] 转写=不可信数据（只回填、绝不自动执行）；音频不入日志；密钥从 env。
+- [x] `pnpm test` + `pnpm test:web` + `pnpm e2e` 全绿且 hermetic（Stub、无网络/麦克风）。
+- [x] README/架构文档更新。
+
+> **Sprint 19 完成**（PR [#106](https://github.com/Timsunzhuping/ApollaAIStudio/pull/106) A · [#107](https://github.com/Timsunzhuping/ApollaAIStudio/pull/107) B · [#108](https://github.com/Timsunzhuping/ApollaAIStudio/pull/108) C · D 本次）。可换挡 **SpeechProvider**（`StubSpeechProvider` 离线确定性、`synthesize→transcribe` 往返 / 新 `@apolla/speech-openai` Whisper+TTS，`OPENAI_API_KEY` 门控）+ `Transcript` 契约；BFF `POST /api/speech/transcribe`（base64 音频→文本）+ `/synthesize`（文本→对象存储音频→`/media/<key>`），owner-scoped + 限流 + 审计 + 追踪 + 大小/长度上限、音频不入日志；研究页**麦克风**（`MediaRecorder`→转写→**回填、不自动提交**）+ 报告**朗读**（合成→`<audio>` 播放），端到端 说→研究→朗读。**转写=不可信数据**（绝不自动执行）。新增 eval `speech-round-trip`（41）。305 root + 23 web + 9 e2e 绿。流式 ASR/唤醒词/diarization/语音克隆/连续对话/电话/扩展语音列为后续。
 
 ## 风险与提示（给代理）
 - **默认 Stub + hermetic**：无 `OPENAI_API_KEY` → StubSpeechProvider；测试用 Stub + mock `MediaRecorder`/fetch/audio，**绝不**连真网络或调真实麦克风/音频解码。

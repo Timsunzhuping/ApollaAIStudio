@@ -13,6 +13,7 @@ describe('Settings page', () => {
       if (u.endsWith('/api/memory/model')) return fakeRes(200, { language: 'English', style: 'concise' });
       if (u.endsWith('/api/tokens') && (init?.method ?? 'GET') === 'GET') return fakeRes(200, []);
       if (u.endsWith('/api/tokens') && init?.method === 'POST') return fakeRes(201, { id: 't1', name: 'ext', token: 'apolla_t1_secret' });
+      if (u.endsWith('/api/mcp/manifest')) return fakeRes(200, { endpoint: '/api/mcp', protocol: 'mcp/2024-11-05', tools: [{ name: 'apolla.research', description: 'Run research' }] });
       return fakeRes(200, {});
     }));
   });
@@ -34,5 +35,12 @@ describe('Settings page', () => {
     fireEvent.change(await screen.findByPlaceholderText(/token name/i), { target: { value: 'ext' } });
     fireEvent.click(screen.getByRole('button', { name: /Create token/i }));
     expect(await screen.findByText('apolla_t1_secret')).toBeInTheDocument();
+  });
+
+  it('shows the MCP server endpoint + tool catalog', async () => {
+    render(<Settings />);
+    expect(await screen.findByText('MCP server')).toBeInTheDocument();
+    expect(await screen.findByText('apolla.research')).toBeInTheDocument();
+    expect((screen.getByDisplayValue(/\/api\/mcp$/) as HTMLInputElement).value).toContain('/api/mcp');
   });
 });

@@ -52,6 +52,7 @@ export const api = {
   register: (email: string, password: string) => http<User>('POST', '/api/auth/register', { email, password }),
   logout: () => http<void>('POST', '/api/auth/logout'),
   authProviders: () => http<{ providers: string[] }>('GET', '/api/auth/providers'),
+  mcpManifest: () => http<{ endpoint: string; protocol: string; tools: { name: string; description: string }[] }>('GET', '/api/mcp/manifest'),
   oauthStartUrl: (provider: string, next = '/') => `${BASE}/api/auth/oauth/${provider}/start?next=${encodeURIComponent(next)}`,
   health: () => http<{ mode: string; persistence: string }>('GET', '/api/health'),
   // projects + memory

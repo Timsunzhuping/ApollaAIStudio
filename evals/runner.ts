@@ -13,6 +13,7 @@ import { runCoworkScenarios } from './src/cowork-scenarios';
 import { runWorkspaceScenarios } from './src/workspace-scenarios';
 import { runSurfaceScenarios } from './src/surface-scenarios';
 import { runRemoteToolScenarios } from './src/remote-tool-scenarios';
+import { runBillingScenarios } from './src/billing-scenarios';
 
 /** Baseline cost for the deterministic golden (mock pricing). Tighten as the loop evolves. */
 const BASELINE_USD = 0.001;
@@ -31,6 +32,7 @@ const results: CheckResult[] = [
   ...(await runWorkspaceScenarios()),
   ...(await runSurfaceScenarios()),
   ...(await runRemoteToolScenarios()),
+  ...(await runBillingScenarios()),
 ];
 
 console.log('Apolla eval — research golden\n');

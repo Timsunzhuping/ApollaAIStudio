@@ -19,8 +19,10 @@ export function Shell() {
   // The Admin console only appears for allowlisted operators (server-enforced; this just hides the link).
   const nav = user?.isAdmin ? [...NAV, { to: '/admin', label: 'Admin' }] : NAV;
   const [health, setHealth] = useState<string | null>(null);
+  const [version, setVersion] = useState<string | null>(null);
   useEffect(() => {
     void api.health().then((h) => setHealth(`${h.mode === 'real' ? 'live models' : 'demo mode'} · ${h.persistence}`)).catch(() => {});
+    void api.version().then((v) => setVersion(v.version)).catch(() => {});
   }, []);
   return (
     <div className="shell">
@@ -31,6 +33,7 @@ export function Shell() {
             {n.label}
           </NavLink>
         ))}
+        {version && <div className="sidebar-footer muted" data-testid="app-version" style={{ marginTop: 'auto', fontSize: '0.8rem' }}>Apolla AI v{version}</div>}
       </nav>
       <div className="main">
         <header className="topbar">

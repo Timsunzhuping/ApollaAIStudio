@@ -78,6 +78,8 @@ export const api = {
   billing: () => http<BillingInfo>('GET', '/api/billing/subscription'),
   checkout: (plan: string) => http<{ url: string; activated: boolean }>('POST', '/api/billing/checkout', { plan }),
   cancelBilling: () => http<void>('POST', '/api/billing/cancel', {}),
+  // release info (S24)
+  version: () => http<{ version: string; mode: string; persistence: string }>('GET', '/api/version'),
   // operator console (S23)
   adminStats: () => http<AdminStats>('GET', '/api/admin/stats'),
   adminAudit: (limit = 50) => http<AdminAuditRow[]>('GET', `/api/admin/audit?limit=${limit}`),

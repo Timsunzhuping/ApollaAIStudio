@@ -10,14 +10,17 @@ import { buildHarness, type Harness } from './harness';
 import { readSession, readBearer, startSession, endSession } from './auth';
 import { applySecurityHeaders, applyCors, clientIp, limiters, isExpensive, MAX_BODY_BYTES } from './security';
 import { observe, metrics, type ObservedResponse } from './obs';
-import { reconcileJobs, withSpanContext } from '@apolla/harness-core';
+import { reconcileJobs, withSpanContext, McpServer, type JsonRpcRequest } from '@apolla/harness-core';
+import { buildCapabilityTools } from './mcp-tools';
 import { UI_HTML } from './ui';
 
 // Assigned by the entry point (or by tests via setHarness) — keeps handlers free of a build-at-import
 // singleton so the handler can be exercised against a constructed harness.
 let harness: Harness;
+let mcpServer: McpServer | undefined; // built lazily from the harness on first /api/mcp call (S18)
 export function setHarness(h: Harness): void {
   harness = h;
+  mcpServer = undefined;
 }
 
 // Single-origin SPA serving (S15): when WEB_DIST points at a built `apps/web/dist`, the BFF serves
@@ -394,6 +397,25 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
   if (isExpensive(method, pathname) && !limiters.owner().allow(ownerId)) {
     res.setHeader('Retry-After', String(limiters.owner().retryAfterSec(ownerId)));
     return json(res, 429, { error: 'rate limit exceeded — slow down' });
+  }
+
+  // --- MCP server (S18): Apolla's capabilities as MCP tools, JSON-RPC, API-token authed (via the
+  // gate above → ownerId). Every tools/call is owner-scoped + quota-gated + rate-limited + audited;
+  // the enclosing http.request span (S17) traces it, with orchestrator spans nesting underneath.
+  if (method === 'POST' && pathname === '/api/mcp') {
+    const rpc = (await readBody(req)) as unknown as JsonRpcRequest;
+    if (rpc.method === 'tools/call') {
+      if (!limiters.owner().allow(ownerId)) {
+        res.setHeader('Retry-After', String(limiters.owner().retryAfterSec(ownerId)));
+        return json(res, 200, { jsonrpc: '2.0', id: rpc.id ?? null, error: { code: -32000, message: 'rate limit exceeded' } });
+      }
+      const q = await harness.quota.check(ownerId);
+      if (!q.ok) return json(res, 200, { jsonrpc: '2.0', id: rpc.id ?? null, error: { code: -32000, message: 'quota reached — upgrade your plan' } });
+      const toolName = (rpc.params as { name?: string } | undefined)?.name ?? '';
+      await harness.audit.record({ id: randomUUID(), ownerId, taskId: 'mcp', tool: `mcp:${toolName}`, risk: 'read', decision: 'allow', status: 'executed', summary: `mcp tools/call ${toolName}` });
+    }
+    mcpServer ??= new McpServer(buildCapabilityTools(harness));
+    return json(res, 200, await mcpServer.handle(rpc, ownerId));
   }
 
   // --- API tokens (S12): cross-origin auth for the extension / CLI ---

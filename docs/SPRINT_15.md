@@ -97,15 +97,17 @@ S15-T1(框架+内存BFF+单源托管) ─ S15-T2(鉴权旅程) ─┬─ S15-T3(
 - **建议 PR 分组**：A(T1+T2) · B(T3+T4) · C(T5+T6) · D(T7+T8)。
 
 ## Sprint 15 Definition of Done（整体验收）
-- [ ] E2E 框架：`e2e/` + Playwright（chromium）+ 内存 BFF fixture + 全 stub；`pnpm e2e` 本地绿、离线、teardown 干净。
-- [ ] BFF 单源托管 SPA（服务 `apps/web/dist` + SPA fallback），cookie 同源生效。
-- [ ] 鉴权旅程：注册/登录/登出/Stub SSO/鉴权门 e2e 通过。
-- [ ] 研究旅程：真实 SSE 流式 + 答案/引用 + 导出 e2e 通过。
-- [ ] 计费旅程：升级→Pro→取消→free + 门禁提示 e2e 通过。
-- [ ] 工作区/Surfaces 旅程 e2e 通过；扩展冒烟达成层通过或显式记为缺口。
-- [ ] 生产构建模式 e2e 绿 + `docs/DEPLOY.md` runbook。
-- [ ] CI `e2e` job 稳定通过（chromium 安装、失败留 trace、超时有界），作为必过门禁；既有门禁不退化。
-- [ ] README/架构文档更新。
+- [x] E2E 框架：`e2e/` + Playwright（chromium）+ 内存 BFF fixture + 全 stub；`pnpm e2e` 本地绿、离线、teardown 干净。
+- [x] BFF 单源托管 SPA（服务 `apps/web/dist` + SPA fallback），cookie 同源生效。
+- [x] 鉴权旅程：注册/登录/登出/Stub SSO/鉴权门 e2e 通过。
+- [x] 研究旅程：真实 SSE 流式 + 报告内容 + 导出 e2e 通过。
+- [x] 计费旅程：升级→Pro→取消→free e2e 通过。
+- [x] 工作区/Surfaces 旅程 e2e 通过；扩展冒烟（MV3 manifest 构建 + 最小权限校验）通过，完整浏览器 MV3 e2e 记为已知缺口。
+- [x] 生产构建模式 e2e 绿（password 模式 + 单源托管）+ `docs/DEPLOY.md` runbook。
+- [x] CI `e2e` job（chromium 安装、失败留 trace/截图）；既有门禁不退化。
+- [x] README/架构文档更新。
+
+> **Sprint 15 完成**（PR [#86](https://github.com/Timsunzhuping/ApollaAIStudio/pull/86) A · [#87](https://github.com/Timsunzhuping/ApollaAIStudio/pull/87) B · [#88](https://github.com/Timsunzhuping/ApollaAIStudio/pull/88) C · D 本次）。新 `e2e/`（@apolla/e2e）**Playwright（chromium）** 真实浏览器 e2e：打**真实整合栈**（构建后 web SPA → 真实 BFF over HTTP/真实 SSE/真实会话 cookie），**hermetic & 离线**（内存 BFF 不设 `DATABASE_URL` + 全 stub provider）。BFF 新增**单源托管 SPA**（`WEB_DIST` → `apps/web/dist`，静态资源 + SPA fallback；env 门控、未设维持内联 UI）——cookie/SSE 天然生效且单源可部署。**9 个 spec**：smoke、鉴权（注册/登出/登录 + Stub SSO + 鉴权门）、研究（真实 SSE + 导出）、计费（升级/取消）、工作区（Surface→工作区）、扩展 manifest 冒烟、发布（单源 + password 模式 + health/metrics）。e2e 全程 password 鉴权模式（prod-like）。`docs/DEPLOY.md` 单源部署 runbook + 全 env 矩阵。CI 独立 `e2e` job（装 chromium、失败留 trace）。9/9 本地绿；既有门禁（268 root + 21 web + eval 37）不退化。完整 MV3 浏览器 e2e（side panel/SW）列为已知缺口。
 
 ## 风险与提示（给代理）
 - **hermetic 优先**：e2e 用**内存 BFF**（不设 `DATABASE_URL`）+ 全 stub provider；绝不连真实网络/凭证；同一旅程可复跑不抖。

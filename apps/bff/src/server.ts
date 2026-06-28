@@ -12,6 +12,7 @@ import { readSession, readBearer, startSession, endSession, mfaPendingToken, ver
 import { z } from 'zod';
 import { CollabOp, AccountBundle } from '@apolla/contracts';
 import { buildAccountBundle, importBundle } from './account';
+import { isAdmin } from './admin';
 import { applySecurityHeaders, applyCors, clientIp, limiters, isExpensive, MAX_BODY_BYTES } from './security';
 import { observe, metrics, type ObservedResponse } from './obs';
 import { reconcileJobs, withSpanContext, McpServer, type JsonRpcRequest } from '@apolla/harness-core';
@@ -463,9 +464,43 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
     if (!user) return json(res, 401, { error: 'not authenticated' });
     const identities = (await harness.identities.listByUser(ownerId)).map((i) => ({ provider: i.provider }));
     const mfaEnabled = (await harness.users.getMfa(ownerId))?.enabled ?? false;
-    return json(res, 200, { ...user, identities, mfaEnabled });
+    return json(res, 200, { ...user, identities, mfaEnabled, isAdmin: isAdmin(user.email) });
   }
   if (!ownerId) return json(res, 401, { error: 'not authenticated' });
+
+  // --- Operator console (S23). ALL /api/admin/* is fail-closed to the ADMIN_EMAILS allowlist; admins
+  // see aggregate + metadata only (never another user's private content). Actions are audited. ---
+  if (pathname.startsWith('/api/admin/')) {
+    const me = await harness.users.get(ownerId);
+    if (!isAdmin(me?.email)) return json(res, 403, { error: 'admin only' });
+    if (!limiters.owner().allow(ownerId)) {
+      res.setHeader('Retry-After', String(limiters.owner().retryAfterSec(ownerId)));
+      return json(res, 429, { error: 'rate limit exceeded — slow down' });
+    }
+    if (!harness.admin) return json(res, 503, { error: 'operator console requires a configured database' });
+    const limit = Number(url.searchParams.get('limit') ?? 50);
+    if (method === 'GET' && pathname === '/api/admin/stats') return json(res, 200, await harness.admin.stats());
+    if (method === 'GET' && pathname === '/api/admin/audit') return json(res, 200, await harness.admin.recentAudit(limit));
+    if (method === 'GET' && pathname === '/api/admin/users') return json(res, 200, await harness.admin.users(limit));
+    const userMatch = pathname.match(/^\/api\/admin\/users\/([^/]+)(\/plan)?$/);
+    if (userMatch) {
+      const targetId = userMatch[1]!;
+      if (method === 'GET' && !userMatch[2]) {
+        const detail = await harness.admin.userDetail(targetId);
+        return detail ? json(res, 200, detail) : json(res, 404, { error: 'unknown user' });
+      }
+      if (method === 'POST' && userMatch[2] === '/plan') {
+        const body = await readBody(req);
+        const plan = String(body.plan ?? '');
+        if (!harness.plans().some((p) => p.id === plan)) return json(res, 400, { error: 'unknown plan' });
+        if (!(await harness.users.get(targetId))) return json(res, 404, { error: 'unknown user' });
+        await harness.subscriptions.save({ ownerId: targetId, plan, status: 'active', updatedAt: new Date().toISOString() });
+        await harness.audit.record({ id: randomUUID(), ownerId, taskId: 'admin', tool: 'admin.set-plan', risk: 'high_write', decision: 'allow', status: 'executed', summary: `set ${targetId} → ${plan}` });
+        return json(res, 200, { ok: true, plan });
+      }
+    }
+    return json(res, 404, { error: 'unknown admin route' });
+  }
 
   // --- MFA enrollment (S20): authed. enroll → verify confirms → disable requires a code. ---
   if (method === 'POST' && pathname === '/api/auth/mfa/enroll') {

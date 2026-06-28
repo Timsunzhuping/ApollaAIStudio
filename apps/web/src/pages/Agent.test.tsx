@@ -11,6 +11,8 @@ describe('Agent page', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
       const u = String(url);
+      if (u.endsWith('/api/connectors/catalog')) return fakeRes(200, [{ id: 'web-fetch-http', name: 'Web Fetch (HTTP MCP)', description: 'hosted MCP', transport: 'http', requiredSecrets: ['token'], readOnlyTools: [] }]);
+      if (u.endsWith('/api/connectors/from-catalog') && init?.method === 'POST') return fakeRes(201, { id: 'c1', name: 'Web Fetch (HTTP MCP)', transport: 'http', enabled: true, tools: [{ name: 'echo', risk: 'read' }] });
       if (u.endsWith('/api/connectors')) return fakeRes(200, []);
       if (u.endsWith('/api/plugins/official')) return fakeRes(200, [{ name: 'research-analyst', skills: [], requiredConnectors: [], commands: [] }]);
       if (u.endsWith('/api/plugins')) return fakeRes(200, []);
@@ -33,5 +35,15 @@ describe('Agent page', () => {
     expect(await screen.findByText('demo/save_note')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Approve/i }));
     await waitFor(() => expect(fetchMock.mock.calls.some((c) => String(c[0]).includes('/api/agent/a1/confirm'))).toBe(true));
+  });
+
+  it('installs a connector from the marketplace catalog', async () => {
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    render(<Agent />);
+    await screen.findByText('hosted MCP'); // catalog description rendered
+    fireEvent.change(screen.getByPlaceholderText('server URL'), { target: { value: 'https://mcp.example/mcp' } });
+    fireEvent.change(screen.getByPlaceholderText('token (optional)'), { target: { value: 'sekret' } });
+    fireEvent.click(screen.getByRole('button', { name: /Add from catalog/i }));
+    await waitFor(() => expect(fetchMock.mock.calls.some((c) => String(c[0]).endsWith('/api/connectors/from-catalog') && (c[1] as RequestInit)?.method === 'POST')).toBe(true));
   });
 });

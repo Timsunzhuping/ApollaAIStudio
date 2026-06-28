@@ -1,0 +1,8 @@
+{
+  "id": "web-fetch-http",
+  "name": "Web Fetch (HTTP MCP)",
+  "description": "A hosted MCP server exposing web fetch/search tools over HTTP. Paste its URL and API token.",
+  "transport": "http",
+  "requiredSecrets": ["token"],
+  "homepage": "https://modelcontextprotocol.io"
+}

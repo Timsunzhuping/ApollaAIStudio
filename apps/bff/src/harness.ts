@@ -32,6 +32,8 @@ import {
   InMemoryApiTokenRepository,
   InMemorySubscriptionRepository,
   StubPaymentProvider,
+  StubSpeechProvider,
+  type SpeechProvider,
   resolveEntitlements,
   StubOAuthProvider,
   InMemoryIdentityRepository,
@@ -91,6 +93,7 @@ import { StripePaymentProvider } from '@apolla/payment-stripe';
 import { GoogleOAuthProvider, GitHubOAuthProvider } from '@apolla/auth-oauth';
 import { RedisJobQueue } from '@apolla/queue-redis';
 import { OtelTracer } from '@apolla/otel';
+import { OpenAiSpeechProvider } from '@apolla/speech-openai';
 import type { ModelCaps } from '@apolla/contracts';
 import { OpenAIImageAdapter } from '@apolla/media-openai';
 import { SeedanceVideoAdapter } from '@apolla/media-seedance';
@@ -140,6 +143,7 @@ export interface Harness {
   apiTokens: ApiTokenRepository;
   subscriptions: SubscriptionRepository;
   payment: PaymentProvider;
+  speech: SpeechProvider;
   plans: () => import('@apolla/contracts').PlanDef[];
   identities: IdentityRepository;
   authProviders: Map<string, AuthProvider>;
@@ -473,6 +477,8 @@ export async function buildHarness(): Promise<Harness> {
     apiTokens,
     subscriptions,
     payment: process.env.STRIPE_SECRET_KEY ? new StripePaymentProvider() : new StubPaymentProvider(),
+    // Speech (S19): OpenAI (Whisper + TTS) when keyed, else the offline Stub provider.
+    speech: OpenAiSpeechProvider.isConfigured() ? new OpenAiSpeechProvider() : new StubSpeechProvider(),
     plans: loadPlans,
     identities,
     // Identity providers: stub always (offline default); real providers when env-keyed (缺 key 不注册).

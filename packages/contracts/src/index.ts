@@ -1,4 +1,5 @@
 export * from './api-token';
+export * from './speech';
 export * from './audit';
 export * from './billing';
 export * from './common';

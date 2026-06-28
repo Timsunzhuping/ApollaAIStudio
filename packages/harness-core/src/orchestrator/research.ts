@@ -18,6 +18,7 @@ import { ToolRuntime } from '../tools/runtime';
 import { InMemoryCostLedger } from '../cost/ledger';
 import { assembleRequest } from '../safety/untrusted';
 import { NoopTracer, type Tracer } from '../obs/tracer';
+import { currentSpanContext } from '../obs/context';
 import type { TaskRepository } from '../repo/types';
 import type { Memory } from '../memory/types';
 import { userModelDirective } from '../memory/types';
@@ -141,7 +142,7 @@ export class ResearchOrchestrator {
     try {
       // 1) PLAN
       let step = begin('plan');
-      const span1 = this.tracer.startSpan('plan');
+      const span1 = this.tracer.startSpan('plan', { parent: currentSpanContext() });
       yield { type: 'step-start', state: 'plan', stepId: step.id };
       const planReq = assembleRequest({
         system: sys(this.d.prompts.render('research.plan').text),
@@ -187,7 +188,7 @@ export class ResearchOrchestrator {
 
       // 4) GENERATE — stream the prose report, then extract citations (two-phase streaming, S2-T9).
       step = begin('generate');
-      const span4 = this.tracer.startSpan('generate');
+      const span4 = this.tracer.startSpan('generate', { parent: currentSpanContext() });
       yield { type: 'step-start', state: 'generate', stepId: step.id };
       const proseReq = assembleRequest({
         system: sys(this.d.prompts.render('research.synthesize').text),

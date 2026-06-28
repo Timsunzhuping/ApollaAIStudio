@@ -55,6 +55,8 @@ import {
   notesExecutor,
   JobRunner,
   InProcessJobQueue,
+  NoopTracer,
+  type Tracer,
   Scheduler,
   notifyJobComplete,
   WebhookDelivery,
@@ -88,6 +90,7 @@ import { getRoute, loadSkills, loadPlugins, loadSurfaces, loadConnectorCatalog, 
 import { StripePaymentProvider } from '@apolla/payment-stripe';
 import { GoogleOAuthProvider, GitHubOAuthProvider } from '@apolla/auth-oauth';
 import { RedisJobQueue } from '@apolla/queue-redis';
+import { OtelTracer } from '@apolla/otel';
 import type { ModelCaps } from '@apolla/contracts';
 import { OpenAIImageAdapter } from '@apolla/media-openai';
 import { SeedanceVideoAdapter } from '@apolla/media-seedance';
@@ -154,6 +157,7 @@ export interface Harness {
   jobs: JobRunner;
   jobRepo: JobRepository;
   jobQueue: JobQueue;
+  tracer: Tracer;
   scheduler: Scheduler;
   scheduleRepo: ScheduledTaskRepository;
   notifications: NotificationRepository;
@@ -278,6 +282,8 @@ export async function buildHarness(): Promise<Harness> {
 
   const ledger = new InMemoryCostLedger(pricing);
   const prompts = new PromptRegistry();
+  // Tracer (S17): OpenTelemetry when OTEL_EXPORTER_OTLP_ENDPOINT is set, else Noop (zero-overhead).
+  const tracer: Tracer = process.env.OTEL_EXPORTER_OTLP_ENDPOINT ? new OtelTracer() : new NoopTracer();
   const orchestrator = new ResearchOrchestrator({
     adapters,
     prompts,
@@ -286,11 +292,12 @@ export async function buildHarness(): Promise<Harness> {
     repo,
     memory,
     routeFor,
+    tracer,
     env: { ...process.env, DEMO_KEY: 'demo' },
   });
 
   // Skill Runtime: built-in config skills + user skills; research → orchestrator, else generic.
-  const router = new ModelRouter({ adapters, routeFor, env: { ...process.env, DEMO_KEY: 'demo' }, onUsage: (e) => ledger.recordLLM(e) });
+  const router = new ModelRouter({ adapters, routeFor, env: { ...process.env, DEMO_KEY: 'demo' }, onUsage: (e) => ledger.recordLLM(e), tracer });
   const skills = new SkillRuntime(
     new CompositeSkillSource(loadSkills(), skillRepo, pluginRepo),
     makeGenericExecutor({ router, prompts, tools }),
@@ -444,6 +451,7 @@ export async function buildHarness(): Promise<Harness> {
     onComplete: (job) => notifyJobComplete(job, { repo: notificationRepo, delivery }),
     canRun: (id) => quota.check(id).then((q) => q.ok),
     queue: jobQueue,
+    tracer,
   });
   // In-process mode: the web consumes its own queue. Distributed mode: the web enqueues only and a
   // standalone worker registers the consumer (see workers/job-worker).
@@ -482,6 +490,7 @@ export async function buildHarness(): Promise<Harness> {
     jobs,
     jobRepo,
     jobQueue,
+    tracer,
     scheduler,
     scheduleRepo,
     notifications: notificationRepo,

@@ -26,6 +26,8 @@ export const Job = z.object({
   status: JobStatus,
   error: z.string().optional(),
   scheduledTaskId: z.string().optional(),
+  /** W3C traceparent captured at enqueue so the worker continues the originating trace (S17). */
+  traceparent: z.string().optional(),
   createdAt: z.string().optional(),
 });
 export type Job = z.infer<typeof Job>;

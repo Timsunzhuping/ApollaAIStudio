@@ -2,6 +2,15 @@ import { randomUUID } from 'node:crypto';
 import type { Job, JobSpec } from '@apolla/contracts';
 import type { JobRepository, JobResolver } from './types';
 import { InProcessJobQueue, type JobQueue, type JobRunContext } from './queue';
+import { NoopTracer, formatTraceparent, type Tracer } from '../obs/tracer';
+import { tracedGen, currentSpanContext } from '../obs/context';
+
+const ZERO_TRACE = '0'.repeat(32);
+
+/** W3C traceparent for the enclosing span context, or undefined when not tracing. */
+function traceparentOf(ctx: { traceId: string; spanId: string } | undefined): string | undefined {
+  return ctx && ctx.traceId !== ZERO_TRACE ? formatTraceparent(ctx) : undefined;
+}
 
 export interface JobRunnerDeps {
   repo: JobRepository;
@@ -11,6 +20,8 @@ export interface JobRunnerDeps {
   /** Quota/eligibility gate — applies to ALL jobs incl. scheduler-triggered ones (S5-T7). */
   canRun?: (ownerId: string) => Promise<boolean> | boolean;
   idGen?: () => string;
+  /** Tracer for the job.run span + cross-process trace continuation (S17). Defaults to Noop. */
+  tracer?: Tracer;
   /**
    * Execution substrate (S16). Omit → an internal InProcessJobQueue is created + the consumer is
    * auto-registered (standalone/test convenience). Pass one → the CALLER registers the consumer
@@ -26,10 +37,12 @@ export interface JobRunnerDeps {
  */
 export class JobRunner {
   private readonly idGen: () => string;
+  private readonly tracer: Tracer;
   readonly queue: JobQueue;
 
   constructor(private readonly d: JobRunnerDeps) {
     this.idGen = d.idGen ?? (() => randomUUID());
+    this.tracer = d.tracer ?? new NoopTracer();
     this.queue = d.queue ?? new InProcessJobQueue();
     if (!d.queue) this.queue.process((id) => this.run(id)); // standalone: self-consume
   }
@@ -43,6 +56,8 @@ export class JobRunner {
       allowTools: spec.allowTools ?? [],
       status: 'queued',
       scheduledTaskId: opts.scheduledTaskId,
+      // Capture the enclosing trace (e.g. the HTTP request span) so the worker continues it (S17).
+      traceparent: traceparentOf(currentSpanContext()),
     };
     await this.d.repo.create(job);
     // Fast-fail quota gate so the HTTP caller / scheduler sees rejection synchronously.
@@ -81,11 +96,15 @@ export class JobRunner {
     await this.d.repo.save(job);
     try {
       const spec: JobSpec = { kind: job.kind, input: job.input, allowTools: job.allowTools ?? [] };
+      // job.run span continues the originating trace (web → worker); orchestrator/LLM spans nest.
+      const parent = this.tracer.extract(job.traceparent);
+      const events = tracedGen(this.tracer, 'job.run', () => this.d.resolve(job.ownerId, spec, job.id), {
+        parent,
+        attributes: { kind: job.kind, jobId: job.id },
+      });
       await this.withTimeout(
         (async () => {
-          for await (const ev of this.d.resolve(job.ownerId, spec, job.id)) {
-            await this.d.repo.appendEvent(job.id, ev);
-          }
+          for await (const ev of events) await this.d.repo.appendEvent(job.id, ev);
         })(),
       );
       job.status = 'done';

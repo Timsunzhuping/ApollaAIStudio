@@ -10,7 +10,7 @@ import { buildHarness, type Harness } from './harness';
 import { readSession, readBearer, startSession, endSession } from './auth';
 import { applySecurityHeaders, applyCors, clientIp, limiters, isExpensive, MAX_BODY_BYTES } from './security';
 import { observe, metrics, type ObservedResponse } from './obs';
-import { reconcileJobs } from '@apolla/harness-core';
+import { reconcileJobs, withSpanContext } from '@apolla/harness-core';
 import { UI_HTML } from './ui';
 
 // Assigned by the entry point (or by tests via setHarness) — keeps handlers free of a build-at-import
@@ -203,7 +203,29 @@ async function probeConnector(c: Connector): Promise<{ ok: boolean; toolCount?: 
   }
 }
 
+/**
+ * Wrap each request in an `http.request` span (S17). The span context is active for the whole
+ * handler, so orchestrator/job spans nest under it and jobs.start() auto-captures it as the parent
+ * (cross-process propagation: web → worker). Inbound traceparent is intentionally NOT honored as a
+ * parent — it is untrusted; correlation only.
+ */
 export async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const tracer = harness?.tracer;
+  if (!tracer) return handleInner(req, res);
+  const pathname = new URL(req.url ?? '/', 'http://localhost').pathname;
+  const span = tracer.startSpan('http.request', { attributes: { 'http.method': req.method ?? 'GET', 'http.route': pathname } });
+  try {
+    await withSpanContext(span.spanContext(), () => handleInner(req, res));
+    span.setStatus(res.statusCode >= 500 ? 'error' : 'ok');
+  } catch (e) {
+    span.setStatus('error', e instanceof Error ? e.message : String(e));
+    throw e;
+  } finally {
+    span.end({ 'http.status_code': res.statusCode });
+  }
+}
+
+async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const url = new URL(req.url ?? '/', 'http://localhost');
   const { pathname } = url;
   const method = req.method ?? 'GET';
@@ -1018,7 +1040,7 @@ if (!process.env.VITEST) {
   const shutdown = () => {
     if (cron) clearInterval(cron);
     server.close(() => {
-      void built.close?.().finally(() => process.exit(0));
+      void built.tracer.shutdown().catch(() => {}).then(() => built.close?.()).finally(() => process.exit(0)); // flush pending spans
     });
     setTimeout(() => process.exit(0), 5000).unref(); // hard cap if connections linger
   };

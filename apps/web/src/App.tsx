@@ -10,6 +10,7 @@ import { Agent } from './pages/Agent';
 import { Automation } from './pages/Automation';
 import { Billing } from './pages/Billing';
 import { Collab } from './pages/Collab';
+import { Admin } from './pages/Admin';
 import { Settings } from './pages/Settings';
 import { Loading } from './components/ui';
 
@@ -28,6 +29,7 @@ function Gate() {
         <Route path="/agent" element={<Agent />} />
         <Route path="/automation" element={<Automation />} />
         <Route path="/billing" element={<Billing />} />
+        <Route path="/admin" element={<Admin />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/research" replace />} />
       </Route>

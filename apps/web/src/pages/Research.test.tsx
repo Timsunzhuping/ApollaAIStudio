@@ -15,6 +15,8 @@ describe('Research page', () => {
       if (u.endsWith('/api/projects')) return fakeRes(200, []);
       if (u.endsWith('/api/skills')) return fakeRes(200, []);
       if (u.endsWith('/api/tasks') && method === 'POST') return fakeRes(200, { taskId: 't1' });
+      if (u.endsWith('/api/speech/transcribe') && method === 'POST') return fakeRes(200, { text: 'spoken question' });
+      if (u.endsWith('/api/speech/synthesize') && method === 'POST') return fakeRes(200, { uri: '/media/spoken.mp3' });
       return fakeRes(200, {});
     }));
   });
@@ -42,5 +44,31 @@ describe('Research page', () => {
     expect(screen.getByText('$0.1234')).toBeInTheDocument();
     // closed on done
     expect(MockEventSource.last().closed).toBe(true);
+
+    // S19: read the report aloud → synthesized audio plays.
+    fireEvent.click(screen.getByRole('button', { name: /Read aloud/i }));
+    await waitFor(() => expect((screen.getByTestId('report-audio') as HTMLAudioElement).getAttribute('src')).toContain('/media/spoken.mp3'));
+  });
+
+  it('dictates the question via the mic without auto-submitting (S19)', async () => {
+    class FakeMediaRecorder {
+      ondataavailable: ((e: { data: Blob }) => void) | null = null;
+      onstop: (() => void) | null = null;
+      mimeType = 'audio/webm';
+      start() {}
+      stop() {
+        this.ondataavailable?.({ data: new Blob(['STUBSPEECH:spoken question'], { type: 'audio/webm' }) });
+        this.onstop?.();
+      }
+    }
+    Object.defineProperty(navigator, 'mediaDevices', { value: { getUserMedia: vi.fn(async () => ({ getTracks: () => [{ stop() {} }] })) }, configurable: true });
+    vi.stubGlobal('MediaRecorder', FakeMediaRecorder);
+
+    render(<Research />);
+    fireEvent.click(screen.getByRole('button', { name: /Dictate question/i })); // start
+    fireEvent.click(await screen.findByRole('button', { name: /Stop recording/i })); // stop → transcribe
+
+    await waitFor(() => expect((screen.getByPlaceholderText(/Ask a research question/i) as HTMLInputElement).value).toBe('spoken question'));
+    expect(MockEventSource.instances).toHaveLength(0); // transcript filled the input — NOT auto-submitted
   });
 });

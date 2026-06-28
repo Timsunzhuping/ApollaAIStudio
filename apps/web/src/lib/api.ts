@@ -66,6 +66,9 @@ export const api = {
   billing: () => http<BillingInfo>('GET', '/api/billing/subscription'),
   checkout: (plan: string) => http<{ url: string; activated: boolean }>('POST', '/api/billing/checkout', { plan }),
   cancelBilling: () => http<void>('POST', '/api/billing/cancel', {}),
+  // speech (S19)
+  transcribe: (audio: string, mime: string) => http<{ text: string }>('POST', '/api/speech/transcribe', { audio, mime }),
+  synthesize: (text: string, voice?: string) => http<{ uri: string }>('POST', '/api/speech/synthesize', { text, voice }),
   getMemoryModel: () => http<Record<string, unknown>>('GET', '/api/memory/model'),
   setMemoryModel: (m: { language?: string; style?: string }) => http<void>('POST', '/api/memory/model', m),
   clearMemory: () => http<void>('DELETE', '/api/memory'),

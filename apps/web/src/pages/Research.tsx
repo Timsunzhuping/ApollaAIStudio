@@ -27,6 +27,65 @@ export function Research() {
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [media, setMedia] = useState<string | null>(null);
 
+  // Voice I/O (S19): dictate the question, read the report aloud.
+  const voiceSupported = typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia && typeof window.MediaRecorder !== 'undefined';
+  const [recording, setRecording] = useState(false);
+  const [voiceBusy, setVoiceBusy] = useState(false);
+  const [audioSrc, setAudioSrc] = useState<string | null>(null);
+  const [recorder, setRecorder] = useState<MediaRecorder | null>(null);
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream);
+      const chunks: Blob[] = [];
+      mr.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+      mr.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(chunks, { type: mr.mimeType || 'audio/webm' });
+        void transcribeBlob(blob, mr.mimeType || 'audio/webm');
+      };
+      mr.start();
+      setRecorder(mr);
+      setRecording(true);
+    } catch {
+      setError('Microphone unavailable.');
+    }
+  };
+  const stopRecording = () => { recorder?.stop(); setRecording(false); setRecorder(null); };
+
+  // The transcript is UNTRUSTED DATA — it only fills the question input; the user still submits.
+  const transcribeBlob = async (blob: Blob, mime: string) => {
+    setVoiceBusy(true);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const r = new FileReader();
+        r.onloadend = () => resolve(String(r.result));
+        r.onerror = () => reject(new Error('read failed'));
+        r.readAsDataURL(blob);
+      });
+      const { text } = await api.transcribe(dataUrl.split(',')[1] ?? '', mime);
+      setQuestion((q) => (q ? `${q} ${text}` : text));
+    } catch {
+      setError('Transcription failed.');
+    } finally {
+      setVoiceBusy(false);
+    }
+  };
+
+  const readAloud = async () => {
+    if (!report.trim()) return;
+    setVoiceBusy(true);
+    try {
+      const { uri } = await api.synthesize(report);
+      setAudioSrc(api.base + uri);
+    } catch {
+      setError('Read-aloud failed.');
+    } finally {
+      setVoiceBusy(false);
+    }
+  };
+
   useEffect(() => {
     void api.projects().then(setProjects).catch(() => {});
     void api.skills().then(setSkills).catch(() => {});
@@ -88,6 +147,12 @@ export function Research() {
         <div className="row">
           <input className="grow" placeholder="Ask a research question, e.g. “State of the EV market in 2026”" value={question}
             onChange={(e) => setQuestion(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void run(); }} />
+          {voiceSupported && (
+            <button className="ghost" aria-label={recording ? 'Stop recording' : 'Dictate question'} title="Dictate your question"
+              disabled={voiceBusy} onClick={() => (recording ? stopRecording() : void startRecording())}>
+              {recording ? '⏹ Stop' : voiceBusy ? '…' : '🎤'}
+            </button>
+          )}
           <button onClick={() => void run()} disabled={running || !question.trim()}>{running ? 'Researching…' : 'Research'}</button>
         </div>
         <div className="row">
@@ -121,8 +186,10 @@ export function Research() {
               <button className="ghost" onClick={() => void saveSkill()}>★ Save as skill</button>
               <button className="ghost" onClick={() => void genMedia('image_premium')}>🖼 Cover</button>
               <button className="ghost" onClick={() => void genMedia('video_standard')}>🎬 Video</button>
+              <button className="ghost" disabled={voiceBusy} onClick={() => void readAloud()}>🔊 Read aloud</button>
             </div>
           )}
+          {audioSrc && <audio data-testid="report-audio" src={audioSrc} controls style={{ marginTop: '0.5rem', width: '100%' }} />}
           {media && <pre className="muted" style={{ marginTop: '0.5rem', whiteSpace: 'pre-wrap' }}>{media}</pre>}
         </Card>
         <Card title="Sources">

@@ -48,4 +48,20 @@ describe('connector marketplace (S11-T3)', () => {
     expect(res.status).toBe(400);
     expect(((await res.json()) as { error: string }).error).toMatch(/token/);
   });
+
+  it('reports connector health (reachable + unreachable) and never leaks the secret value', async () => {
+    await fetch(`${base}/api/connectors/from-catalog`, authed({ id: 'web-fetch-http', url: mcpUrl, secrets: { token: 'sekret' } }));
+    const list = (await (await fetch(`${base}/api/connectors`, authed())).json()) as { id: string; url?: string; secrets: string[] }[];
+    expect(JSON.stringify(list)).not.toContain('sekret'); // only secret key names, never the value
+    const good = list.find((c) => c.url === mcpUrl)!;
+    const okH = (await (await fetch(`${base}/api/connectors/${good.id}/health`, authed())).json()) as { ok: boolean; toolCount: number };
+    expect(okH.ok).toBe(true);
+    expect(okH.toolCount).toBe(2);
+
+    // Seed a connector that was reachable at install but is now unreachable → health ok:false.
+    const me = (await (await fetch(`${base}/api/auth/me`, authed())).json()) as { id: string };
+    await harness.connectors.save({ id: 'dead-conn', ownerId: me.id, name: 'dead', transport: 'http', url: 'http://127.0.0.1:1/x', args: [], readOnlyTools: [], disabledTools: [], enabled: true, tools: [], secrets: {} });
+    const badH = (await (await fetch(`${base}/api/connectors/dead-conn/health`, authed())).json()) as { ok: boolean };
+    expect(badH.ok).toBe(false);
+  });
 });

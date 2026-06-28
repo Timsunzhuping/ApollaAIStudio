@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { randomUUID } from 'node:crypto';
-import { exportArtifact, autoDraftSkill, embedMedia, encryptSecret, inferRisk, AgentOrchestrator, nextRun } from '@apolla/harness-core';
+import { exportArtifact, autoDraftSkill, embedMedia, encryptSecret, decryptSecret, inferRisk, AgentOrchestrator, nextRun } from '@apolla/harness-core';
 import type { Connector } from '@apolla/contracts';
 import { hashPassword, verifyPassword } from '@apolla/harness-core';
 import { buildHarness, type Harness } from './harness';
@@ -99,6 +99,27 @@ async function createConnector(ownerId: string, input: ConnectorInput): Promise<
   };
   await harness.connectors.save(connector);
   return connector;
+}
+
+/** Read-only health probe: connect + listTools, timed; never mutates. Decrypts secrets locally. */
+async function probeConnector(c: Connector): Promise<{ ok: boolean; toolCount?: number; ms?: number; error?: string }> {
+  const plain: Record<string, string> = {};
+  for (const [k, v] of Object.entries(c.secrets)) {
+    try { plain[k] = decryptSecret(v); } catch { /* skip unreadable secret */ }
+  }
+  const server = {
+    name: c.name, transport: c.transport, command: c.command, args: c.args, url: c.url,
+    readOnlyTools: c.readOnlyTools, headers: httpHeadersFromPlain(c.transport, plain), timeoutMs: 8000,
+  };
+  const start = Date.now();
+  try {
+    const session = await harness.mcpClientFor(c.transport).connect(server as never);
+    const tools = await session.listTools();
+    await session.close();
+    return { ok: true, toolCount: tools.length, ms: Date.now() - start };
+  } catch (e) {
+    return { ok: false, ms: Date.now() - start, error: e instanceof Error ? e.message : String(e) };
+  }
 }
 
 export async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -576,6 +597,14 @@ export async function handle(req: IncomingMessage, res: ServerResponse): Promise
   if (method === 'GET' && pathname === '/api/connectors') {
     const list = await harness.connectors.list(ownerId);
     return json(res, 200, list.map((c) => ({ ...c, secrets: Object.keys(c.secrets) })));
+  }
+  const connHealth = pathname.match(/^\/api\/connectors\/([^/]+)\/health$/);
+  if (method === 'GET' && connHealth) {
+    const c = await harness.connectors.get(connHealth[1]!);
+    if (!c || c.ownerId !== ownerId) return json(res, 404, { error: 'unknown connector' });
+    const h = await probeConnector(c);
+    metrics.inc(`connector.health.${h.ok ? 'ok' : 'fail'}`);
+    return json(res, 200, h);
   }
   const connToggle = pathname.match(/^\/api\/connectors\/([^/]+)\/tool$/);
   if (method === 'POST' && connToggle) {

@@ -93,6 +93,7 @@ export const api = {
   connectorCatalog: () => http<ConnectorCatalogEntry[]>('GET', '/api/connectors/catalog'),
   installFromCatalog: (id: string, url: string, secrets: Record<string, string>) =>
     http<Connector>('POST', '/api/connectors/from-catalog', { id, url, secrets }),
+  connectorHealth: (id: string) => http<{ ok: boolean; toolCount?: number; ms?: number; error?: string }>('GET', `/api/connectors/${id}/health`),
   toggleConnector: (id: string, enabled: boolean) => http<Connector>('POST', `/api/connectors/${id}/toggle`, { enabled }),
   deleteConnector: (id: string) => http<void>('DELETE', `/api/connectors/${id}`),
   // automation

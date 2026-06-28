@@ -1,6 +1,6 @@
 {
   "name": "@apolla/mcp-stdio",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "MCP client over stdio (JSON-RPC, newline-delimited) — connects to local MCP servers.",

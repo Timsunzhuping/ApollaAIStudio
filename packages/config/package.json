@@ -1,6 +1,6 @@
 {
   "name": "@apolla/config",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "Registries as config: routes, feature gates, prompts, skills + validated loaders.",

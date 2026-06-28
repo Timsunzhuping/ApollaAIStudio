@@ -1,6 +1,6 @@
 {
   "name": "@apolla/media-openai",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "OpenAI Images MediaAdapter (fetch-based, env-keyed text→image / image→image).",

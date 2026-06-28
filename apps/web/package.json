@@ -1,6 +1,6 @@
 {
   "name": "@apolla/web",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "Sprint 09 production web frontend: Vite + React SPA consuming the BFF HTTP/SSE API.",

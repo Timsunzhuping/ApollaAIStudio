@@ -1,6 +1,6 @@
 {
   "name": "@apolla/db-postgres",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "Postgres TaskRepository — durable persistence behind the Sprint 01 Repository interface.",

@@ -1,6 +1,6 @@
 {
   "name": "@apolla/media-seedance",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "Seedance 2.0 video MediaAdapter (fetch-based, env-keyed, async submit/poll).",

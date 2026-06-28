@@ -1,6 +1,6 @@
 {
   "name": "@apolla/adapter-openai",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "OpenAI LLMAdapter (Chat Completions, fetch-based, streaming + structured outputs).",

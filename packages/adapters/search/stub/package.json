@@ -1,6 +1,6 @@
 {
   "name": "@apolla/search-stub",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "Deterministic fixture SearchProvider — offline default and eval determinism.",

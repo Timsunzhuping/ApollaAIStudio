@@ -1,6 +1,6 @@
 {
   "name": "@apolla/search-tavily",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "Tavily SearchProvider (fetch-based, env-keyed real web search).",

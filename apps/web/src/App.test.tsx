@@ -15,6 +15,7 @@ describe('App auth gate', () => {
       const u = String(url);
       if (u.endsWith('/api/auth/me')) return authed ? fakeRes(200, { id: 'u', email: 'a@b.c' }) : fakeRes(401, { error: 'no session' });
       if (u.endsWith('/api/auth/login')) { authed = true; return fakeRes(200, { id: 'u', email: 'a@b.c' }); }
+      if (u.endsWith('/api/version')) return fakeRes(200, { version: '1.0.0', mode: 'demo', persistence: 'memory' });
       return fakeRes(200, []); // projects/skills etc.
     }));
 
@@ -26,5 +27,7 @@ describe('App auth gate', () => {
     // after login the protected shell renders (nav + research route)
     await waitFor(() => expect(screen.getByText('Apolla AI')).toBeInTheDocument());
     expect(screen.getByRole('link', { name: 'Research' })).toBeInTheDocument();
+    // the release version is surfaced in the shell (S24)
+    expect(await screen.findByTestId('app-version')).toHaveTextContent('v1.0.0');
   });
 });

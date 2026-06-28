@@ -33,7 +33,10 @@ async function http<T>(method: string, path: string, body?: unknown): Promise<T>
   return (text ? JSON.parse(text) : undefined) as T;
 }
 
-export interface User { id: string; email: string; identities?: { provider: string }[]; mfaEnabled?: boolean }
+export interface User { id: string; email: string; identities?: { provider: string }[]; mfaEnabled?: boolean; isAdmin?: boolean }
+export interface AdminStats { users: number; projects: number; tasks: number; jobs: Record<string, number>; subscriptions: Record<string, number> }
+export interface AdminUserRow { id: string; email: string; createdAt: string; plan: string | null; projects: number }
+export interface AdminAuditRow { id: string; ownerId: string; tool: string; risk: string; decision: string; status: string; summary: string; createdAt: string }
 export type LoginResult = User | { mfaRequired: true; pendingToken: string };
 export interface MfaEnrollment { secret: string; otpauthUri: string; recoveryCodes: string[] }
 export const isMfaRequired = (r: LoginResult): r is { mfaRequired: true; pendingToken: string } => 'mfaRequired' in r;
@@ -75,6 +78,11 @@ export const api = {
   billing: () => http<BillingInfo>('GET', '/api/billing/subscription'),
   checkout: (plan: string) => http<{ url: string; activated: boolean }>('POST', '/api/billing/checkout', { plan }),
   cancelBilling: () => http<void>('POST', '/api/billing/cancel', {}),
+  // operator console (S23)
+  adminStats: () => http<AdminStats>('GET', '/api/admin/stats'),
+  adminAudit: (limit = 50) => http<AdminAuditRow[]>('GET', `/api/admin/audit?limit=${limit}`),
+  adminUsers: (limit = 100) => http<AdminUserRow[]>('GET', `/api/admin/users?limit=${limit}`),
+  adminSetPlan: (id: string, plan: string) => http<{ ok: boolean; plan: string }>('POST', `/api/admin/users/${encodeURIComponent(id)}/plan`, { plan }),
   // account data lifecycle (S22)
   accountExport: () => http<Record<string, unknown>>('GET', '/api/account/export'),
   accountDelete: (confirm: string) => http<{ deleted: boolean }>('POST', '/api/account/delete', { confirm }),

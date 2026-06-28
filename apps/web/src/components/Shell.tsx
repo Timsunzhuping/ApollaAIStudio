@@ -16,6 +16,8 @@ const NAV = [
 
 export function Shell() {
   const { user, logout } = useAuth();
+  // The Admin console only appears for allowlisted operators (server-enforced; this just hides the link).
+  const nav = user?.isAdmin ? [...NAV, { to: '/admin', label: 'Admin' }] : NAV;
   const [health, setHealth] = useState<string | null>(null);
   useEffect(() => {
     void api.health().then((h) => setHealth(`${h.mode === 'real' ? 'live models' : 'demo mode'} · ${h.persistence}`)).catch(() => {});
@@ -24,7 +26,7 @@ export function Shell() {
     <div className="shell">
       <nav className="sidebar" aria-label="Primary">
         <div className="brand">Apolla AI</div>
-        {NAV.map((n) => (
+        {nav.map((n) => (
           <NavLink key={n.to} to={n.to} className={({ isActive }) => `navlink${isActive ? ' active' : ''}`}>
             {n.label}
           </NavLink>

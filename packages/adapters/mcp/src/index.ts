@@ -1,3 +1,7 @@
+export { HttpMCPClient } from './http';
+export { StubHttpMcpServer } from './stub-http-server';
+export type { StubHttpMcpOptions } from './stub-http-server';
+
 import { spawn } from 'node:child_process';
 import type {
   MCPClient,

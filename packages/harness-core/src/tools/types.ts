@@ -37,4 +37,8 @@ export interface MCPServerConfig {
    * low_write (conservative — needs confirmation) unless the server annotates a tool read-only.
    */
   readOnlyTools?: string[];
+  /** http transport: resolved (decrypted) auth headers — sent ONLY to `url`'s host (S11). */
+  headers?: Record<string, string>;
+  /** http transport: per-request timeout in ms (default 10000). */
+  timeoutMs?: number;
 }

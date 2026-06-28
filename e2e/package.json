@@ -1,6 +1,6 @@
 {
   "name": "@apolla/e2e",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "test": "playwright test"

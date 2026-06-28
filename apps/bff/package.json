@@ -1,6 +1,6 @@
 {
   "name": "@apolla/bff",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "Sprint 01 demo BFF: research→artifact API (SSE) + workspace UI. Composition root.",

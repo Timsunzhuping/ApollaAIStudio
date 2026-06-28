@@ -1,6 +1,6 @@
 {
   "name": "@apolla/contracts",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "Single source of truth: shared types + JSON Schemas for the Apolla harness.",

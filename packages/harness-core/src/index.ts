@@ -24,6 +24,9 @@ export type { Tool, ToolContext, ToolFilter, MCPServerConfig } from './tools/typ
 export { WebSearchTool } from './tools/search';
 export type { SearchProvider, SearchHit, SearchOpts, WebSearchArgs } from './tools/search';
 export { wrapMCPTool, inferRisk } from './tools/mcp';
+export { McpServer } from './mcp-server/server';
+export { defineTool } from './mcp-server/types';
+export type { CapabilityTool, JsonRpcRequest, JsonRpcResponse } from './mcp-server/types';
 export type { MCPClient, MCPSession, MCPToolDef, MCPCallResult } from './tools/mcp';
 export { StubMCPClient } from './tools/mcp-stub';
 export { AgentOrchestrator } from './agent/orchestrator';

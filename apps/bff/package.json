@@ -28,7 +28,8 @@
     "@apolla/media-openai": "workspace:*",
     "@apolla/media-seedance": "workspace:*",
     "@apolla/search-stub": "workspace:*",
-    "@apolla/search-tavily": "workspace:*"
+    "@apolla/search-tavily": "workspace:*",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "tsx": "^4.19.2"

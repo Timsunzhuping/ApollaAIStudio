@@ -314,6 +314,19 @@ importers:
         specifier: ^3.23.5
         version: 3.25.2(zod@3.25.76)
 
+  workers/job-worker:
+    dependencies:
+      '@apolla/bff':
+        specifier: workspace:*
+        version: link:../../apps/bff
+      '@apolla/harness-core':
+        specifier: workspace:*
+        version: link:../../packages/harness-core
+    devDependencies:
+      tsx:
+        specifier: ^4.19.2
+        version: 4.22.4
+
 packages:
 
   '@adobe/css-tools@4.5.0':

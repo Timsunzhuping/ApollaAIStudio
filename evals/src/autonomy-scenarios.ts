@@ -46,8 +46,8 @@ export async function backgroundJob(): Promise<CheckResult> {
       yield { type: 'done' };
     },
   });
-  const { job, done } = await runner.start('u', spec);
-  await done;
+  const { job } = await runner.start('u', spec);
+  await runner.idle();
   const events = (await repo.events(job.id)).map((e: any) => e.type);
   const ok = (await repo.get(job.id))?.status === 'done' && events.join(',') === 'plan,done';
   return { name: 'background-job-replay', ok, issues: ok ? [] : ['job did not complete with an ordered run-log'] };
@@ -65,7 +65,8 @@ export async function notificationDelivery(): Promise<CheckResult> {
     resolve: async function* () { yield { type: 'done' }; },
     onComplete: (job) => notifyJobComplete(job, { repo: notifRepo, delivery, idGen: () => `n${n++}` }),
   });
-  await (await runner.start('u', spec)).done;
+  await runner.start('u', spec);
+  await runner.idle();
   const ok = (await notifRepo.list('u')).length === 1 && delivery.sent.length === 1;
   return { name: 'notification-delivery', ok, issues: ok ? [] : ['notification or delivery missing'] };
 }

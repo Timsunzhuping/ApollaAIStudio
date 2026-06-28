@@ -10,6 +10,7 @@ const job = (id: string, ownerId: string): Job => ({
   ownerId,
   kind: 'research',
   input: { question: 'x' },
+  allowTools: [],
   status: 'queued',
 });
 

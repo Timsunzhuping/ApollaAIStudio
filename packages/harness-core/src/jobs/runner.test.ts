@@ -18,9 +18,9 @@ describe('JobRunner', () => {
         yield { type: 'done' };
       },
     });
-    const { job, done } = await runner.start('u1', spec);
+    const { job } = await runner.start('u1', spec);
     expect(job.status).toBe('queued'); // returns immediately
-    await done;
+    await runner.idle();
 
     const finished = await repo.get(job.id);
     expect(finished?.status).toBe('done');
@@ -41,8 +41,8 @@ describe('JobRunner', () => {
         throw new Error('boom');
       },
     });
-    const { job, done } = await runner.start('u1', spec);
-    await done;
+    const { job } = await runner.start('u1', spec);
+    await runner.idle();
     expect((await repo.get(job.id))?.status).toBe('failed');
     expect(completed).toHaveLength(1);
     expect(completed[0]!.status).toBe('failed');
@@ -60,8 +60,8 @@ describe('JobRunner', () => {
         yield { type: 'done' };
       },
     });
-    const { job, done } = await runner.start('u1', spec);
-    await done;
+    const { job } = await runner.start('u1', spec);
+    await runner.idle();
     expect(job.status).toBe('failed');
     expect((await repo.get('jq'))?.error).toContain('quota');
     expect(resolved).toBe(false); // the orchestrator never ran
@@ -71,8 +71,9 @@ describe('JobRunner', () => {
     const repo = new InMemoryJobRepository();
     let n = 0;
     const runner = new JobRunner({ repo, idGen: () => `j${n++}`, resolve: async function* () { yield { type: 'done' }; } });
-    await (await runner.start('u1', spec)).done;
-    await (await runner.start('u2', spec)).done;
+    await runner.start('u1', spec);
+    await runner.start('u2', spec);
+    await runner.idle();
     expect((await repo.list('u1')).length).toBe(1);
   });
 });

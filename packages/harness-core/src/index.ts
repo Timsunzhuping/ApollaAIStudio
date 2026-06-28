@@ -74,6 +74,8 @@ export type { NotificationRepository, NotificationDelivery, NotifyDeps } from '.
 export { JobRunner } from './jobs/runner';
 export type { JobRunnerDeps } from './jobs/runner';
 export type { JobRepository, JobResolver } from './jobs/types';
+export { InProcessJobQueue } from './jobs/queue';
+export type { JobQueue, JobHandler } from './jobs/queue';
 export { Scheduler } from './schedule/scheduler';
 export type { ScheduledTaskRepository, SchedulerDeps } from './schedule/scheduler';
 export { cronMatches, nextRun } from './schedule/cron';

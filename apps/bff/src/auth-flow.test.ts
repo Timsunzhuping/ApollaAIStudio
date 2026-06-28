@@ -80,7 +80,7 @@ describe('auth + isolation (HTTP)', () => {
     const b = await register();
     const aId = ((await (await fetch(`${base}/api/auth/me`, authed(a))).json()) as { id: string }).id;
     // Seed a terminal job owned by A directly (avoids spawning a background runner in tests).
-    await harness.jobRepo.create({ id: 'idor-job-1', ownerId: aId, kind: 'research', input: {}, status: 'done' });
+    await harness.jobRepo.create({ id: 'idor-job-1', ownerId: aId, kind: 'research', input: {}, allowTools: [], status: 'done' });
     expect((await fetch(`${base}/api/jobs/idor-job-1`, authed(b))).status).toBe(404);
     expect((await fetch(`${base}/api/jobs/idor-job-1`, authed(a))).status).toBe(200);
   });

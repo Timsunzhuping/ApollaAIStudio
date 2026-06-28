@@ -3,7 +3,7 @@ import type { Job } from '@apolla/contracts';
 import { notifyJobComplete, StubDelivery } from './notify';
 import { InMemoryNotificationRepository } from '../repo/memory';
 
-const job = (status: Job['status']): Job => ({ id: 'j1', ownerId: 'u1', kind: 'research', input: {}, status, error: status === 'failed' ? 'boom' : undefined });
+const job = (status: Job['status']): Job => ({ id: 'j1', ownerId: 'u1', kind: 'research', input: {}, allowTools: [], status, error: status === 'failed' ? 'boom' : undefined });
 
 describe('notifyJobComplete', () => {
   it('creates an in-app notification and delivers out-of-band on success', async () => {

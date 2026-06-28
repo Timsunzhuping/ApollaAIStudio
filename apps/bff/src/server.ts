@@ -13,6 +13,8 @@ import { z } from 'zod';
 import { CollabOp, AccountBundle } from '@apolla/contracts';
 import { buildAccountBundle, importBundle } from './account';
 import { isAdmin } from './admin';
+import { enforceConfigOrExit } from './config';
+import { VERSION, versionInfo } from './version';
 import { applySecurityHeaders, applyCors, clientIp, limiters, isExpensive, MAX_BODY_BYTES } from './security';
 import { observe, metrics, type ObservedResponse } from './obs';
 import { reconcileJobs, withSpanContext, McpServer, type JsonRpcRequest } from '@apolla/harness-core';
@@ -304,12 +306,27 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
   if (method === 'GET' && pathname === '/api/health') {
     return json(res, 200, {
       ok: true,
+      version: VERSION,
       mode: harness.mode,
       persistence: harness.persistence,
       jobQueue: harness.jobQueue.inProcess ? 'in-process' : 'distributed',
       tracing: process.env.OTEL_EXPORTER_OTLP_ENDPOINT ? 'otel' : 'noop',
       features: { auto_skill_write: harness.features.enabled('auto_skill_write') },
     });
+  }
+  // Public build info — version + mode only, never secrets/connection strings (S24).
+  if (method === 'GET' && pathname === '/api/version') {
+    return json(res, 200, { ...versionInfo(), mode: harness.mode, persistence: harness.persistence });
+  }
+  // Readiness probe for load balancers / k8s — pings the DB in Postgres mode (S24).
+  if (method === 'GET' && pathname === '/api/ready') {
+    if (!harness.ping) return json(res, 200, { ready: true });
+    try {
+      await harness.ping();
+      return json(res, 200, { ready: true });
+    } catch {
+      return json(res, 503, { ready: false, error: 'not ready' });
+    }
   }
 
   // --- Auth ---
@@ -1296,6 +1313,7 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
 
 // Entry point — skipped under vitest so tests can import { handle, setHarness } without listening.
 if (!process.env.VITEST) {
+  enforceConfigOrExit('bff'); // S24: fail fast on insecure production config before doing anything.
   const built = await buildHarness();
   setHarness(built);
   // In distributed mode (Redis queue) the standalone worker owns reconciliation + scheduling; the

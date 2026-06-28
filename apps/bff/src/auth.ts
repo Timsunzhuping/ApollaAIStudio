@@ -2,7 +2,9 @@ import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { verifyPassword, parseApiToken, type SessionRepository, type ApiTokenRepository } from '@apolla/harness-core';
 
-const SECRET = process.env.SESSION_SECRET ?? 'dev-insecure-secret-change-me';
+/** The insecure dev fallback — config validation (S24) rejects this in production. */
+export const DEV_SESSION_SECRET = 'dev-insecure-secret-change-me';
+const SECRET = process.env.SESSION_SECRET ?? DEV_SESSION_SECRET;
 const COOKIE = 'apolla_session';
 const TTL_MS = Number(process.env.SESSION_TTL_MS ?? 1000 * 60 * 60 * 24 * 30); // 30d
 const IS_PROD = process.env.NODE_ENV === 'production';

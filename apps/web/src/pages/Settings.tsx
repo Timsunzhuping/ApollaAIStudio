@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
-import { Card, Field } from '../components/ui';
+import { useAuth } from '../lib/auth';
+import { Card, Field, ErrorMsg } from '../components/ui';
 
 export function Settings() {
   const [language, setLanguage] = useState('');
@@ -49,6 +50,36 @@ export function Settings() {
     void api.me().then((u) => { setIdentities(u.identities ?? []); setMfaEnabled(u.mfaEnabled ?? false); }).catch(() => {});
     void api.mcpManifest().then((m) => setMcpTools(m.tools ?? [])).catch(() => {});
   }, []);
+
+  // Your data (S22): export / import / delete account
+  const { logout, user } = useAuth();
+  const [importMsg, setImportMsg] = useState<string | null>(null);
+  const [dangerOpen, setDangerOpen] = useState(false);
+  const [confirmEmail, setConfirmEmail] = useState('');
+  const [delError, setDelError] = useState<string | null>(null);
+  const exportData = async () => {
+    const bundle = await api.accountExport();
+    const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'apolla-account-export.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+  const importData = async (file: File) => {
+    setImportMsg(null);
+    try {
+      const c = await api.accountImport(JSON.parse(await file.text()));
+      setImportMsg(`Imported ${c.projects} projects, ${c.skills} skills, ${c.workspace} files.`);
+    } catch {
+      setImportMsg('Import failed — not a valid export file.');
+    }
+  };
+  const deleteAccount = async () => {
+    setDelError(null);
+    try { await api.accountDelete(confirmEmail.trim()); await logout(); }
+    catch (e) { setDelError(e instanceof Error ? e.message : 'deletion failed'); }
+  };
 
   const mcpUrl = `${window.location.origin}/api/mcp`;
 
@@ -131,6 +162,42 @@ export function Settings() {
       <Card title="Memory">
         <span className="muted">Clear all remembered notes for your account.</span>
         <div><button className="ghost" onClick={() => void api.clearMemory()}>Clear memory</button></div>
+      </Card>
+
+      <Card title="Your data">
+        <span className="muted">Download a copy of your data, restore it from a previous export, or permanently delete your account.</span>
+        <div className="row">
+          <button onClick={() => void exportData()} data-testid="export-data">⬇ Export my data</button>
+          <label className="button ghost" style={{ cursor: 'pointer' }}>
+            ⬆ Import
+            <input
+              type="file"
+              accept="application/json"
+              data-testid="import-data"
+              style={{ display: 'none' }}
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) void importData(f); }}
+            />
+          </label>
+        </div>
+        {importMsg && <span className="muted" data-testid="import-msg">{importMsg}</span>}
+
+        <div className="danger-zone" style={{ marginTop: '1rem', borderTop: '1px solid var(--border)', paddingTop: '0.75rem' }}>
+          {!dangerOpen ? (
+            <button className="ghost" data-testid="delete-open" onClick={() => setDangerOpen(true)}>Delete account…</button>
+          ) : (
+            <div className="col">
+              <span className="muted">This permanently deletes your account and all data. Type your email <strong>{user?.email}</strong> to confirm.</span>
+              <Field label="Confirm email">
+                <input value={confirmEmail} data-testid="delete-confirm" onChange={(e) => setConfirmEmail(e.target.value)} placeholder="you@example.com" />
+              </Field>
+              <div className="row">
+                <button className="danger" data-testid="delete-submit" onClick={() => void deleteAccount()}>Permanently delete</button>
+                <button className="ghost" onClick={() => { setDangerOpen(false); setConfirmEmail(''); setDelError(null); }}>Cancel</button>
+              </div>
+              {delError && <ErrorMsg>{delError}</ErrorMsg>}
+            </div>
+          )}
+        </div>
       </Card>
     </div>
   );

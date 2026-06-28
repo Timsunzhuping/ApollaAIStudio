@@ -284,6 +284,13 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
     return;
   }
 
+  // MCP tool catalog (S18) — public discovery (names/descriptions only, no secrets); the Settings
+  // page renders it + connection instructions. Calling tools still requires an API token.
+  if (method === 'GET' && pathname === '/api/mcp/manifest') {
+    mcpServer ??= new McpServer(buildCapabilityTools(harness));
+    return json(res, 200, { endpoint: '/api/mcp', protocol: 'mcp/2024-11-05', tools: mcpServer.list().map((t) => ({ name: t.name, description: t.description })) });
+  }
+
   if (method === 'GET' && pathname === '/api/health') {
     return json(res, 200, {
       ok: true,

@@ -10,6 +10,9 @@ export function Settings() {
   // Linked sign-in identities (S14)
   const [identities, setIdentities] = useState<{ provider: string }[]>([]);
 
+  // MCP server: expose Apolla's capabilities to MCP clients (S18)
+  const [mcpTools, setMcpTools] = useState<{ name: string; description: string }[]>([]);
+
   // API tokens (browser extension / CLI)
   const [tokens, setTokens] = useState<{ id: string; name: string }[]>([]);
   const [tokenName, setTokenName] = useState('');
@@ -29,7 +32,10 @@ export function Settings() {
     }).catch(() => {});
     void loadTokens();
     void api.me().then((u) => setIdentities(u.identities ?? [])).catch(() => {});
+    void api.mcpManifest().then((m) => setMcpTools(m.tools ?? [])).catch(() => {});
   }, []);
+
+  const mcpUrl = `${window.location.origin}/api/mcp`;
 
   const save = async () => {
     await api.setMemoryModel({ language, style });
@@ -56,8 +62,16 @@ export function Settings() {
           <div className="row">{identities.map((i) => <span key={i.provider} className="badge">{i.provider}</span>)}</div>
         )}
       </Card>
+      <Card title="MCP server">
+        <span className="muted">Connect Apolla to any MCP client (Claude Desktop, Cursor, …) with an API token — your research, translate, and skills become callable tools.</span>
+        <Field label="Endpoint"><input readOnly value={mcpUrl} /></Field>
+        {mcpTools.length > 0 && (
+          <div className="row" style={{ flexWrap: 'wrap' }}>{mcpTools.map((t) => <span key={t.name} className="badge" title={t.description}>{t.name}</span>)}</div>
+        )}
+        <pre className="muted" style={{ whiteSpace: 'pre-wrap', fontSize: '0.8em' }}>{JSON.stringify({ mcpServers: { apolla: { url: mcpUrl, headers: { Authorization: 'Bearer <your API token>' } } } }, null, 2)}</pre>
+      </Card>
       <Card title="API tokens">
-        <span className="muted">For the browser extension / CLI. The token is shown once — copy it now.</span>
+        <span className="muted">For the browser extension / CLI / MCP. The token is shown once — copy it now.</span>
         <div className="row">
           <input placeholder="token name (e.g. browser extension)" value={tokenName} onChange={(e) => setTokenName(e.target.value)} />
           <button onClick={() => void createToken()}>Create token</button>

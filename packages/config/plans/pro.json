@@ -1,0 +1,1 @@
+{ "id": "pro", "name": "Pro", "taskLimit": 100000, "features": ["research", "surfaces", "workspace", "cowork", "media", "connectors"], "priceUsd": 20 }

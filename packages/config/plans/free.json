@@ -1,0 +1,1 @@
+{ "id": "free", "name": "Free", "taskLimit": 50, "features": ["research", "surfaces", "workspace"], "priceUsd": 0 }

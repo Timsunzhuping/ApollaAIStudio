@@ -1,0 +1,1 @@
+{ "id": "team", "name": "Team", "taskLimit": 1000000, "features": ["research", "surfaces", "workspace", "cowork", "media", "connectors", "plugins"], "priceUsd": 60 }

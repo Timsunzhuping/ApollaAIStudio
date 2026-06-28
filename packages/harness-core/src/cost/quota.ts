@@ -20,11 +20,12 @@ export interface QuotaStatus {
 export class Quota {
   constructor(
     private readonly countTasks: (ownerId: string) => Promise<number>,
-    private readonly planOf: (ownerId: string) => Plan = () => PLANS.free!,
+    // Resolve the owner's plan — may read their subscription (async) for billing entitlements (S13).
+    private readonly planOf: (ownerId: string) => Plan | Promise<Plan> = () => PLANS.free!,
   ) {}
 
   async check(ownerId: string): Promise<QuotaStatus> {
-    const plan = this.planOf(ownerId);
+    const plan = await this.planOf(ownerId);
     const used = await this.countTasks(ownerId);
     return { ok: used < plan.taskLimit, used, limit: plan.taskLimit, plan: plan.name };
   }

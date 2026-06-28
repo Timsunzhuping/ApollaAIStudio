@@ -1,5 +1,6 @@
 export * from './api-token';
 export * from './audit';
+export * from './billing';
 export * from './common';
 export * from './connector';
 export * from './catalog';

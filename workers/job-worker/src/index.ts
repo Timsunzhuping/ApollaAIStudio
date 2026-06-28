@@ -1,5 +1,6 @@
 import { createServer } from 'node:http';
 import { buildHarness } from '@apolla/bff/harness';
+import { enforceConfigOrExit } from '@apolla/bff/config';
 import { reconcileJobs } from '@apolla/harness-core';
 
 /**
@@ -9,6 +10,7 @@ import { reconcileJobs } from '@apolla/harness-core';
  * self-executes, so this worker is only meaningful with a shared (Redis) queue.
  */
 async function main(): Promise<void> {
+  enforceConfigOrExit('worker'); // S24: fail fast on insecure production config.
   const h = await buildHarness();
 
   // Own execution: consume the queue.

@@ -162,6 +162,8 @@ export interface Harness {
   purgeOwner?: (ownerId: string) => Promise<void>;
   /** Operator-console aggregations (S23). Present only with a real database. */
   admin?: AdminApi;
+  /** Readiness check (S24): pings the database. Present only with a real database. */
+  ping?: () => Promise<void>;
   plans: () => import('@apolla/contracts').PlanDef[];
   identities: IdentityRepository;
   authProviders: Map<string, AuthProvider>;
@@ -258,6 +260,7 @@ export async function buildHarness(): Promise<Harness> {
   let close = async (): Promise<void> => {};
   let purgeOwner: Harness['purgeOwner'];
   let admin: Harness['admin'];
+  let ping: Harness['ping'];
 
   if (process.env.DATABASE_URL) {
     const sql = createSql();
@@ -298,6 +301,7 @@ export async function buildHarness(): Promise<Harness> {
       });
     };
     admin = buildAdminApi(sql);
+    ping = async () => { await sql`SELECT 1`; };
   } else {
     repo = new InMemoryTaskRepository();
     users = new InMemoryUserRepository();
@@ -526,6 +530,7 @@ export async function buildHarness(): Promise<Harness> {
     collabAccess,
     purgeOwner,
     admin,
+    ping,
     plans: loadPlans,
     identities,
     // Identity providers: stub always (offline default); real providers when env-keyed (缺 key 不注册).

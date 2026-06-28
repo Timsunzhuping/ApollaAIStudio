@@ -72,6 +72,8 @@ flowchart TB
 
 **前端触点层（Sprint 09，已落地 Web App）**：`apps/web`（Vite + React + TS SPA）是面向用户的生产前端——纯 API 客户端，通过类型化客户端 + SSE hook 消费 BFF 的 HTTP/SSE 接口，**不旁路 BFF、不直连模型/库、不持密钥**（鉴权走会话 cookie），Markdown 安全渲染。BFF（`apps/bff`，刻意独立的 Node 服务）仍是唯一后端与组合根；其内联工作台保留为零配置兜底。SSR/营销站、桌面宿主、移动端为后续触点。
 
+**数据权利闭环 / 账号生命周期（Sprint 22，已落地）**：导出 / 删除 / 导入。**导出**:`buildAccountBundle(harness, ownerId)` 跨所有 owner-keyed 仓库聚合该用户数据 → `AccountBundle`(`contracts`),**剔除全部 secret**(连接器 `secrets` 置空,不读密码/TOTP/token)。**删除**:`harness.purgeOwner(ownerId)` 单事务级联 `DELETE … WHERE owner_id`(owner-keyed 表)/`WHERE user_id`(身份表)+ users 行,**不可逆**(仅 Postgres);`POST /api/account/delete` 需**再输邮箱**确认(不符 401)→ purge + 注销会话。**导入**:`importBundle` 把包内每行**重写 ownerId 为当前用户** + 新建 id,**绝不按包内 ownerId 写**(防越权/覆盖他人)、不导 secret/不导可自执行的计划。`GET /api/account/export`(附件)/`POST /api/account/import`(zod 校验)均 owner-scoped + 审计。`buildAccountBundle`/`importBundle` 仅 `import type Harness`(运行时不拉 harness),故 eval 用内存仓库离线跑。
+
 **实时协同编辑（Sprint 21，已落地）**：单人 → 多人。**RGA 文本 CRDT**（`replica:counter` 元素 id、insert-after + 墓碑删除、并发同位插入按 id 全序确定排序）——状态是 op **集合**的纯函数，**任意顺序应用必收敛**，故经无序/至少一次通道同步即正确。`CollabSession`（CRDT + append-only op 日志 + `opsSince(cursor)` + presence + snapshot/restore）。同步**复用既有 SSE/HTTP**（无 WebSocket）：`POST /api/collab/:docId/ops` 上行、`GET …/events` 下行 SSE（推自 cursor 起的新 op + presence、心跳、断线即停），`GET /api/collab/:docId` 拉取快照。**分享/访问**：owner `POST …/share` → **签名、限该 docId、限时**的 share-link，`POST /api/collab/share/accept` 验签 → 授权；`CollabAccessRepository`（内存 + Postgres）；每个端点 **fail-closed**（已存在文档需 owner 或被授权）。**远端 op 是数据**（只 mutate CRDT，绝不触发动作）；文档内容 untrusted。纯 CRDT 经 `@apolla/harness-core/collab` 子路径供前端用（不把服务端 harness 带进浏览器包）。
 
 **账号安全 / MFA + 无密码（Sprint 20，已落地）**：补全鉴权——密码（S10）→ OAuth（S14）→ **第二因子 + 无密码（S20）**，全建在既有原语上（签名会话、scrypt、`SECRETS_KEY` 加密、投递抽象），确定性可离线测（注入时钟 + Stub 投递）。**MFA（TOTP，RFC 6238）**：enroll→verify 确认；`users` 存**加密 TOTP secret** + **scrypt 哈希备份码** + `mfa_enabled`。**登录 step-up**：密码通过 + 启用 MFA → 发**域隔离的短时签名 pending 凭证**（绝不能被当作会话/魔法链接复用——这是 step-up **fail-closed** 的关键），`/api/auth/mfa/login` 验 TOTP 或单次备份码后才 `startSession`。**魔法链接**：`newMagicToken`(签名+exp+单次 jti) / `verifyMagicToken` + `MagicLinkRepository`(单次态)，请求**恒 200**(枚举安全)、`NotificationDelivery` 投递(Stub/真实邮件)。所有鉴权端点限流 + 审计；secret/码/token 不入日志。
@@ -287,6 +289,7 @@ interface Orchestrator {
 | 把一个能力暴露为 MCP 工具（Sprint 18）| `defineTool`（zod 入参 + owner-scoped handler + readOnly）注册到 `McpServer`| mcp-server-contract + owner-scoped/鉴权 + dogfood 对环 |
 | 接入语音后端（Sprint 19）| 实现 `SpeechProvider`（transcribe/synthesize，Stub/OpenAI，`OPENAI_API_KEY` 门控）| speech-round-trip + 端点 owner-scoped/限制/审计 |
 | 加一个协同文档类型（Sprint 21）| 用 RGA CRDT op + `CollabSession`，经 SSE op 同步 + 访问检查 | collab-convergence + 两客户端同步 + 访问 fail-closed |
+| 加一类可导出/导入的数据（Sprint 22）| 在 `buildAccountBundle`/`importBundle` 加该仓库(脱敏 + 重写 ownerId)，并入 `purgeOwner` 表清单 | account-data-lifecycle(无 secret + 重写 owner)+ 删除级联 + 跨租户隔离 |
 | 新增套餐 / 调整权益（Sprint 13）| 加 `config/plans/*.json`（`taskLimit`+`features`），零业务代码 | 权益解析 + 套餐门禁回归 |
 | 模型变强后退役脚手架 | 关闭对应 `FeatureGate.scaffold` 开关；探针确认 `caps` 达标 | 回归无退化 |
 | 新增 Plugin（Cowork）| 声明 Skills+连接器+命令+子代理 捆绑 + 权限清单 | 安装授权流 + 安全 eval |

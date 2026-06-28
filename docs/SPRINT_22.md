@@ -64,13 +64,15 @@
 - **做**：README/ARCHITECTURE(数据生命周期 + 安全语义)/CLAUDE/AGENTS(数据铁律)/DoD 勾选。
 
 ## Sprint 22 DoD
-- [ ] 导出聚合器 + `AccountBundle` 契约(脱敏,无 secret)。
-- [ ] 删除级联 `purgeOwner`(全表 + 会话,不可逆)。
-- [ ] 导出/删除/导入端点,owner-scoped + 确认 + 审计。
-- [ ] 导入重写 ownerId 为当前用户,不导 secret/不提权。
-- [ ] 设置页导出/导入/删除 UI。
-- [ ] `pnpm test`+`test:web`+`e2e` 全绿 hermetic。
-- [ ] 文档更新。
+- [x] 导出聚合器 + `AccountBundle` 契约(脱敏,无 secret)。
+- [x] 删除级联 `purgeOwner`(全表 + 会话,不可逆)。
+- [x] 导出/删除/导入端点,owner-scoped + 确认 + 审计。
+- [x] 导入重写 ownerId 为当前用户,不导 secret/不提权。
+- [x] 设置页导出/导入/删除 UI。
+- [x] `pnpm test`+`test:web`+`e2e` 全绿 hermetic。
+- [x] 文档更新。
+
+> **Sprint 22 完成**（PR [#121](https://github.com/Timsunzhuping/ApollaAIStudio/pull/121) A · [#122](https://github.com/Timsunzhuping/ApollaAIStudio/pull/122) B · [#123](https://github.com/Timsunzhuping/ApollaAIStudio/pull/123) C · D 本次）。数据权利闭环:**导出** `buildAccountBundle` 跨 owner-keyed 仓库聚合(项目/技能/工作区含内容/计划/通知/插件/连接器/任务/用户模型),连接器密钥置空、密码/TOTP/token 不读不导;**删除** `harness.purgeOwner` 单事务级联清全部 owner-keyed 表 + 身份表 + users 行,`POST /api/account/delete` 需再输邮箱确认 → purge + 注销会话(不可逆,仅 PG);**导入** `importBundle` 重写 ownerId 为当前用户 + 新建 id(项目/技能/工作区/用户模型),绝不冒充原 owner、不导 secret/计划。端点 `GET /api/account/export`(附件)/`POST /api/account/import`(zod)owner-scoped + 审计。设置页"你的数据"(导出下载 / 导入 / 删除危险区)。新增 eval `account-data-lifecycle`(44 total)。329 root + 30 web + 9 e2e 绿。加密导出包 / 团队迁移 / 删除宽限窗口列为后续。
 
 ## 风险与提示
 - **secret 零导出**：导出包过白名单/剔除 secret(连接器密钥、密码哈希、TOTP、token);测试断言无 secret。

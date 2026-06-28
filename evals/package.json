@@ -9,6 +9,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@apolla/bff": "workspace:*",
     "@apolla/contracts": "workspace:*",
     "@apolla/harness-core": "workspace:*",
     "@apolla/mcp-stdio": "workspace:*",

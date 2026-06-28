@@ -6,7 +6,7 @@
 
 ## 状态
 
-**Sprint 01–15 完成** —— 从研究→成品骨架，升级为持久化、多用户、有记忆、技能可复用、多模态成品、工具生态与低风险执行（MCP + Agent + 分级确认 + 审计）、主动运行（定时 + 后台 Job + 通知）、Cowork 集成式自治、版本化文件区（+ Writer + Cowork 文件协作）、文本产品面（翻译/表格/会议纪要）、生产级 Web 前端、生产硬化与安全、开放工具生态（HTTP/SSE MCP + 连接器市场）、浏览器扩展（MV3 划词 + 侧边栏 + API token）、变现（可插拔支付 Provider + 套餐/权益 + Checkout/Webhook + 套餐门禁）、身份与注册（可插拔 OAuth/SSO：Google + GitHub + Stub，按邮箱归一账号）、端到端测试与发布就绪（Playwright 真实浏览器 e2e + BFF 单源托管 SPA + 部署 runbook）、规模与可靠性（可插拔任务队列：进程内默认 / Redis-BullMQ 分布式 + 独立 Worker 进程 + 重试/超时/优雅排空）、可观测性（可插拔 Tracer：Noop 默认 / OpenTelemetry + 跨进程链路追踪 Web→Worker + per-operation SLO）、开放能力供给（Apolla 作为 MCP Server：把研究/翻译/技能/工作区以 MCP 工具暴露给任意 MCP 客户端，API token 鉴权、owner-scoped、只读）、语音模态（可插拔 SpeechProvider：ASR + TTS，Stub 离线 / OpenAI，说话提问 + 朗读答案）、账号安全（MFA TOTP + 备份码 + 登录 step-up + 无密码魔法链接）、并完成 **实时协同编辑（CRDT 收敛 + SSE op 同步 + 文档分享）**的工作台。
+**Sprint 01–15 完成** —— 从研究→成品骨架，升级为持久化、多用户、有记忆、技能可复用、多模态成品、工具生态与低风险执行（MCP + Agent + 分级确认 + 审计）、主动运行（定时 + 后台 Job + 通知）、Cowork 集成式自治、版本化文件区（+ Writer + Cowork 文件协作）、文本产品面（翻译/表格/会议纪要）、生产级 Web 前端、生产硬化与安全、开放工具生态（HTTP/SSE MCP + 连接器市场）、浏览器扩展（MV3 划词 + 侧边栏 + API token）、变现（可插拔支付 Provider + 套餐/权益 + Checkout/Webhook + 套餐门禁）、身份与注册（可插拔 OAuth/SSO：Google + GitHub + Stub，按邮箱归一账号）、端到端测试与发布就绪（Playwright 真实浏览器 e2e + BFF 单源托管 SPA + 部署 runbook）、规模与可靠性（可插拔任务队列：进程内默认 / Redis-BullMQ 分布式 + 独立 Worker 进程 + 重试/超时/优雅排空）、可观测性（可插拔 Tracer：Noop 默认 / OpenTelemetry + 跨进程链路追踪 Web→Worker + per-operation SLO）、开放能力供给（Apolla 作为 MCP Server：把研究/翻译/技能/工作区以 MCP 工具暴露给任意 MCP 客户端，API token 鉴权、owner-scoped、只读）、语音模态（可插拔 SpeechProvider：ASR + TTS，Stub 离线 / OpenAI，说话提问 + 朗读答案）、账号安全（MFA TOTP + 备份码 + 登录 step-up + 无密码魔法链接）、实时协同编辑（CRDT 收敛 + SSE op 同步 + 文档分享）、并完成 **数据权利闭环（导出 / 删除账号 / 导入,owner-scoped + 脱敏）**的工作台。
 - **Harness Core**：Model Router（failover/多密钥）、Prompt Registry、Tool Runtime（Web Search）、Safety & Policy（三级权限 + 防注入）、Cost Ledger、研究状态机（流式综合）、FeatureGate 运行时。
 - **持久化与账号**：Postgres（接口的 PG 实现）、最小 Auth、Projects。
 - **个人化**：Memory（FTS 检索 + 用户模型 + 注入研究流）。
@@ -52,6 +52,8 @@ pnpm dev:web      # 终端 B：Web 前端（http://localhost:5173）
 **接真实模型/搜索/媒体**：复制 `.env.example` 为 `.env`，填 `OPENAI_API_KEY` + `ANTHROPIC_API_KEY`（LLM，`OPENAI_API_KEY` 同时用于文生图）、`TAVILY_API_KEY`（搜索）、`SEEDANCE_API_KEY` + `SEEDANCE_BASE_URL`（文生视频）。会话签名 `SESSION_SECRET`；本地媒体存储目录 `MEDIA_DIR`；连接器密钥加密 `SECRETS_KEY`；本地 MCP server 经连接器的 stdio transport 接入。无对应 key 时该模态/工具自动回退到确定性 stub。
 
 **变现 / 计费（Sprint 13）**：套餐声明在 `packages/config/plans/*.json`（free/pro/team：`taskLimit` + `features` + 价格），新增套餐无需改业务代码。支付走可插拔 **PaymentProvider**——默认 **Stub**（离线确定性，Checkout 立即激活，便于本地/CI 演示），配 `STRIPE_SECRET_KEY` 时切到 **Stripe**（托管 Checkout，无 SDK），`STRIPE_WEBHOOK_SECRET` 校验 Webhook 签名，`STRIPE_PRICE_<PLAN>`（如 `STRIPE_PRICE_PRO`）映射套餐→Stripe Price。**卡号永不经我方服务器**（provider 托管 Checkout，我方只存 `providerRef` + 订阅状态）；Webhook 必验签 + 幂等；权益解析失败回落 free。Web **Billing** 页查看当前套餐/用量、升级、取消；stub 模式可端到端演示升级→pro 权益解锁→取消回落。
+
+**数据权利闭环（Sprint 22）**：成熟 To-C 产品的数据生命周期。设置页"你的数据"——**导出**:一键把你的全部数据(项目/技能/工作区文件含内容/计划/通知/插件/连接器/任务/用户模型)打包成 JSON;**脱敏**——连接器密钥清空,密码哈希/TOTP/token 一律不读不导。**删除账号**:危险区二次确认(再输你的邮箱)→ **级联清除全部 owner-keyed 数据**(单事务)+ 注销会话 + 登出,**不可逆**。**导入**:选一个导出文件 → 数据**归到当前用户名下**(重写 ownerId + 新建 id,**绝不冒充原 owner、不导入密钥/权限**)。三者严格 owner-scoped、落审计。
 
 **实时协同编辑（Sprint 21）**：单人工作台 → **多人实时**。Collab 页打开/新建协同文档,基于 **RGA 文本 CRDT**(确定性收敛——并发编辑任意 op 顺序 → 同一文本),经**既有 SSE/HTTP** 实时同步(op 上行 POST、下行 SSE,**无 WebSocket**):一边打字另一边实时看到。文档可**分享**——owner 生成**签名、限该文档、限时**的 share-link,他人打开即获访问;**未分享者拒访问(fail-closed)**。能看到**谁在编辑**(presence)。**远端 op 是数据**(只改共享 CRDT,绝不触发动作);访问 owner/share 受控、限流、审计、追踪。(并发下光标可能跳动——已知限制。)
 

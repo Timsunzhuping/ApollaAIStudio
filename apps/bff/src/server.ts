@@ -8,7 +8,9 @@ import type { Connector, Subscription, WebhookEvent, PlanDef } from '@apolla/con
 import { hashPassword, verifyPassword, newApiToken } from '@apolla/harness-core';
 import { newTotpSecret, verifyTotp, otpauthUri, newRecoveryCodes, newMagicToken, verifyMagicToken } from '@apolla/harness-core';
 import { buildHarness, type Harness } from './harness';
-import { readSession, readBearer, startSession, endSession, mfaPendingToken, verifyMfaPending } from './auth';
+import { readSession, readBearer, startSession, endSession, mfaPendingToken, verifyMfaPending, shareToken, verifyShareToken } from './auth';
+import { z } from 'zod';
+import { CollabOp } from '@apolla/contracts';
 import { applySecurityHeaders, applyCors, clientIp, limiters, isExpensive, MAX_BODY_BYTES } from './security';
 import { observe, metrics, type ObservedResponse } from './obs';
 import { reconcileJobs, withSpanContext, McpServer, type JsonRpcRequest } from '@apolla/harness-core';
@@ -551,6 +553,64 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
     const { uri } = await harness.objectStore.put(`speech/${randomUUID()}.${ext}`, bytes, mime);
     await harness.audit.record({ id: randomUUID(), ownerId, taskId: 'speech', tool: 'speech.synthesize', risk: 'read', decision: 'allow', status: 'executed', summary: `synthesized ${text.length} chars` });
     return json(res, 200, { uri });
+  }
+
+  // --- Realtime collaboration (S21). Access is owner-or-shared, fail-closed. Ops are DATA (they only
+  // mutate the shared CRDT — they never trigger an action). Doc content is untrusted. ---
+  // Accept a share link → grant the current user access to that doc.
+  if (method === 'POST' && pathname === '/api/collab/share/accept') {
+    const body = await readBody(req);
+    const docId = verifyShareToken(String(body.token ?? ''));
+    if (!docId) return json(res, 401, { error: 'invalid or expired share link' });
+    await harness.collabAccess.grant(docId, ownerId);
+    await harness.audit.record({ id: randomUUID(), ownerId, taskId: 'collab', tool: 'collab.share-accept', risk: 'low_write', decision: 'allow', status: 'executed', summary: `granted access to ${docId}` });
+    return json(res, 200, { docId });
+  }
+  const collabMatch = pathname.match(/^\/api\/collab\/([^/]+)(\/ops|\/events|\/share)?$/);
+  if (collabMatch) {
+    const docId = collabMatch[1]!;
+    const sub = collabMatch[2];
+    const existing = harness.collab.get(docId);
+    // Access: an existing doc requires owner or a grant; a non-existent doc can be created by anyone.
+    if (existing && existing.ownerId !== ownerId && !(await harness.collabAccess.has(docId, ownerId))) {
+      return json(res, 403, { error: 'no access to this document' });
+    }
+    const doc = harness.collab.getOrCreate(docId, ownerId);
+
+    if (method === 'POST' && sub === '/ops') {
+      const body = await readBody(req);
+      const parsed = z.array(CollabOp).safeParse(body.ops);
+      if (!parsed.success) return json(res, 400, { error: 'invalid ops' });
+      return json(res, 200, doc.session.applyOps(parsed.data));
+    }
+    if (method === 'POST' && sub === '/share') {
+      if (doc.ownerId !== ownerId) return json(res, 403, { error: 'only the owner can share' });
+      const token = shareToken(docId);
+      const proto = (req.headers['x-forwarded-proto'] as string) ?? 'http';
+      const link = `${proto}://${req.headers.host}/collab/accept?token=${encodeURIComponent(token)}`;
+      await harness.audit.record({ id: randomUUID(), ownerId, taskId: 'collab', tool: 'collab.share', risk: 'low_write', decision: 'allow', status: 'executed', summary: `shared ${docId}` });
+      return json(res, 200, { token, link });
+    }
+    if (method === 'GET' && sub === '/events') {
+      res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
+      let open = true;
+      req.on('close', () => { open = false; });
+      let cursor = Number(url.searchParams.get('since') ?? 0);
+      while (open) {
+        doc.session.join(ownerId); // presence heartbeat
+        const ops = doc.session.opsSince(cursor);
+        if (ops.length) cursor = doc.session.seq;
+        res.write(`data: ${JSON.stringify({ ops, seq: cursor, participants: doc.session.participants() })}\n\n`);
+        await sleep(500);
+      }
+      res.end();
+      return;
+    }
+    if (method === 'GET' && !sub) {
+      doc.session.join(ownerId);
+      const since = Number(url.searchParams.get('since') ?? 0);
+      return json(res, 200, { docId, ownerId: doc.ownerId, text: doc.session.text(), seq: doc.session.seq, ops: doc.session.opsSince(since), participants: doc.session.participants() });
+    }
   }
 
   // --- API tokens (S12): cross-origin auth for the extension / CLI ---

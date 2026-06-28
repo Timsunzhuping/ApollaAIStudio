@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { User, Project, SkillDef, Session, ApiToken, Subscription, OAuthIdentity, type User as UserT, type Project as ProjectT, type SkillDef as SkillDefT, type Session as SessionT, type ApiToken as ApiTokenT, type Subscription as SubscriptionT, type OAuthIdentity as OAuthIdentityT } from '@apolla/contracts';
-import type { UserRepository, ProjectRepository, SkillRepository, SessionRepository, ApiTokenRepository, SubscriptionRepository, IdentityRepository, MagicLinkRepository, MfaRecord } from '@apolla/harness-core';
+import type { UserRepository, ProjectRepository, SkillRepository, SessionRepository, ApiTokenRepository, SubscriptionRepository, IdentityRepository, MagicLinkRepository, MfaRecord, CollabAccessRepository } from '@apolla/harness-core';
 import type { Sql } from './index';
 
 export class PostgresUserRepository implements UserRepository {
@@ -209,5 +209,21 @@ export class PostgresMagicLinkRepository implements MagicLinkRepository {
       INSERT INTO magic_links (jti) VALUES (${jti}) ON CONFLICT (jti) DO NOTHING RETURNING jti
     `;
     return rows.length > 0;
+  }
+}
+
+export class PostgresCollabAccessRepository implements CollabAccessRepository {
+  constructor(private readonly sql: Sql) {}
+
+  async grant(docId: string, userId: string): Promise<void> {
+    await this.sql`INSERT INTO collab_access (doc_id, user_id) VALUES (${docId}, ${userId}) ON CONFLICT DO NOTHING`;
+  }
+  async has(docId: string, userId: string): Promise<boolean> {
+    const rows = await this.sql<{ user_id: string }[]>`SELECT user_id FROM collab_access WHERE doc_id = ${docId} AND user_id = ${userId}`;
+    return rows.length > 0;
+  }
+  async list(docId: string): Promise<string[]> {
+    const rows = await this.sql<{ user_id: string }[]>`SELECT user_id FROM collab_access WHERE doc_id = ${docId}`;
+    return rows.map((r) => r.user_id);
   }
 }

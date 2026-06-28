@@ -92,6 +92,30 @@ export function verifyMfaPending(token: string | undefined): string | null {
   }
 }
 
+const SHARE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+/** A signed collab share token, scoped to ONE docId (S21). Domain-separated ('share:' prefix). */
+export function shareToken(docId: string): string {
+  const payload = Buffer.from(JSON.stringify({ p: 'share', docId, exp: Date.now() + SHARE_TTL_MS })).toString('base64url');
+  const mac = createHmac('sha256', SECRET).update(`share:${payload}`).digest('base64url');
+  return `${payload}.${mac}`;
+}
+export function verifyShareToken(token: string | undefined): string | null {
+  if (!token) return null;
+  const [payload, mac] = token.split('.');
+  if (!payload || !mac) return null;
+  const expected = createHmac('sha256', SECRET).update(`share:${payload}`).digest('base64url');
+  const a = Buffer.from(mac);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+  try {
+    const d = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as { p?: string; docId?: string; exp?: number };
+    if (d.p !== 'share' || !d.docId || !d.exp || d.exp <= Date.now()) return null;
+    return d.docId;
+  } catch {
+    return null;
+  }
+}
+
 /** Invalidate the current session server-side and clear the cookie. */
 export async function endSession(req: IncomingMessage, res: ServerResponse, sessions: SessionRepository): Promise<void> {
   const id = unsign(cookieValue(req));

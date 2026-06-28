@@ -8,6 +8,7 @@ packages:
   - 'packages/adapters/payment/*'
   - 'packages/adapters/auth/*'
   - 'packages/adapters/queue/*'
+  - 'packages/adapters/otel'
   - 'packages/adapters/mcp'
   - 'apps/*'
   - 'workers/*'

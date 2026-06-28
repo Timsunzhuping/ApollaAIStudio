@@ -13,6 +13,21 @@ export function Settings() {
   // MCP server: expose Apolla's capabilities to MCP clients (S18)
   const [mcpTools, setMcpTools] = useState<{ name: string; description: string }[]>([]);
 
+  // Two-factor authentication (S20)
+  const [mfaEnabled, setMfaEnabled] = useState(false);
+  const [enroll, setEnroll] = useState<{ secret: string; otpauthUri: string; recoveryCodes: string[] } | null>(null);
+  const [mfaCode, setMfaCode] = useState('');
+  const [mfaError, setMfaError] = useState<string | null>(null);
+  const startEnroll = async () => { setMfaError(null); setEnroll(await api.mfaEnroll()); };
+  const confirmEnroll = async () => {
+    try { await api.mfaVerify(mfaCode.trim()); setMfaEnabled(true); setEnroll(null); setMfaCode(''); }
+    catch (e) { setMfaError(e instanceof Error ? e.message : 'invalid code'); }
+  };
+  const disableMfa = async () => {
+    try { await api.mfaDisable(mfaCode.trim()); setMfaEnabled(false); setMfaCode(''); }
+    catch (e) { setMfaError(e instanceof Error ? e.message : 'invalid code'); }
+  };
+
   // API tokens (browser extension / CLI)
   const [tokens, setTokens] = useState<{ id: string; name: string }[]>([]);
   const [tokenName, setTokenName] = useState('');
@@ -31,7 +46,7 @@ export function Settings() {
       setStyle(String((m as { style?: string }).style ?? ''));
     }).catch(() => {});
     void loadTokens();
-    void api.me().then((u) => setIdentities(u.identities ?? [])).catch(() => {});
+    void api.me().then((u) => { setIdentities(u.identities ?? []); setMfaEnabled(u.mfaEnabled ?? false); }).catch(() => {});
     void api.mcpManifest().then((m) => setMcpTools(m.tools ?? [])).catch(() => {});
   }, []);
 
@@ -53,6 +68,35 @@ export function Settings() {
           <button onClick={() => void save()}>Save preferences</button>
           {saved && <span className="badge">✓ saved</span>}
         </div>
+      </Card>
+      <Card title="Two-factor authentication">
+        {mfaEnabled ? (
+          <>
+            <div className="row"><span className="badge">✓ Enabled</span></div>
+            <span className="muted">Enter a current code to turn it off.</span>
+            <div className="row">
+              <input inputMode="numeric" placeholder="code" value={mfaCode} onChange={(e) => setMfaCode(e.target.value)} />
+              <button className="ghost" disabled={!mfaCode.trim()} onClick={() => void disableMfa()}>Disable</button>
+            </div>
+          </>
+        ) : enroll ? (
+          <>
+            <span className="muted">Scan this in your authenticator app, then enter a code to confirm.</span>
+            <Field label="Setup key (otpauth)"><input readOnly value={enroll.otpauthUri} /></Field>
+            <span className="muted">Backup codes (save these — shown once):</span>
+            <div className="row" style={{ flexWrap: 'wrap' }}>{enroll.recoveryCodes.map((c) => <span key={c} className="badge">{c}</span>)}</div>
+            <div className="row">
+              <input inputMode="numeric" placeholder="123456" value={mfaCode} onChange={(e) => setMfaCode(e.target.value)} />
+              <button disabled={!mfaCode.trim()} onClick={() => void confirmEnroll()}>Confirm</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <span className="muted">Add a second factor (TOTP authenticator app) to your account.</span>
+            <div className="row"><button onClick={() => void startEnroll()}>Enable two-factor</button></div>
+          </>
+        )}
+        {mfaError && <span className="muted" style={{ color: 'var(--danger, #c00)' }}>{mfaError}</span>}
       </Card>
       <Card title="Linked accounts">
         <span className="muted">Single sign-on identities connected to your account.</span>

@@ -14,6 +14,7 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "test:web": "pnpm --filter @apolla/web test",
+    "e2e": "pnpm --filter @apolla/web build && pnpm --filter @apolla/e2e test",
     "dev": "pnpm --filter @apolla/bff dev",
     "dev:web": "pnpm --filter @apolla/web dev",
     "eval": "pnpm --filter @apolla/evals eval",

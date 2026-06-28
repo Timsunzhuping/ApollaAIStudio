@@ -7,3 +7,8 @@ coverage/
 !.env.example
 .DS_Store
 .turbo/
+
+# Playwright e2e artifacts
+test-results/
+playwright-report/
+playwright/.cache/

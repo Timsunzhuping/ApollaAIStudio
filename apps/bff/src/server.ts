@@ -1,5 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { randomUUID } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
+import { extname, normalize, join } from 'node:path';
 import { exportArtifact, autoDraftSkill, embedMedia, encryptSecret, decryptSecret, inferRisk, AgentOrchestrator, nextRun, resolveEntitlements, hasFeature, newState, newPkce } from '@apolla/harness-core';
 import type { ResolvedIdentity } from '@apolla/harness-core';
 import type { Connector, Subscription, WebhookEvent, PlanDef } from '@apolla/contracts';
@@ -16,6 +18,38 @@ import { UI_HTML } from './ui';
 let harness: Harness;
 export function setHarness(h: Harness): void {
   harness = h;
+}
+
+// Single-origin SPA serving (S15): when WEB_DIST points at a built `apps/web/dist`, the BFF serves
+// the SPA + assets so the frontend is same-origin (cookies + SSE just work). Off when unset (the
+// inline UI_HTML + JSON-404 behavior is unchanged).
+const WEB_DIST = process.env.WEB_DIST;
+const MIME: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
+  '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.ico': 'image/x-icon',
+  '.json': 'application/json', '.woff2': 'font/woff2', '.woff': 'font/woff', '.map': 'application/json', '.webmanifest': 'application/manifest+json',
+};
+
+/** Resolve an existing file under WEB_DIST for `pathname` (path-traversal guarded), or null. */
+function spaFile(pathname: string): string | null {
+  if (!WEB_DIST) return null;
+  const rel = normalize(decodeURIComponent(pathname)).replace(/^(\.\.[/\\])+/, '').replace(/^[/\\]+/, '');
+  const abs = join(WEB_DIST, rel);
+  if (!abs.startsWith(WEB_DIST)) return null; // traversal guard
+  return existsSync(abs) && extname(abs) ? abs : null;
+}
+function sendFile(res: ServerResponse, abs: string): void {
+  res.writeHead(200, { 'content-type': MIME[extname(abs)] ?? 'application/octet-stream' });
+  res.end(readFileSync(abs));
+}
+/** Serve the SPA index.html (client-side routing fallback) if WEB_DIST is configured. */
+function sendSpaIndex(res: ServerResponse): boolean {
+  if (!WEB_DIST) return false;
+  const index = join(WEB_DIST, 'index.html');
+  if (!existsSync(index)) return false;
+  res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+  res.end(readFileSync(index));
+  return true;
 }
 
 // Production requires a password; demo mode keeps zero-config (email-only) login.
@@ -204,9 +238,17 @@ export async function handle(req: IncomingMessage, res: ServerResponse): Promise
   }
 
   if (method === 'GET' && pathname === '/') {
+    if (sendSpaIndex(res)) return; // single-origin SPA when WEB_DIST is set
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
     res.end(UI_HTML);
     return;
+  }
+  // SPA serving (public, before the auth gate): real assets (/assets/*, favicon) by path; any other
+  // non-API/non-media GET → index.html so client-side routes (/billing, /research) deep-link.
+  if (method === 'GET' && WEB_DIST) {
+    const file = spaFile(pathname);
+    if (file) return sendFile(res, file);
+    if (!pathname.startsWith('/api/') && !pathname.startsWith('/media/') && sendSpaIndex(res)) return;
   }
   // GET /media/:key — serve re-hosted media (public; uris are unguessable enough for the demo).
   if (method === 'GET' && pathname.startsWith('/media/')) {

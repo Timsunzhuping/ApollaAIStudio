@@ -75,6 +75,10 @@ export const api = {
   billing: () => http<BillingInfo>('GET', '/api/billing/subscription'),
   checkout: (plan: string) => http<{ url: string; activated: boolean }>('POST', '/api/billing/checkout', { plan }),
   cancelBilling: () => http<void>('POST', '/api/billing/cancel', {}),
+  // account data lifecycle (S22)
+  accountExport: () => http<Record<string, unknown>>('GET', '/api/account/export'),
+  accountDelete: (confirm: string) => http<{ deleted: boolean }>('POST', '/api/account/delete', { confirm }),
+  accountImport: (bundle: unknown) => http<{ projects: number; skills: number; workspace: number }>('POST', '/api/account/import', { bundle }),
   // collab (S21)
   collabGet: (docId: string, since = 0) => http<{ docId: string; ownerId: string; text: string; seq: number; ops: unknown[]; participants: string[] }>('GET', `/api/collab/${encodeURIComponent(docId)}?since=${since}`),
   collabPushOps: (docId: string, ops: unknown[]) => http<{ seq: number }>('POST', `/api/collab/${encodeURIComponent(docId)}/ops`, { ops }),

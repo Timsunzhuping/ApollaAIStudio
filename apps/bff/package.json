@@ -6,7 +6,8 @@
   "description": "Sprint 01 demo BFF: research→artifact API (SSE) + workspace UI. Composition root.",
   "exports": {
     ".": "./src/server.ts",
-    "./harness": "./src/harness.ts"
+    "./harness": "./src/harness.ts",
+    "./account": "./src/account.ts"
   },
   "scripts": {
     "dev": "tsx watch src/server.ts",

@@ -194,6 +194,9 @@ importers:
 
   evals:
     dependencies:
+      '@apolla/bff':
+        specifier: workspace:*
+        version: link:../apps/bff
       '@apolla/contracts':
         specifier: workspace:*
         version: link:../packages/contracts

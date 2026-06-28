@@ -197,6 +197,9 @@ importers:
       '@apolla/mcp-stdio':
         specifier: workspace:*
         version: link:../packages/adapters/mcp
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
     devDependencies:
       tsx:
         specifier: ^4.19.2

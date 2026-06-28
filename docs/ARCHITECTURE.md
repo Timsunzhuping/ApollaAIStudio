@@ -72,6 +72,8 @@ flowchart TB
 
 **前端触点层（Sprint 09，已落地 Web App）**：`apps/web`（Vite + React + TS SPA）是面向用户的生产前端——纯 API 客户端，通过类型化客户端 + SSE hook 消费 BFF 的 HTTP/SSE 接口，**不旁路 BFF、不直连模型/库、不持密钥**（鉴权走会话 cookie），Markdown 安全渲染。BFF（`apps/bff`，刻意独立的 Node 服务）仍是唯一后端与组合根；其内联工作台保留为零配置兜底。SSR/营销站、桌面宿主、移动端为后续触点。
 
+**开放能力供给 / Apolla 作为 MCP Server（Sprint 18，已落地）**：S11（MCP 客户端）的**对偶**——Apolla 把自己的能力以 MCP 工具对外暴露。`McpServer`（harness-core，传输无关 JSON-RPC：`initialize`/`tools/list`/`tools/call`）+ `CapabilityTool` 注册表（`defineTool`，zod 入参、owner-scoped handler、`readOnly`）。`buildCapabilityTools(harness)` 把研究/翻译/总结/技能/工作区读包成工具（背后接既有编排/Surface/技能/工作区，自动继承安全/配额/审计/追踪）。`POST /api/mcp`（JSON-RPC，**API token 鉴权**复用 S12 `readBearer` → ownerId，线格式与 S11 `HttpMCPClient` 互通）。治理：每次 `tools/call` owner 隔离 + 配额 + 限流 + 审计 + 追踪（http span 包裹、编排 span 嵌套）；**只暴露只读/低风险**（写/扣费/破坏/自治不注册）；入参 zod 校验。`GET /api/mcp/manifest` 公开目录。dogfood：Apolla 的 `HttpMCPClient` 连 Apolla 的 MCP server 对环。
+
 **可观测性 / 分布式追踪（Sprint 17，已落地）**：又一个可换挡适配器——`Tracer`（**Noop 默认 / OpenTelemetry 生产**，env 门控 `OTEL_EXPORTER_OTLP_ENDPOINT`，与其余适配器同构）。`Tracer`/`Span` 升级为支持子 span（父上下文）、status/events、W3C traceparent inject/extract、shutdown；`AsyncLocalStorage`（`obs/context.ts` 的 `traced`/`tracedGen`/`currentSpanContext`）让子 span 跨 await/yield 自动嵌套。数据流：`http.request` span 包住每个请求并置 ALS → 编排（research plan/generate）/`llm.complete`/工具 子 span 自动嵌套 → `jobs.start` 自动捕获当前 span 写入 `Job.traceparent` → Worker `job.run` span `extract` 续上 = **Web→队列→Worker 一条 trace**。`/metrics` 增 per-operation SLO（计数/错误率/p50·p95）。安全：span 脱敏（无密钥/PII、owner 哈希）、入站 traceparent 不可信（仅关联）、Noop 零开销、关停 flush。与 metrics/日志互补：metrics 看聚合 SLO、trace 看单请求跨进程因果。
 
 **规模与可靠性 / 任务队列（Sprint 16，已落地）**：又一个可换挡适配器——`JobQueue`（**InProcess 默认 / Redis(BullMQ) 分布式**，env 门控 `REDIS_URL`，与 LLM/媒体/搜索/支付/身份适配器同构）。`JobRunner` 拆为 `start()`（持久化 queued + 配额门 + `enqueue`）与 `run(jobId)`（消费到终态，幂等：仅 queued/interrupted 执行）。数据流：**Web 入队** → **Worker 进程**（`workers/job-worker`）消费 `run` → 每个事件 `appendEvent` 进**持久 run-log** → Web 的 SSE `/api/jobs/:id/events` **轮询尾随该 log** → 跨进程实时出流（生产者/流式天然解耦，无需改 SSE）。可靠性：先落库再入队 + `reconcileJobs` 重入队（崩溃存活）、幂等消费、重试+指数退避+上限→failed（重试前 `clearEvents` 清 run-log 避免重复）、`JOB_TIMEOUT_MS` 超时、SIGTERM 优雅排空；调度**单点**在 Worker（杜绝多实例重复 tick）；配额/安全在 Worker 路径同样强制（同一 `jobResolve`，子代理继承、high_write 永拒、后台白名单、审计）。默认/离线 hermetic（无 Redis）；CI Redis service 跑门控集成测试。
@@ -276,6 +278,7 @@ interface Orchestrator {
 | 接入一个登录 provider（Sprint 14）| 实现 `AuthProvider`（Stub/Google/GitHub，env 门控）| identity-unification + state/开放重定向/邮箱校验回归 |
 | 切换任务执行基座（Sprint 16）| 实现 `JobQueue`（InProcess/Redis-BullMQ，`REDIS_URL` 门控）| job-queue-lifecycle + 幂等/重试/超时 + 门控 Redis 集成测试 |
 | 接入追踪后端（Sprint 17）| 实现 `Tracer`（Noop/OTel，`OTEL_EXPORTER_OTLP_ENDPOINT` 门控）| tracing-propagation + span 树/跨进程/脱敏断言（InMemoryTracer）|
+| 把一个能力暴露为 MCP 工具（Sprint 18）| `defineTool`（zod 入参 + owner-scoped handler + readOnly）注册到 `McpServer`| mcp-server-contract + owner-scoped/鉴权 + dogfood 对环 |
 | 新增套餐 / 调整权益（Sprint 13）| 加 `config/plans/*.json`（`taskLimit`+`features`），零业务代码 | 权益解析 + 套餐门禁回归 |
 | 模型变强后退役脚手架 | 关闭对应 `FeatureGate.scaffold` 开关；探针确认 `caps` 达标 | 回归无退化 |
 | 新增 Plugin（Cowork）| 声明 Skills+连接器+命令+子代理 捆绑 + 权限清单 | 安装授权流 + 安全 eval |

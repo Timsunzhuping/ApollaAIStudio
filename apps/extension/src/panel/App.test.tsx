@@ -35,6 +35,10 @@ describe('extension side panel', () => {
     render(<App facade={facade} />);
     expect(await screen.findByText(/Streaming answer/)).toBeInTheDocument();
     await waitFor(() => expect(facade.store.pendingAction).toBeNull()); // consumed
+    // save the research clip to the workspace + record it as recent
+    fireEvent.click(await screen.findByRole('button', { name: /Save to workspace/i }));
+    await waitFor(() => expect(((globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls).some((c) => String(c[0]).endsWith('/api/workspace/save-artifact'))).toBe(true));
+    await waitFor(() => expect((facade.store.recent as unknown[])?.length).toBe(1));
   });
 
   it('runs a pending summarize action via a surface and shows the saved result', async () => {

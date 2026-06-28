@@ -51,3 +51,19 @@ export class InMemoryMagicLinkRepository implements MagicLinkRepository {
     return true;
   }
 }
+
+/** Delivers the sign-in link to the user (Stub offline / real email in prod). */
+export interface MagicLinkDelivery {
+  send(email: string, link: string): Promise<void>;
+}
+
+/** Offline delivery — records the last link per email so tests/dev can retrieve it (no email sent). */
+export class StubMagicLinkDelivery implements MagicLinkDelivery {
+  private readonly byEmail = new Map<string, string>();
+  async send(email: string, link: string): Promise<void> {
+    this.byEmail.set(email.toLowerCase(), link);
+  }
+  last(email: string): string | undefined {
+    return this.byEmail.get(email.toLowerCase());
+  }
+}

@@ -6,8 +6,9 @@ import { exportArtifact, autoDraftSkill, embedMedia, encryptSecret, decryptSecre
 import type { ResolvedIdentity } from '@apolla/harness-core';
 import type { Connector, Subscription, WebhookEvent, PlanDef } from '@apolla/contracts';
 import { hashPassword, verifyPassword, newApiToken } from '@apolla/harness-core';
+import { newTotpSecret, verifyTotp, otpauthUri, newRecoveryCodes, newMagicToken, verifyMagicToken } from '@apolla/harness-core';
 import { buildHarness, type Harness } from './harness';
-import { readSession, readBearer, startSession, endSession } from './auth';
+import { readSession, readBearer, startSession, endSession, mfaPendingToken, verifyMfaPending } from './auth';
 import { applySecurityHeaders, applyCors, clientIp, limiters, isExpensive, MAX_BODY_BYTES } from './security';
 import { observe, metrics, type ObservedResponse } from './obs';
 import { reconcileJobs, withSpanContext, McpServer, type JsonRpcRequest } from '@apolla/harness-core';
@@ -337,6 +338,10 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
         if (!cred) verifyPassword(password, hashPassword('x'));
         return json(res, 401, { error: 'invalid email or password' });
       }
+      // Step-up (S20): when MFA is enabled, password is NOT enough — issue a short-lived pending
+      // credential and require a second factor at /api/auth/mfa/login before any session is created.
+      const mfa = await harness.users.getMfa(cred.user.id);
+      if (mfa?.enabled) return json(res, 200, { mfaRequired: true, pendingToken: mfaPendingToken(cred.user.id) });
       await startSession(res, harness.sessions, cred.user.id);
       return json(res, 200, { id: cred.user.id, email: cred.user.email });
     }
@@ -348,6 +353,60 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
   if (method === 'POST' && pathname === '/api/auth/logout') {
     await endSession(req, res, harness.sessions);
     return json(res, 200, { ok: true });
+  }
+
+  // MFA step-up (S20): exchange the pending credential + a second factor for a full session. Public
+  // (the pending token IS the first-factor proof). Generic errors — no account enumeration.
+  if (method === 'POST' && pathname === '/api/auth/mfa/login') {
+    if (!limiters.ip().allow(clientIp(req))) return json(res, 429, { error: 'too many attempts' });
+    const body = await readBody(req);
+    const userId = verifyMfaPending(String(body.pendingToken ?? ''));
+    const code = String(body.code ?? '').trim();
+    if (!userId) return json(res, 401, { error: 'invalid or expired challenge' });
+    const mfa = userId ? await harness.users.getMfa(userId) : undefined;
+    if (!mfa?.enabled || !mfa.secret) return json(res, 401, { error: 'invalid challenge' });
+    let ok = verifyTotp(decryptSecret(mfa.secret), code);
+    if (!ok) {
+      const idx = mfa.recoveryHashes.findIndex((h) => verifyPassword(code, h));
+      if (idx >= 0) {
+        ok = true;
+        mfa.recoveryHashes.splice(idx, 1); // recovery codes are single-use
+        await harness.users.saveMfa(userId, mfa);
+      }
+    }
+    if (!ok) return json(res, 401, { error: 'invalid code' });
+    const user = await harness.users.get(userId);
+    if (!user) return json(res, 401, { error: 'invalid challenge' });
+    await startSession(res, harness.sessions, userId);
+    await harness.audit.record({ id: randomUUID(), ownerId: userId, taskId: 'auth', tool: 'mfa', risk: 'low_write', decision: 'allow', status: 'executed', summary: 'mfa login' });
+    return json(res, 200, { id: user.id, email: user.email });
+  }
+
+  // Passwordless magic-link (S20). request → always 200 (enumeration-safe); verify → session.
+  if (method === 'POST' && pathname === '/api/auth/magic-link/request') {
+    if (!limiters.ip().allow(clientIp(req))) return json(res, 429, { error: 'too many requests' });
+    const body = await readBody(req);
+    const email = String(body.email ?? '').trim().toLowerCase();
+    const cred = email.includes('@') ? await harness.users.findCredentialByEmail(email) : undefined;
+    if (cred) {
+      const { token } = newMagicToken(cred.user.id);
+      const proto = (req.headers['x-forwarded-proto'] as string) ?? 'http';
+      const link = `${proto}://${req.headers.host}/auth/magic?token=${encodeURIComponent(token)}`;
+      await harness.magicLinkDelivery.send(email, link);
+      await harness.audit.record({ id: randomUUID(), ownerId: cred.user.id, taskId: 'auth', tool: 'magic-link', risk: 'low_write', decision: 'allow', status: 'executed', summary: 'magic-link requested' });
+    }
+    return json(res, 200, { ok: true }); // never reveal whether the email exists
+  }
+  if (method === 'POST' && pathname === '/api/auth/magic-link/verify') {
+    if (!limiters.ip().allow(clientIp(req))) return json(res, 429, { error: 'too many attempts' });
+    const body = await readBody(req);
+    const v = verifyMagicToken(String(body.token ?? ''));
+    if (!v) return json(res, 401, { error: 'invalid or expired link' });
+    if (!(await harness.magicLinks.consume(v.jti))) return json(res, 401, { error: 'link already used' });
+    const user = await harness.users.get(v.userId);
+    if (!user) return json(res, 401, { error: 'invalid link' });
+    await startSession(res, harness.sessions, v.userId);
+    return json(res, 200, { id: user.id, email: user.email });
   }
 
   // OAuth/SSO (S14): public. start → state+PKCE → 302 to provider; callback → verify → link → session.
@@ -400,9 +459,39 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
     const user = await harness.users.get(ownerId);
     if (!user) return json(res, 401, { error: 'not authenticated' });
     const identities = (await harness.identities.listByUser(ownerId)).map((i) => ({ provider: i.provider }));
-    return json(res, 200, { ...user, identities });
+    const mfaEnabled = (await harness.users.getMfa(ownerId))?.enabled ?? false;
+    return json(res, 200, { ...user, identities, mfaEnabled });
   }
   if (!ownerId) return json(res, 401, { error: 'not authenticated' });
+
+  // --- MFA enrollment (S20): authed. enroll → verify confirms → disable requires a code. ---
+  if (method === 'POST' && pathname === '/api/auth/mfa/enroll') {
+    const secret = newTotpSecret();
+    const recoveryCodes = newRecoveryCodes();
+    await harness.users.saveMfa(ownerId, { secret: encryptSecret(secret), recoveryHashes: recoveryCodes.map(hashPassword), enabled: false });
+    const user = await harness.users.get(ownerId);
+    return json(res, 200, { secret, otpauthUri: otpauthUri(secret, user?.email ?? 'account'), recoveryCodes });
+  }
+  if (method === 'POST' && pathname === '/api/auth/mfa/verify') {
+    const body = await readBody(req);
+    const mfa = await harness.users.getMfa(ownerId);
+    if (!mfa?.secret) return json(res, 400, { error: 'start enrollment first' });
+    if (!verifyTotp(decryptSecret(mfa.secret), String(body.code ?? '').trim())) return json(res, 400, { error: 'invalid code' });
+    await harness.users.saveMfa(ownerId, { ...mfa, enabled: true });
+    await harness.audit.record({ id: randomUUID(), ownerId, taskId: 'auth', tool: 'mfa', risk: 'low_write', decision: 'allow', status: 'executed', summary: 'mfa enabled' });
+    return json(res, 200, { mfaEnabled: true });
+  }
+  if (method === 'POST' && pathname === '/api/auth/mfa/disable') {
+    const body = await readBody(req);
+    const mfa = await harness.users.getMfa(ownerId);
+    if (!mfa?.enabled || !mfa.secret) return json(res, 400, { error: 'mfa not enabled' });
+    const code = String(body.code ?? '').trim();
+    const ok = verifyTotp(decryptSecret(mfa.secret), code) || mfa.recoveryHashes.some((h) => verifyPassword(code, h));
+    if (!ok) return json(res, 401, { error: 'invalid code' });
+    await harness.users.saveMfa(ownerId, { secret: null, recoveryHashes: [], enabled: false });
+    await harness.audit.record({ id: randomUUID(), ownerId, taskId: 'auth', tool: 'mfa', risk: 'low_write', decision: 'allow', status: 'executed', summary: 'mfa disabled' });
+    return json(res, 200, { mfaEnabled: false });
+  }
   (res as ObservedResponse).__ownerId = ownerId; // for the structured access log (id, not PII)
 
   // Strict per-owner limit on expensive (LLM/media) endpoints (S10-T3).

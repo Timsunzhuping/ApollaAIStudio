@@ -63,6 +63,35 @@ export async function startSession(res: ServerResponse, sessions: SessionReposit
   res.setHeader('Set-Cookie', `${COOKIE}=${encodeURIComponent(sign(id))}; ${flags.join('; ')}`);
 }
 
+const MFA_PENDING_TTL_MS = 5 * 60 * 1000;
+/**
+ * A short-lived signed credential issued after the first factor (password) when MFA is enabled, and
+ * exchanged at /api/auth/mfa/login for a full session (S20). Domain-separated from sessions and
+ * magic-links ('mfa:' prefix + distinct payload) so it can NEVER be used as either — that separation
+ * is what keeps step-up fail-closed.
+ */
+export function mfaPendingToken(userId: string): string {
+  const payload = Buffer.from(JSON.stringify({ p: 'mfa', userId, exp: Date.now() + MFA_PENDING_TTL_MS })).toString('base64url');
+  const mac = createHmac('sha256', SECRET).update(`mfa:${payload}`).digest('base64url');
+  return `${payload}.${mac}`;
+}
+export function verifyMfaPending(token: string | undefined): string | null {
+  if (!token) return null;
+  const [payload, mac] = token.split('.');
+  if (!payload || !mac) return null;
+  const expected = createHmac('sha256', SECRET).update(`mfa:${payload}`).digest('base64url');
+  const a = Buffer.from(mac);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+  try {
+    const d = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as { p?: string; userId?: string; exp?: number };
+    if (d.p !== 'mfa' || !d.userId || !d.exp || d.exp <= Date.now()) return null;
+    return d.userId;
+  } catch {
+    return null;
+  }
+}
+
 /** Invalidate the current session server-side and clear the cookie. */
 export async function endSession(req: IncomingMessage, res: ServerResponse, sessions: SessionRepository): Promise<void> {
   const id = unsign(cookieValue(req));

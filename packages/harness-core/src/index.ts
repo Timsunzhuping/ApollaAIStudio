@@ -62,8 +62,8 @@ export {
 export type { PluginRepository } from './plugins/types';
 export { hashPassword, verifyPassword } from './auth/password';
 export { newTotpSecret, generateTotp, verifyTotp, otpauthUri, newRecoveryCodes } from './auth/totp';
-export { newMagicToken, verifyMagicToken, InMemoryMagicLinkRepository } from './auth/magiclink';
-export type { MagicLinkRepository } from './auth/magiclink';
+export { newMagicToken, verifyMagicToken, InMemoryMagicLinkRepository, StubMagicLinkDelivery } from './auth/magiclink';
+export type { MagicLinkRepository, MagicLinkDelivery } from './auth/magiclink';
 export { RateLimiter } from './security/ratelimit';
 export type { RateLimiterOptions } from './security/ratelimit';
 export { Metrics } from './obs/metrics';
@@ -124,7 +124,7 @@ export type {
   MediaRouteConfig,
 } from './media/types';
 export type { MediaRouterDeps, MediaGenerateResult } from './media/router';
-export type { TaskRepository, UserRepository, ProjectRepository, ConnectorRepository, AuditRepository } from './repo/types';
+export type { TaskRepository, UserRepository, MfaRecord, ProjectRepository, ConnectorRepository, AuditRepository } from './repo/types';
 export { encryptSecret, decryptSecret } from './security/secrets';
 export { SkillRuntime } from './skills/runtime';
 export { makeResearchExecutor, makeGenericExecutor, makeMediaExecutor, makeAgentExecutor } from './skills/executors';

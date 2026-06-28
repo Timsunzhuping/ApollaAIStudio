@@ -67,4 +67,17 @@ describe('billing (S13)', () => {
     await fetch(`${base}/api/billing/cancel`, authed(c, {}));
     expect(((await (await fetch(`${base}/api/billing/subscription`, authed(c))).json()) as { plan: { id: string } }).plan.id).toBe('free');
   });
+
+  it('subscriptions are owner-scoped and responses carry no payment secrets (S13-T6)', async () => {
+    const a = await register();
+    const b = await register();
+    await fetch(`${base}/api/billing/checkout`, authed(a, { plan: 'pro' }));
+    // A is pro; B is unaffected (owner isolation)
+    const aRes = await (await fetch(`${base}/api/billing/subscription`, authed(a))).json();
+    const bRes = await (await fetch(`${base}/api/billing/subscription`, authed(b))).json();
+    expect((aRes as { plan: { id: string } }).plan.id).toBe('pro');
+    expect((bRes as { plan: { id: string } }).plan.id).toBe('free');
+    // no payment secret / key ever appears in a billing response
+    expect(JSON.stringify(aRes)).not.toMatch(/sk_|whsec_|STRIPE|secret/i);
+  });
 });

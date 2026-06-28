@@ -1,4 +1,11 @@
-import type { Plugin, Surface, ConnectorCatalogEntry } from '@apolla/contracts';
+import type { Plugin, Surface, ConnectorCatalogEntry, PlanDef, Subscription } from '@apolla/contracts';
+
+export interface BillingInfo {
+  subscription: Subscription | null;
+  plan: PlanDef;
+  usage: { used: number; limit: number; plan: string };
+  plans: PlanDef[];
+}
 
 /** Thrown on any non-2xx response; carries the BFF's error message + status. */
 export class ApiError extends Error {
@@ -52,6 +59,10 @@ export const api = {
   tokens: () => http<{ id: string; name: string; createdAt?: string; lastUsedAt?: string }[]>('GET', '/api/tokens'),
   createToken: (name: string) => http<{ id: string; name: string; token: string }>('POST', '/api/tokens', { name }),
   deleteToken: (id: string) => http<void>('DELETE', `/api/tokens/${id}`),
+  // billing
+  billing: () => http<BillingInfo>('GET', '/api/billing/subscription'),
+  checkout: (plan: string) => http<{ url: string; activated: boolean }>('POST', '/api/billing/checkout', { plan }),
+  cancelBilling: () => http<void>('POST', '/api/billing/cancel', {}),
   getMemoryModel: () => http<Record<string, unknown>>('GET', '/api/memory/model'),
   setMemoryModel: (m: { language?: string; style?: string }) => http<void>('POST', '/api/memory/model', m),
   clearMemory: () => http<void>('DELETE', '/api/memory'),

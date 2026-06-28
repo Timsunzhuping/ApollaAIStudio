@@ -37,6 +37,10 @@ import {
   InMemoryMagicLinkRepository,
   StubMagicLinkDelivery,
   type MagicLinkRepository,
+  InMemoryCollabRepository,
+  InMemoryCollabAccessRepository,
+  type CollabRepository,
+  type CollabAccessRepository,
   resolveEntitlements,
   StubOAuthProvider,
   InMemoryIdentityRepository,
@@ -128,6 +132,7 @@ import {
   PostgresSubscriptionRepository,
   PostgresIdentityRepository,
   PostgresMagicLinkRepository,
+  PostgresCollabAccessRepository,
 } from '@apolla/db-postgres';
 import { DemoLLMAdapter } from './demo-adapter';
 
@@ -150,6 +155,8 @@ export interface Harness {
   speech: SpeechProvider;
   magicLinks: MagicLinkRepository;
   magicLinkDelivery: StubMagicLinkDelivery;
+  collab: CollabRepository;
+  collabAccess: CollabAccessRepository;
   plans: () => import('@apolla/contracts').PlanDef[];
   identities: IdentityRepository;
   authProviders: Map<string, AuthProvider>;
@@ -230,6 +237,7 @@ export async function buildHarness(): Promise<Harness> {
   let subscriptions: SubscriptionRepository;
   let identities: IdentityRepository;
   let magicLinks: MagicLinkRepository;
+  let collabAccess: CollabAccessRepository;
   let projects: ProjectRepository;
   let memory: Memory;
   let skillRepo: SkillRepository;
@@ -254,6 +262,7 @@ export async function buildHarness(): Promise<Harness> {
     subscriptions = new PostgresSubscriptionRepository(sql);
     identities = new PostgresIdentityRepository(sql);
     magicLinks = new PostgresMagicLinkRepository(sql);
+    collabAccess = new PostgresCollabAccessRepository(sql);
     projects = new PostgresProjectRepository(sql);
     memory = new PostgresMemory(sql);
     skillRepo = new PostgresSkillRepository(sql);
@@ -277,6 +286,7 @@ export async function buildHarness(): Promise<Harness> {
     subscriptions = new InMemorySubscriptionRepository();
     identities = new InMemoryIdentityRepository();
     magicLinks = new InMemoryMagicLinkRepository();
+    collabAccess = new InMemoryCollabAccessRepository();
     projects = new InMemoryProjectRepository();
     memory = new InMemoryMemory();
     skillRepo = new InMemorySkillRepository();
@@ -491,6 +501,9 @@ export async function buildHarness(): Promise<Harness> {
     // Magic-link (S20): single-use store + offline Stub delivery (real email is a deploy concern).
     magicLinks,
     magicLinkDelivery: new StubMagicLinkDelivery(),
+    // Collab (S21): in-memory live sessions; access grants persist (Postgres/in-memory).
+    collab: new InMemoryCollabRepository(),
+    collabAccess,
     plans: loadPlans,
     identities,
     // Identity providers: stub always (offline default); real providers when env-keyed (缺 key 不注册).

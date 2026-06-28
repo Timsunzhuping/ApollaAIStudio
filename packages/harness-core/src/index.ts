@@ -30,6 +30,8 @@ export { Rga, Replica } from './collab/rga';
 export type { CollabOp, InsertOp, DeleteOp } from './collab/rga';
 export { CollabSession, InMemoryCollabRepository } from './collab/session';
 export type { CollabDoc, CollabRepository } from './collab/session';
+export { InMemoryCollabAccessRepository } from './collab/access';
+export type { CollabAccessRepository } from './collab/access';
 export { McpServer } from './mcp-server/server';
 export { defineTool } from './mcp-server/types';
 export type { CapabilityTool, JsonRpcRequest, JsonRpcResponse } from './mcp-server/types';

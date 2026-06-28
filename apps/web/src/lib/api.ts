@@ -33,7 +33,10 @@ async function http<T>(method: string, path: string, body?: unknown): Promise<T>
   return (text ? JSON.parse(text) : undefined) as T;
 }
 
-export interface User { id: string; email: string; identities?: { provider: string }[] }
+export interface User { id: string; email: string; identities?: { provider: string }[]; mfaEnabled?: boolean }
+export type LoginResult = User | { mfaRequired: true; pendingToken: string };
+export interface MfaEnrollment { secret: string; otpauthUri: string; recoveryCodes: string[] }
+export const isMfaRequired = (r: LoginResult): r is { mfaRequired: true; pendingToken: string } => 'mfaRequired' in r;
 export interface Project { id: string; name: string; description?: string }
 export interface WorkspaceEntry { path: string; mime: string; version: number; size: number }
 export interface WorkspaceFile { path: string; mime: string; version: number; size: number; content: string }
@@ -48,7 +51,13 @@ export const api = {
   base: BASE,
   // auth
   me: () => http<User>('GET', '/api/auth/me'),
-  login: (email: string, password?: string) => http<User>('POST', '/api/auth/login', password ? { email, password } : { email }),
+  login: (email: string, password?: string) => http<LoginResult>('POST', '/api/auth/login', password ? { email, password } : { email }),
+  mfaLogin: (pendingToken: string, code: string) => http<User>('POST', '/api/auth/mfa/login', { pendingToken, code }),
+  mfaEnroll: () => http<MfaEnrollment>('POST', '/api/auth/mfa/enroll', {}),
+  mfaVerify: (code: string) => http<{ mfaEnabled: boolean }>('POST', '/api/auth/mfa/verify', { code }),
+  mfaDisable: (code: string) => http<{ mfaEnabled: boolean }>('POST', '/api/auth/mfa/disable', { code }),
+  magicLinkRequest: (email: string) => http<{ ok: boolean }>('POST', '/api/auth/magic-link/request', { email }),
+  magicLinkVerify: (token: string) => http<User>('POST', '/api/auth/magic-link/verify', { token }),
   register: (email: string, password: string) => http<User>('POST', '/api/auth/register', { email, password }),
   logout: () => http<void>('POST', '/api/auth/logout'),
   authProviders: () => http<{ providers: string[] }>('GET', '/api/auth/providers'),

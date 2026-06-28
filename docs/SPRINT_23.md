@@ -63,12 +63,14 @@
 - **做**：README/ARCHITECTURE(运营台 + 鉴权语义)/CLAUDE/AGENTS(管理铁律)/DEPLOY(`ADMIN_EMAILS`)/DoD 勾选。
 
 ## Sprint 23 DoD
-- [ ] 管理员鉴权(`ADMIN_EMAILS` 可信来源,fail-closed)+ `me.isAdmin`。
-- [ ] 全站统计 + 跨 owner 审计 + 用户元数据聚合(无私有内容)。
-- [ ] 管理只读端点 + 授计划动作,requireAdmin + 限流 + 审计。
-- [ ] Web 运营台(仅管理员)+ 仪表盘 + 审计流 + 用户管理。
-- [ ] `pnpm test`+`test:web`+`e2e` 全绿 hermetic。
-- [ ] 文档更新。
+- [x] 管理员鉴权(`ADMIN_EMAILS` 可信来源,fail-closed)+ `me.isAdmin`。
+- [x] 全站统计 + 跨 owner 审计 + 用户元数据聚合(无私有内容)。
+- [x] 管理只读端点 + 授计划动作,requireAdmin + 限流 + 审计。
+- [x] Web 运营台(仅管理员)+ 仪表盘 + 审计流 + 用户管理。
+- [x] `pnpm test`+`test:web`+`e2e` 全绿 hermetic。
+- [x] 文档更新。
+
+> **Sprint 23 完成**（PR [#126](https://github.com/Timsunzhuping/ApollaAIStudio/pull/126) A · [#127](https://github.com/Timsunzhuping/ApollaAIStudio/pull/127) B · [#128](https://github.com/Timsunzhuping/ApollaAIStudio/pull/128) C · D 本次）。运营/管理控制台:`isAdmin(email)` 只读 `ADMIN_EMAILS` 白名单(不可自我提权);`/api/admin/*` 统一 requireAdmin(非管理员 403)+ 限流;`harness.admin`(仅 PG,无 DB → 503)聚合 stats(用户/项目/任务/job 按 status/订阅按 plan)/recentAudit(跨 owner,裁剪为运营元数据)/users/userDetail(元数据 + 计划 + 计数,只 SELECT 元数据列 → 不泄私有内容);`POST /api/admin/users/:id/plan` 校验 plan ∈ 已配置计划 → `SubscriptionRepository.save`(entitlements 生效)+ 审计;`me.isAdmin`;Web Admin 页(仪表盘 + 用户搜索/授计划 + 审计流,导航仅管理员可见,后端仍强校验)。新增 eval `admin-authz`(45 total)。333 root + 32 web + 9 e2e 绿。封禁/删他人账号、细粒度 RBAC、组织管理列为后续。
 
 ## 风险与提示
 - **不可自我提权**：管理员身份只来自 `ADMIN_EMAILS` 环境变量,绝不读客户端字段、绝不加可被用户改写的 DB 列。

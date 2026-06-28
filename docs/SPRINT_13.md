@@ -97,14 +97,16 @@ S13-T1(PaymentProvider+订阅) ─ S13-T2(套餐/权益) ─┬─ S13-T3(Checko
 - **建议 PR 分组**：A(T1+T2) · B(T3+T4) · C(T5+T6) · D(T7+T8)。
 
 ## Sprint 13 Definition of Done（整体验收）
-- [ ] 支付 Provider：`PaymentProvider`（Stub 离线 / Stripe env 门控 + 验签）+ `Subscription` + 仓库（内存 + Postgres）；卡号不落我方。
-- [ ] 套餐/权益：声明式 `config/plans/*.json` + `entitlementsOf`；`Quota` 读订阅；解析失败回落 free。
-- [ ] Checkout/生命周期：发起 Checkout、Webhook 验签 + 幂等更新、查订阅/权益/用量；订阅变更落审计。
-- [ ] 门禁：功能门 + 配额门按套餐；超限 402 + 升级提示；用量准确。
-- [ ] Billing UI：当前套餐/用量/升级/取消走通。
-- [ ] 安全：验签 + 幂等 + owner 隔离 + 支付 secret 不入日志/响应。
-- [ ] `pnpm test` + `pnpm test:web` 覆盖生命周期/幂等/验签/门禁/回落/UI；CI 全门禁绿。
-- [ ] README/架构文档更新；Demo 离线（stub）可演示。
+- [x] 支付 Provider：`PaymentProvider`（Stub 离线 / Stripe env 门控 + 验签）+ `Subscription` + 仓库（内存 + Postgres）；卡号不落我方。
+- [x] 套餐/权益：声明式 `config/plans/*.json` + `resolveEntitlements`；`Quota` 读订阅；解析失败回落 free。
+- [x] Checkout/生命周期：发起 Checkout、Webhook 验签 + 幂等更新、查订阅/权益/用量；订阅变更落审计。
+- [x] 门禁：功能门（cowork/media 为 pro）+ 配额门按套餐；超限 402 + 升级提示；用量准确。
+- [x] Billing UI：当前套餐/用量/升级/取消走通。
+- [x] 安全：验签 + 幂等 + owner 隔离 + 支付 secret 不入日志/响应。
+- [x] `pnpm test` + `pnpm test:web` 覆盖生命周期/幂等/验签/门禁/回落/UI；CI 全门禁绿。
+- [x] README/架构文档更新；Demo 离线（stub）可演示。
+
+> **Sprint 13 完成**（PR [#76](https://github.com/Timsunzhuping/ApollaAIStudio/pull/76) A · [#77](https://github.com/Timsunzhuping/ApollaAIStudio/pull/77) B · [#78](https://github.com/Timsunzhuping/ApollaAIStudio/pull/78) C · D 本次）。可插拔 **PaymentProvider**（Stub 离线 / Stripe env 门控，fetch-based 无 SDK + 签名验证）+ `Subscription`/`WebhookEvent`/`PlanDef` 契约 + 仓库（内存 + Postgres `subscriptions`/`billing_events`）；声明式套餐 `config/plans/*.json`（free/pro/team）+ `resolveEntitlements`（fail-closed 回落 free）+ `Quota.planOf` 异步读订阅；Checkout（stub 立即激活）+ 公开 Webhook（原始体验签 + 幂等）+ cancel + 订阅/权益/用量端点（订阅变更落审计）；功能门（cowork/media 为 pro）+ 配额门（402 + 升级）；Web Billing 页（套餐/用量/升级/取消）。卡号不落我方。测试：harness-core 8 + bff 5 + web Billing 1；新增 eval `billing-entitlements`（共 36）。全门禁绿。
 
 ## 风险与提示（给代理）
 - **卡号零接触**：永远用 provider 托管 Checkout；我方只存 providerRef + 订阅状态；绝不收/存/传卡号。

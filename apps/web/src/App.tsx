@@ -8,6 +8,7 @@ import { Workspace } from './pages/Workspace';
 import { Surfaces } from './pages/Surfaces';
 import { Agent } from './pages/Agent';
 import { Automation } from './pages/Automation';
+import { Billing } from './pages/Billing';
 import { Settings } from './pages/Settings';
 import { Loading } from './components/ui';
 
@@ -23,6 +24,7 @@ function Gate() {
         <Route path="/surfaces" element={<Surfaces />} />
         <Route path="/agent" element={<Agent />} />
         <Route path="/automation" element={<Automation />} />
+        <Route path="/billing" element={<Billing />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/research" replace />} />
       </Route>

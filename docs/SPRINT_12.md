@@ -95,14 +95,16 @@ S12-T1(API token) ─ S12-T2(扩展脚手架) ─┬─ S12-T3(content/backgroun
 - **建议 PR 分组**：A(T1+T2) · B(T3+T4) · C(T5+T6) · D(T7+T8)。
 
 ## Sprint 12 Definition of Done（整体验收）
-- [ ] API token：生成（明文仅一次）/列出/吊销，哈希存储；Bearer 鉴权与会话并存、受限流 + owner 隔离；web 设置页可管理。
-- [ ] 扩展脚手架：MV3（background/content/side panel）多入口构建；Bearer API 客户端；设置页存/校验 token；chrome.* facade 化。
-- [ ] 划词与动作：content script 抓选区/页面（untrusted）；background 右键/侧边栏动作路由到 BFF。
-- [ ] 流式：SSE-over-fetch（带 Bearer，超时/清理）；侧边栏流式渲染研究（安全 Markdown）。
-- [ ] 页面 Surface：翻译/总结页面或选区 → 一键存入工作区。
-- [ ] 安全：token 仅 chrome.storage、不进页面；页面内容 untrusted 不升级；最小权限 manifest。
-- [ ] `pnpm test` + 扩展测试覆盖 token/客户端/路由/面板/SSE；CI 全门禁绿（含扩展 build）。
-- [ ] README/架构文档更新（装载 + token）；离线可测，浏览器可手测。
+- [x] API token：生成（明文仅一次）/列出/吊销，哈希存储；Bearer 鉴权与会话并存、受限流 + owner 隔离；web 设置页可管理。
+- [x] 扩展脚手架：MV3（background/content/side panel）多入口构建；Bearer API 客户端；设置页存/校验 token；chrome.* facade 化。
+- [x] 划词与动作：content script 抓选区/页面（untrusted）；background 右键/侧边栏动作路由到 BFF。
+- [x] 流式：SSE-over-fetch（带 Bearer，超时/清理）；侧边栏流式渲染研究（安全 Markdown）。
+- [x] 页面 Surface：翻译/总结页面或选区 → 一键存入工作区。
+- [x] 安全：token 仅 chrome.storage、不进页面；页面内容 untrusted 不升级；最小权限 manifest。
+- [x] `pnpm test` + 扩展测试覆盖 token/客户端/路由/面板/SSE；CI 全门禁绿（含扩展 build）。
+- [x] README/架构文档更新（装载 + token）；离线可测，浏览器可手测。
+
+> **Sprint 12 完成。** S12-T1–T8 全部合并到 main（PR #71–#73 + 本 PR）。MV3 浏览器扩展 `apps/extension` 落地：API token 跨源鉴权（scrypt 哈希、Bearer 与会话并存）、SSE-over-fetch 流式、划词 → 右键研究/翻译/总结 → 侧边栏渲染 → 存工作区；最小权限（activeTab+scripting，无 `<all_urls>`/静态 content script），token 仅 chrome.storage 绝不进页面，页面内容 untrusted。242 root + 18 web + 18 extension 测试；eval 35；CI 含扩展构建。真实浏览器 e2e（Playwright）留待后续。
 
 ## 风险与提示（给代理）
 - **token 是跨源鉴权的关键**：EventSource 不能带头 → 用 API token + SSE-over-fetch；token 哈希存储、仅 chrome.storage、绝不进 content script/页面 DOM/日志。

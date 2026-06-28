@@ -70,7 +70,9 @@ flowchart TB
 
 > **Harness Core 是本平台的工程重心**。中台/触点/基础设施都是常规工程；真正的杠杆在 Core 的注册表与编排。
 
-**前端触点层（Sprint 09，已落地 Web App）**：`apps/web`（Vite + React + TS SPA）是面向用户的生产前端——纯 API 客户端，通过类型化客户端 + SSE hook 消费 BFF 的 HTTP/SSE 接口，**不旁路 BFF、不直连模型/库、不持密钥**（鉴权走会话 cookie），Markdown 安全渲染。BFF（`apps/bff`，刻意独立的 Node 服务）仍是唯一后端与组合根；其内联工作台保留为零配置兜底。SSR/营销站、桌面宿主、扩展、移动端为后续触点。
+**前端触点层（Sprint 09，已落地 Web App）**：`apps/web`（Vite + React + TS SPA）是面向用户的生产前端——纯 API 客户端，通过类型化客户端 + SSE hook 消费 BFF 的 HTTP/SSE 接口，**不旁路 BFF、不直连模型/库、不持密钥**（鉴权走会话 cookie），Markdown 安全渲染。BFF（`apps/bff`，刻意独立的 Node 服务）仍是唯一后端与组合根；其内联工作台保留为零配置兜底。SSR/营销站、桌面宿主、移动端为后续触点。
+
+**浏览器扩展触点（Sprint 12，已落地）**：`apps/extension`（MV3 + Vite + React）把研究/翻译/总结带到任意网页——又一个纯 BFF 客户端。跨源鉴权用 **API token**（`apolla_<id>_<secret>`，scrypt 哈希、仅展示一次；Bearer 与会话并存、owner 隔离 + 限流），流式用 **SSE-over-fetch**（EventSource 不能带 Bearer 头）。**最小权限**：`activeTab` + `scripting`（无 `<all_urls>`、无静态 content script，采集按用户手势注入）；token 仅 `chrome.storage`、绝不进页面 DOM；页面内容 untrusted（安全 Markdown）。content/background 逻辑经 chrome.* facade 注入，离线可测。
 
 ---
 
@@ -308,7 +310,7 @@ apolla/
   apps/
     bff/                 # ★ 独立 Node BFF：HTTP/SSE API + 组合根 + 内联工作台（唯一后端）
     web/                 # ★ 生产前端：Vite + React + TS SPA，消费 BFF（Sprint 09，已落地）
-    extension/           # MV3 浏览器扩展（后续）
+    extension/           # ★ MV3 浏览器扩展：API token 跨源消费 BFF（Sprint 12，已落地）
     desktop/             # 桌面 / Cowork 宿主（后续）
   packages/
     harness-core/        # ★ Model Router / Prompt Registry / Tool Runtime / Media / Skill / Memory / Safety / Orchestrator / Eval

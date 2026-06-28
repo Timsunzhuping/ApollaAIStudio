@@ -30,6 +30,27 @@ pnpm --filter @apolla/bff start
   `index.html` for client-side routing.
 - The BFF auto-runs the idempotent DB migration on boot and reconciles interrupted jobs.
 
+## 2b. Background jobs: in-process vs. distributed (S16)
+
+Long-running jobs (research / media / cowork / scheduled tasks) run behind a swappable **JobQueue**.
+
+- **In-process (default).** `REDIS_URL` unset → the web process executes jobs itself and runs the
+  cron scheduler. Simplest; fine for a single instance. No broker needed.
+- **Distributed.** Set `REDIS_URL` → the web **only enqueues**; one or more standalone **workers**
+  execute jobs and **one** worker owns the cron scheduler (single point — no double-ticking). Jobs
+  survive web/worker restarts (persisted + reconciled), and workers scale horizontally.
+
+```bash
+# Distributed: web (enqueue-only) + worker(s) + Redis, sharing Postgres + REDIS_URL.
+REDIS_URL=redis://redis:6379 WEB_DIST=/abs/apps/web/dist DATABASE_URL=... pnpm --filter @apolla/bff start
+REDIS_URL=redis://redis:6379 DATABASE_URL=... WORKER_PORT=3100 pnpm --filter @apolla/job-worker start
+```
+
+Scale by running more `@apolla/job-worker` processes (tune `JOB_CONCURRENCY`). Run **exactly one**
+scheduler-owning worker, or accept that every worker ticks (each tick is deduped per task/minute, so
+duplicate ticks are harmless but wasteful). Worker exposes `GET /health` when `WORKER_PORT` is set;
+SIGTERM drains in-flight jobs before exit.
+
 ## 3. Environment variables
 
 | Var | Purpose | Notes |
@@ -40,6 +61,9 @@ pnpm --filter @apolla/bff start
 | `NODE_ENV` | `production` → `Secure` cookies + password mode | Serve over HTTPS in prod |
 | `WEB_DIST` | Path to `apps/web/dist` (single-origin SPA) | See §2 |
 | `CORS_ORIGIN` | Comma-separated allowlist for cross-origin clients | e.g. the browser extension origin |
+| `REDIS_URL` | Distributed job queue broker (BullMQ) | Unset → in-process jobs (no broker) |
+| `JOB_CONCURRENCY` / `JOB_ATTEMPTS` / `JOB_BACKOFF_MS` / `JOB_TIMEOUT_MS` | Worker tuning (S16) | Concurrency, retry attempts + exponential backoff, per-job timeout (0=off) |
+| `WORKER_PORT` | Worker health endpoint port | Unset → no health server |
 | `SECRETS_KEY` | AES-GCM key for connector secrets (S11) | Required if using connectors with secrets |
 | `MEDIA_DIR` | Local media storage dir (S3) | |
 | `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` | LLM (also text→image) | Missing → deterministic stub |

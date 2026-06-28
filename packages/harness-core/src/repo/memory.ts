@@ -179,6 +179,10 @@ export class InMemoryJobRepository implements JobRepository {
   async events(jobId: string): Promise<unknown[]> {
     return structuredClone(this.log.get(jobId) ?? []);
   }
+
+  async clearEvents(jobId: string): Promise<void> {
+    this.log.set(jobId, []);
+  }
 }
 
 export class InMemoryScheduledTaskRepository implements ScheduledTaskRepository {

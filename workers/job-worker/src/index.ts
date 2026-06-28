@@ -1,3 +1,4 @@
+import { createServer } from 'node:http';
 import { buildHarness } from '@apolla/bff/harness';
 import { reconcileJobs } from '@apolla/harness-core';
 
@@ -26,11 +27,26 @@ async function main(): Promise<void> {
 
   console.log(`[job-worker] ready (${interrupted} interrupted re-queued, persistence=${h.persistence}, queue=${h.jobQueue.inProcess ? 'in-process' : 'distributed'})`);
 
+  // Optional health endpoint for container/orchestrator probes (gated on WORKER_PORT).
+  const port = Number(process.env.WORKER_PORT ?? 0);
+  const health = port
+    ? createServer((req, res) => {
+        if (req.url === '/health') { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ ok: true, role: 'worker', persistence: h.persistence })); }
+        else { res.writeHead(404); res.end(); }
+      }).listen(port, () => console.log(`[job-worker] health on :${port}`))
+    : undefined;
+
+  let draining = false;
   const shutdown = (): void => {
+    if (draining) return;
+    draining = true; // stop pulling new work, drain in-flight, then exit
     clearInterval(cron);
-    void h.jobQueue.close?.();
-    void h.close?.().finally(() => process.exit(0));
-    setTimeout(() => process.exit(0), 5000).unref(); // hard cap if in-flight lingers
+    health?.close();
+    void h.jobQueue.close?.()
+      .catch(() => {})
+      .then(() => h.close?.())
+      .finally(() => process.exit(0));
+    setTimeout(() => process.exit(0), 30_000).unref(); // hard cap if in-flight lingers
   };
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);

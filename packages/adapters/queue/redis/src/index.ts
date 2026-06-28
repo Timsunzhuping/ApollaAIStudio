@@ -61,10 +61,12 @@ export class RedisJobQueue implements JobQueue {
 
   process(handler: JobHandler): void {
     this.workerConn = new IORedis(this.url, { maxRetriesPerRequest: null });
-    this.worker = new Worker(this.name, async (job) => handler(String(job.data.jobId)), {
-      connection: asConnection(this.workerConn),
-      concurrency: this.concurrency,
-    });
+    const maxAttempts = this.attempts;
+    this.worker = new Worker(
+      this.name,
+      async (job) => handler(String(job.data.jobId), { attempt: job.attemptsMade + 1, maxAttempts }),
+      { connection: asConnection(this.workerConn), concurrency: this.concurrency },
+    );
   }
 
   async close(): Promise<void> {

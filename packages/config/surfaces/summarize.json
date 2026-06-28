@@ -1,0 +1,9 @@
+{
+  "id": "summarize",
+  "title": "Summarize text",
+  "inputKind": "text",
+  "params": {},
+  "promptRef": "summarize",
+  "outputMime": "text/markdown",
+  "executor": "generic"
+}

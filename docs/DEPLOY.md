@@ -67,6 +67,7 @@ SIGTERM drains in-flight jobs before exit.
 | `JOB_CONCURRENCY` / `JOB_ATTEMPTS` / `JOB_BACKOFF_MS` / `JOB_TIMEOUT_MS` | Worker tuning (S16) | Concurrency, retry attempts + exponential backoff, per-job timeout (0=off) |
 | `WORKER_PORT` | Worker health endpoint port | Unset → no health server |
 | `SECRETS_KEY` | AES-GCM key for connector secrets (S11) | Required if using connectors with secrets |
+| `ADMIN_EMAILS` | Comma-separated operator allowlist for the admin console (S23) | Unset → no admins; the only source of admin rights (no DB column → no self-escalation) |
 | `MEDIA_DIR` | Local media storage dir (S3) | |
 | `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` | LLM (also text→image) | Missing → deterministic stub |
 | `TAVILY_API_KEY` | Web search | Missing → stub |

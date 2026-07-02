@@ -16,6 +16,31 @@ describe('routes registry', () => {
   it('resolves a route by alias', () => {
     expect(getRoute('claude_write').alias).toBe('claude_write');
   });
+
+  it('APOLLA_ROUTES_FILE swaps the whole mapping without touching the repo', async () => {
+    const os = await import('node:os');
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const file = path.join(os.tmpdir(), `apolla-routes-${process.pid}.json`);
+    const routes = ['gpt_fast', 'gpt_premium', 'claude_write', 'claude_premium'].map((alias) => ({
+      alias,
+      primary: 'openai/custom-gateway-model',
+      fallbackChain: [],
+      keyPool: ['OPENAI_API_KEY'],
+    }));
+    fs.writeFileSync(file, JSON.stringify({ routes }));
+    process.env.APOLLA_ROUTES_FILE = file;
+    try {
+      expect(getRoute('claude_write').primary).toBe('openai/custom-gateway-model');
+      // the override is still validated: a file missing a required alias throws
+      fs.writeFileSync(file, JSON.stringify({ routes: routes.slice(0, 2) }));
+      expect(() => loadRoutes()).toThrow(/missing required alias/);
+    } finally {
+      delete process.env.APOLLA_ROUTES_FILE;
+      fs.unlinkSync(file);
+    }
+    expect(getRoute('claude_write').primary).not.toBe('openai/custom-gateway-model');
+  });
 });
 
 describe('media routes registry', () => {

@@ -42,9 +42,17 @@ function listMarkdown(dir: string): string[] {
     .map((f) => path.join(abs, f));
 }
 
-/** Load and validate alias→model routes. Throws if any required alias is missing. */
+/**
+ * Load and validate alias→model routes. Throws if any required alias is missing.
+ * `APOLLA_ROUTES_FILE` (absolute path) lets a deployment swap the whole model mapping without
+ * touching the repo — e.g. pointing every alias at an OpenAI-compatible gateway model. Same schema,
+ * same validation ("升级即换挡", ARCHITECTURE §1.2).
+ */
 export function loadRoutes(): RouteConfigT[] {
-  const raw = readJson('routes.json') as { routes?: unknown };
+  const override = process.env.APOLLA_ROUTES_FILE;
+  const raw = (
+    override ? (JSON.parse(fs.readFileSync(override, 'utf8')) as unknown) : readJson('routes.json')
+  ) as { routes?: unknown };
   const routes = z.array(RouteConfig).parse(raw.routes ?? []);
   const present = new Set(routes.map((r) => r.alias));
   for (const alias of ModelAlias.options) {

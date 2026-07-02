@@ -215,14 +215,19 @@ export interface Harness {
  * Persistence: Postgres when DATABASE_URL is set (migrated on boot), else in-memory.
  */
 export async function buildHarness(): Promise<Harness> {
-  const useReal = !!process.env.OPENAI_API_KEY && !!process.env.ANTHROPIC_API_KEY;
+  // Real mode with ANY provider key: register only the keyed adapters. The router's fallback chain
+  // already skips models whose adapter/key is missing, so single-provider deployments (including
+  // OpenAI-compatible gateways via OPENAI_BASE_URL + an APOLLA_ROUTES_FILE override) just work.
+  const hasOpenAI = !!process.env.OPENAI_API_KEY;
+  const hasAnthropic = !!process.env.ANTHROPIC_API_KEY;
+  const useReal = hasOpenAI || hasAnthropic;
   const adapters = new Map<string, LLMAdapter>();
   const pricing = new PricingBook();
   let routeFor: (alias: ModelAlias) => RouteConfig;
 
   if (useReal) {
-    adapters.set('openai', new OpenAIAdapter());
-    adapters.set('anthropic', new AnthropicAdapter());
+    if (hasOpenAI) adapters.set('openai', new OpenAIAdapter());
+    if (hasAnthropic) adapters.set('anthropic', new AnthropicAdapter());
     routeFor = getRoute;
   } else {
     adapters.set('demo', new DemoLLMAdapter());
@@ -521,7 +526,9 @@ export async function buildHarness(): Promise<Harness> {
     subscriptions,
     payment: process.env.STRIPE_SECRET_KEY ? new StripePaymentProvider() : new StubPaymentProvider(),
     // Speech (S19): OpenAI (Whisper + TTS) when keyed, else the offline Stub provider.
-    speech: OpenAiSpeechProvider.isConfigured() ? new OpenAiSpeechProvider() : new StubSpeechProvider(),
+    // OpenAI speech only against the real OpenAI endpoint — OpenAI-compatible LLM gateways
+    // (OPENAI_BASE_URL set, e.g. Ark/vLLM) rarely implement /audio/*, so fall back to the stub there.
+    speech: OpenAiSpeechProvider.isConfigured() && !process.env.OPENAI_BASE_URL ? new OpenAiSpeechProvider() : new StubSpeechProvider(),
     // Magic-link (S20): single-use store + offline Stub delivery (real email is a deploy concern).
     magicLinks,
     magicLinkDelivery: new StubMagicLinkDelivery(),

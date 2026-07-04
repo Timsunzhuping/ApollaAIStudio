@@ -61,7 +61,7 @@ export const UI_HTML = `<!doctype html>
     <div class="col">
       <h3>Sources</h3><div id="sources" class="muted">—</div>
       <h3 style="margin-top:1rem">Cost</h3><div class="cost" id="cost">$0.0000</div>
-      <div class="exp" id="exp" style="display:none"><button class="ghost" data-fmt="md">Export .md</button><button class="ghost" data-fmt="html">Export .html</button><button class="ghost" id="saveSkill">★ Save as skill</button><button class="ghost" id="saveWs">💾 To workspace</button><button class="ghost" id="genImage">🖼 Cover</button><button class="ghost" id="genVideo">🎬 Video</button></div>
+      <div class="exp" id="exp" style="display:none"><button class="ghost" data-fmt="md">Export .md</button><button class="ghost" data-fmt="html">Export .html</button><button class="ghost" data-fmt="docx">Export .docx</button><button class="ghost" id="saveSkill">★ Save as skill</button><button class="ghost" id="saveWs">💾 To workspace</button><button class="ghost" id="genImage">🖼 Cover</button><button class="ghost" id="genVideo">🎬 Video</button></div>
       <div id="media" style="margin-top:.6rem"></div>
     </div>
   </div>

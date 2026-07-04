@@ -1,11 +1,13 @@
 import type { Artifact } from '@apolla/contracts';
+import { markdownToDocx } from './docx';
 
-export type ExportFormat = 'markdown' | 'html';
+export type ExportFormat = 'markdown' | 'html' | 'docx';
 
 export interface ExportedFile {
   filename: string;
   mime: string;
-  content: string;
+  /** Text formats are strings; binary formats (docx) are bytes. */
+  content: string | Uint8Array;
 }
 
 function slug(artifact: Artifact): string {
@@ -87,6 +89,13 @@ export function exportArtifact(artifact: Artifact, fmt: ExportFormat): ExportedF
   const md = artifact.content ?? '';
   if (fmt === 'markdown') {
     return { filename: `${slug(artifact)}.md`, mime: 'text/markdown', content: md };
+  }
+  if (fmt === 'docx') {
+    return {
+      filename: `${slug(artifact)}.docx`,
+      mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      content: markdownToDocx(md),
+    };
   }
   return { filename: `${slug(artifact)}.html`, mime: 'text/html', content: renderHtml(md) };
 }

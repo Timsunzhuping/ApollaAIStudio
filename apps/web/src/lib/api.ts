@@ -104,7 +104,7 @@ export const api = {
   // research / tasks
   createTask: (question: string, projectId?: string) => http<{ taskId: string }>('POST', '/api/tasks', { question, projectId }),
   taskEventsUrl: (taskId: string) => `${BASE}/api/tasks/${taskId}/events`,
-  exportUrl: (taskId: string, fmt: 'md' | 'html') => `${BASE}/api/tasks/${taskId}/export?fmt=${fmt}`,
+  exportUrl: (taskId: string, fmt: 'md' | 'html' | 'docx') => `${BASE}/api/tasks/${taskId}/export?fmt=${fmt}`,
   saveAsSkill: (taskId: string) => http<{ name: string }>('POST', `/api/tasks/${taskId}/save-as-skill`),
   sendFeedback: (taskId: string, verdict: 'up' | 'down' | 'unusable') => http<{ ok: boolean }>('POST', `/api/tasks/${taskId}/feedback`, { verdict }),
   taskMedia: (taskId: string, alias: string, confirm: boolean) =>

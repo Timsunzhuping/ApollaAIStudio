@@ -5,7 +5,7 @@ import { extname, normalize, join } from 'node:path';
 import { exportArtifact, autoDraftSkill, embedMedia, encryptSecret, decryptSecret, inferRisk, AgentOrchestrator, nextRun, resolveEntitlements, hasFeature, newState, newPkce } from '@apolla/harness-core';
 import type { ResolvedIdentity } from '@apolla/harness-core';
 import type { Connector, Subscription, WebhookEvent, PlanDef, ProductEvent } from '@apolla/contracts';
-import { hashPassword, verifyPassword, newApiToken } from '@apolla/harness-core';
+import { hashPassword, verifyPassword, newApiToken, retrieveWorkspaceEvidence, StubEmbeddingProvider } from '@apolla/harness-core';
 import { weeklyNorthStar, weeklyReportMarkdown, WEEK_MS } from '@apolla/harness-core';
 import { newTotpSecret, verifyTotp, otpauthUri, newRecoveryCodes, newMagicToken, verifyMagicToken } from '@apolla/harness-core';
 import { buildHarness, type Harness } from './harness';
@@ -231,6 +231,9 @@ function track(e: Omit<ProductEvent, 'id' | 'at'>): void {
     .record({ id: randomUUID(), at: new Date().toISOString(), ...e })
     .catch(() => {});
 }
+
+/** S27: deterministic offline embedder for workspace retrieval (real provider slots in later). */
+const embedder = new StubEmbeddingProvider();
 
 export async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const tracer = harness?.tracer;
@@ -1306,10 +1309,16 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
       });
       try {
         const systemAddendum = await projectContext(input.projectId, ownerId);
+        // S27: project runs retrieve the most relevant workspace passages as citable evidence.
+        const extraEvidence = input.projectId
+          ? await retrieveWorkspaceEvidence(harness.workspace, embedder, {
+              ownerId, projectId: input.projectId, query: input.question,
+            }).catch(() => undefined)
+          : undefined;
         const skill = input.skillName ? await harness.skills.get(input.skillName, ownerId) : undefined;
         const stream = skill
           ? harness.skills.run(skill, { ownerId, question: input.question, taskId, projectId: input.projectId })
-          : harness.orchestrator.run({ ownerId, question: input.question, taskId, projectId: input.projectId, systemAddendum });
+          : harness.orchestrator.run({ ownerId, question: input.question, taskId, projectId: input.projectId, systemAddendum, extraEvidence });
         for await (const ev of stream) {
           if (ev.type === 'done') track({ type: 'task_delivered', ownerId, taskId });
           else if (ev.type === 'error') track({ type: 'task_failed', ownerId, taskId });

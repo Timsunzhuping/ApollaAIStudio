@@ -210,14 +210,18 @@ export class ResearchOrchestrator {
       // The verified pipeline (S25: extract quotes → compare claims → cited synthesis) engages
       // only when real page text was fetched AND its prompts are registered; otherwise the run
       // takes the legacy path unchanged — fail-safe by construction.
+      // File-derived chunks (workspace retrieval, S27) are verifiable evidence too.
+      const fileChunks = effectiveExtra.filter((uc) => uc.sourceId.startsWith('file:'));
       const verifiedPath =
-        enrich.fetched > 0 &&
+        (enrich.fetched > 0 || fileChunks.length > 0) &&
         this.d.prompts.has('research.extract') &&
         this.d.prompts.has('research.compare');
       // Map a fetched chunk id back to its display source (citations must reference task.sources).
       const sourceIdByOrigin = new Map(searchEvidence.map((uc) => [uc.origin, uc.sourceId]));
       const originByPage = enrich.requestedOriginByPage;
+      const knownSourceIds = new Set(searchEvidence.map((uc) => uc.sourceId));
       const displaySourceIdForChunk = (chunkId: string): string | undefined => {
+        if (chunkId.startsWith('file:')) return knownSourceIds.has(chunkId) ? chunkId : undefined;
         const origin = originByPage[pageKey(chunkId)];
         return origin ? sourceIdByOrigin.get(origin) : undefined;
       };
@@ -226,7 +230,7 @@ export class ResearchOrchestrator {
       // quote is a real substring of its chunk (fabricated quotes are dropped, never repaired).
       step = begin('extract');
       yield { type: 'step-start', state: 'extract', stepId: step.id };
-      const fetchedChunks = enrich.evidence;
+      const fetchedChunks = [...enrich.evidence, ...fileChunks];
       let rejectedQuotes = 0;
       if (verifiedPath) {
         const span3 = this.tracer.startSpan('extract', { parent: currentSpanContext() });

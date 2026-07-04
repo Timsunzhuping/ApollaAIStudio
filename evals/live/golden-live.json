@@ -1,0 +1,12 @@
+[
+  { "id": "lq-01", "question": "2025 年全球电动车销量与主要市场份额如何？", "tags": ["factual", "zh"] },
+  { "id": "lq-02", "question": "What are current best practices for prompt injection defense in LLM applications?", "tags": ["technical", "en"] },
+  { "id": "lq-03", "question": "固态电池商业化进展到什么阶段了？主要厂商的时间表是什么？", "tags": ["timely", "zh"] },
+  { "id": "lq-04", "question": "Is remote work increasing or decreasing productivity? Summarize the conflicting evidence.", "tags": ["disputed", "en"] },
+  { "id": "lq-05", "question": "RCEP 对东南亚跨境电商的实际影响有哪些？", "tags": ["analytical", "zh"] },
+  { "id": "lq-06", "question": "Compare the pricing models of major web search APIs for AI applications.", "tags": ["comparative", "en"] },
+  { "id": "lq-07", "question": "咖啡因对睡眠质量的影响：目前研究的共识与争议是什么？", "tags": ["disputed", "zh"] },
+  { "id": "lq-08", "question": "What is the evidence for and against a four-day work week improving retention?", "tags": ["disputed", "en"] },
+  { "id": "lq-09", "question": "中国新能源汽车出口欧洲面临哪些关税与合规变化？", "tags": ["timely", "zh"] },
+  { "id": "lq-10", "question": "What happened in the most recent major AI model releases and how do they compare?", "tags": ["timely", "en"] }
+]

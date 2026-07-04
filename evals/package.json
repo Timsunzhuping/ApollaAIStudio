@@ -6,7 +6,8 @@
   "description": "LLM product evals — deterministic research golden + citation/cost regression gates.",
   "scripts": {
     "eval": "tsx runner.ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "eval:live": "tsx live/runner.ts"
   },
   "dependencies": {
     "@apolla/bff": "workspace:*",

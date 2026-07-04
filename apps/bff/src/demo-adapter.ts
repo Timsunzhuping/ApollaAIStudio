@@ -40,6 +40,38 @@ export class DemoLLMAdapter implements LLMAdapter {
       return JSON.stringify({ columns: ['Option', 'Price', 'Rating'], rows: [['A', '$10', '4.5'], ['B', '$20', '4.0'], ['C', '$15', '4.8']] });
     }
 
+    // Research extract (S25): return VERBATIM quotes from the provided chunks so the
+    // orchestrator's programmatic quote verification passes in demo mode.
+    if (sys.includes('verbatim quotation')) {
+      const snippets = data.slice(0, 3).map((d) => {
+        const line = (d.content.split('\n').find((l) => l.trim().length >= 40) ?? d.content).trim();
+        return { sourceId: d.sourceId, quote: line.slice(0, 200), relevance: 'Directly addresses the sub-question.' };
+      });
+      return JSON.stringify({ snippets });
+    }
+    // Research compare (S25): claims over the provided snippet ids (status recomputed downstream).
+    if (sys.includes('comparison stage')) {
+      const ids = data.map((d) => d.sourceId);
+      const claims: { claim: string; supportingSnippetIds: string[]; conflictingSnippetIds: string[]; status: string }[] = [];
+      if (ids.length > 0) {
+        claims.push({
+          claim: `The evidence on ${q} points to continued measurable growth.`,
+          supportingSnippetIds: ids.slice(0, Math.min(2, ids.length)),
+          conflictingSnippetIds: [],
+          status: 'single_source',
+        });
+      }
+      if (ids.length > 2) {
+        claims.push({
+          claim: `Analysts differ on the pace of change for ${q}.`,
+          supportingSnippetIds: [ids[2]!],
+          conflictingSnippetIds: [],
+          status: 'single_source',
+        });
+      }
+      return JSON.stringify({ claims });
+    }
+
     // Cowork plan (S6): break a goal into parallel sub-goals.
     if (sys.includes('sub-goal')) {
       return JSON.stringify({
@@ -90,6 +122,18 @@ export class DemoLLMAdapter implements LLMAdapter {
     // Translator (S8): return a clearly-translated, structure-preserving doc offline.
     if (sys.includes('professional translator') && data[0]) {
       return `> _Translated (demo)_\n\n${data[0].content}`;
+    }
+    // Cited synthesis (S25): the data channel holds verified quotes → cite them as [^snippetId].
+    if (sys.includes('footnote')) {
+      const lines = data.map((d) => `${d.content.replace(/\s+/g, ' ').trim()} [^${d.sourceId}]`);
+      return [
+        `## Overview`,
+        `This report answers **${q}** from verified quotes.`,
+        ``,
+        `## Findings`,
+        ...lines.map((l) => `${l}\n`),
+        `_Demo synthesis (offline mode). Connect model keys for full analysis._`,
+      ].join('\n');
     }
     const bullets = data.map((d) => `- ${d.content.split('\n')[0] ?? ''} [${d.sourceId}]`).join('\n');
     return [

@@ -24,6 +24,14 @@ import type { Memory } from '../memory/types';
 import { userModelDirective } from '../memory/types';
 import type { TaskEvent } from './events';
 import { fetchEnrichEvidence } from './fetch-enrich';
+import {
+  SnippetsResult,
+  ClaimsCompareResult,
+  validateSnippets,
+  validateClaims,
+  pageKey,
+} from './verify';
+import type { Snippet } from '@apolla/contracts';
 
 const PlanResult = z.object({
   subquestions: z.array(z.string()).min(1),
@@ -199,45 +207,116 @@ export class ResearchOrchestrator {
       yield { type: 'sources', sources: task.sources };
       yield { type: 'step-end', state: 'search', stepId: step.id, summary: step.summary };
 
-      // 3) EXTRACT (evidence prepared; dedupe already done)
+      // The verified pipeline (S25: extract quotes → compare claims → cited synthesis) engages
+      // only when real page text was fetched AND its prompts are registered; otherwise the run
+      // takes the legacy path unchanged — fail-safe by construction.
+      const verifiedPath =
+        enrich.fetched > 0 &&
+        this.d.prompts.has('research.extract') &&
+        this.d.prompts.has('research.compare');
+      // Map a fetched chunk id back to its display source (citations must reference task.sources).
+      const sourceIdByOrigin = new Map(searchEvidence.map((uc) => [uc.origin, uc.sourceId]));
+      const originByPage = enrich.requestedOriginByPage;
+      const displaySourceIdForChunk = (chunkId: string): string | undefined => {
+        const origin = originByPage[pageKey(chunkId)];
+        return origin ? sourceIdByOrigin.get(origin) : undefined;
+      };
+
+      // 3) EXTRACT — select verbatim quotes per subquestion, then programmatically verify each
+      // quote is a real substring of its chunk (fabricated quotes are dropped, never repaired).
       step = begin('extract');
       yield { type: 'step-start', state: 'extract', stepId: step.id };
-      step.summary = `${evidence.length} evidence chunks`;
+      const fetchedChunks = enrich.evidence;
+      let rejectedQuotes = 0;
+      if (verifiedPath) {
+        const span3 = this.tracer.startSpan('extract', { parent: currentSpanContext() });
+        const seenQuotes = new Set<string>();
+        for (const sq of plan.subquestions) {
+          const req = assembleRequest({
+            system: this.d.prompts.render('research.extract').text,
+            user: sq,
+            data: fetchedChunks,
+          });
+          const raw = await router.json(this.planAlias, req, SnippetsResult);
+          const { snippets, rejected } = validateSnippets(raw, fetchedChunks, this.idGen);
+          rejectedQuotes += rejected;
+          for (const s of snippets) {
+            const key = `${s.sourceId} ${s.quote}`;
+            if (seenQuotes.has(key)) continue;
+            seenQuotes.add(key);
+            task.snippets.push(s);
+          }
+        }
+        span3.end();
+        step.summary = `${task.snippets.length} verified quotes` + (rejectedQuotes ? ` · ${rejectedQuotes} rejected` : '');
+        yield { type: 'snippets', snippets: task.snippets };
+      } else {
+        step.summary = `${evidence.length} evidence chunks`;
+      }
       yield { type: 'step-end', state: 'extract', stepId: step.id, summary: step.summary };
 
-      // 4) GENERATE — stream the prose report, then extract citations (two-phase streaming, S2-T9).
+      // 3b) COMPARE — derive cross-source claims over the verified quotes; claim status is
+      // recomputed from evidence (conflict → disputed; 2+ pages → corroborated).
+      const snippetData: UntrustedContent[] = task.snippets.map((s) => ({
+        kind: 'untrusted' as const,
+        sourceId: s.id,
+        origin: s.sourceId,
+        content: s.quote,
+      }));
+      if (verifiedPath && task.snippets.length > 0) {
+        step = begin('compare');
+        const spanC = this.tracer.startSpan('compare', { parent: currentSpanContext() });
+        yield { type: 'step-start', state: 'compare', stepId: step.id };
+        const compareReq = assembleRequest({
+          system: this.d.prompts.render('research.compare').text,
+          user: input.question,
+          data: snippetData,
+        });
+        const rawClaims = await router.json(this.planAlias, compareReq, ClaimsCompareResult);
+        task.citations = validateClaims(rawClaims, task.snippets, displaySourceIdForChunk);
+        spanC.end();
+        yield { type: 'citations', citations: task.citations };
+        yield { type: 'step-end', state: 'compare', stepId: step.id, summary: `${task.citations.length} compared claims` };
+      }
+
+      // 4) GENERATE — stream the prose report. On the verified path the model writes from the
+      // verified quotes and cites them as [^snippetId]; legacy runs keep two-phase citation
+      // extraction (S2-T9) so behavior is unchanged where S25 isn't active.
       step = begin('generate');
       const span4 = this.tracer.startSpan('generate', { parent: currentSpanContext() });
       yield { type: 'step-start', state: 'generate', stepId: step.id };
+      const useCited = verifiedPath && task.snippets.length > 0 && this.d.prompts.has('research.synthesize-cited');
       const proseReq = assembleRequest({
-        system: sys(this.d.prompts.render('research.synthesize').text),
+        system: sys(this.d.prompts.render(useCited ? 'research.synthesize-cited' : 'research.synthesize').text),
         user: input.question,
-        data: evidence,
+        data: useCited ? snippetData : evidence,
       });
       let report = '';
       for await (const chunk of router.complete(this.synthAlias, proseReq)) {
         report += chunk.delta;
         if (chunk.delta) yield { type: 'delta', text: chunk.delta };
       }
-      const extractReq = assembleRequest({
-        system: this.d.prompts.render('research.extract-citations').text,
-        user: report,
-        data: evidence,
-      });
-      const extracted = await router.json(this.synthAlias, extractReq, ClaimsResult);
-      const validIds = new Set(task.sources.map((s) => s.id));
-      // Citation integrity: keep only claims backed by a known source (ARCHITECTURE §3.9 / PRD §6.2).
-      task.citations = (extracted.claims ?? [])
-        .map((c) => ({ claim: c.claim, sourceIds: c.sourceIds.filter((id) => validIds.has(id)) }))
-        .filter((c): c is Citation => c.sourceIds.length > 0);
+      if (task.citations.length === 0) {
+        const extractReq = assembleRequest({
+          system: this.d.prompts.render('research.extract-citations').text,
+          user: report,
+          data: evidence,
+        });
+        const extracted = await router.json(this.synthAlias, extractReq, ClaimsResult);
+        const validIds = new Set(task.sources.map((s) => s.id));
+        // Citation integrity: keep only claims backed by a known source (ARCHITECTURE §3.9 / PRD §6.2).
+        task.citations = (extracted.claims ?? [])
+          .map((c) => ({ claim: c.claim, sourceIds: c.sourceIds.filter((id) => validIds.has(id)) }))
+          .filter((c): c is Citation => c.sourceIds.length > 0);
+        yield { type: 'citations', citations: task.citations };
+      }
       span4.end();
-      yield { type: 'citations', citations: task.citations };
       yield { type: 'step-end', state: 'generate', stepId: step.id, summary: `${task.citations.length} cited claims` };
 
-      // 5) DELIVER (assemble the report artifact)
+      // 5) DELIVER (assemble the report artifact — footnoted when verified quotes exist)
       step = begin('deliver');
       yield { type: 'step-start', state: 'deliver', stepId: step.id };
-      const artifact = buildReport(input.question, report, task.sources);
+      const artifact = buildReport(input.question, report, task.sources, task.snippets, task.citations);
       task.artifacts = [artifact];
       yield { type: 'artifact', artifact };
       yield { type: 'step-end', state: 'deliver', stepId: step.id };
@@ -273,8 +352,35 @@ function toSource(uc: UntrustedContent): Source {
   };
 }
 
-function buildReport(question: string, report: string, sources: Source[]): Artifact {
-  const list = sources.map((s) => `- [${s.id}] ${s.title ?? ''} — ${s.url ?? ''}`).join('\n');
-  const content = `# ${question}\n\n${report}\n\n## Sources\n\n${list}\n`;
+function buildReport(
+  question: string,
+  report: string,
+  sources: Source[],
+  snippets: Snippet[] = [],
+  citations: Citation[] = [],
+): Artifact {
+  const list = sources
+    .map((s) => `- [${s.id}] ${s.title ?? ''} — ${s.url ?? ''}${s.degraded ? ' _(snippet only — page fetch failed)_' : ''}`)
+    .join('\n');
+  const sections = [`# ${question}`, '', report];
+
+  // Verified path (S25): compared claims + verbatim quote footnotes make every conclusion traceable.
+  const compared = citations.filter((c) => c.status);
+  if (compared.length > 0) {
+    const label = { corroborated: 'Corroborated', single_source: 'Single source', disputed: 'Disputed' } as const;
+    sections.push(
+      '',
+      '## Key claims',
+      '',
+      ...compared.map(
+        (c) => `- **[${label[c.status!]}]** ${c.claim} (${(c.snippetIds ?? []).map((id) => `[^${id}]`).join(' ')})`,
+      ),
+    );
+  }
+  if (snippets.length > 0) {
+    sections.push('', '## Cited snippets', '', ...snippets.map((s) => `[^${s.id}]: "${s.quote}" — ${s.sourceId}`));
+  }
+  sections.push('', '## Sources', '', list, '');
+  const content = sections.join('\n');
   return { id: `artifact-${question.length}-${sources.length}`, type: 'report', format: 'markdown', content };
 }

@@ -21,7 +21,8 @@
     "db:up": "docker compose -f infra/docker-compose.yml up -d postgres",
     "db:down": "docker compose -f infra/docker-compose.yml down",
     "db:migrate": "pnpm --filter @apolla/db-postgres migrate",
-    "contract-test": "vitest run contract"
+    "contract-test": "vitest run contract",
+    "eval:live": "pnpm --filter @apolla/evals eval:live"
   },
   "devDependencies": {
     "@types/node": "^22.10.1",

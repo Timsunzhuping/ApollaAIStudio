@@ -6,6 +6,8 @@ import { MockAdapter } from '../router/mock';
 import { PromptRegistry } from '../prompts/registry';
 import { ToolRuntime } from '../tools/runtime';
 import { WebSearchTool, type SearchProvider, type SearchHit } from '../tools/search';
+import { WebFetchTool } from '../tools/fetch';
+import { StubFetchProvider } from '../tools/fetch-stub';
 import { InMemoryCostLedger } from '../cost/ledger';
 import { PricingBook } from '../cost/pricing';
 import { InMemoryTaskRepository } from '../repo/memory';
@@ -17,7 +19,7 @@ class FakeProvider implements SearchProvider {
   }
 }
 
-function makeOrchestrator() {
+function makeOrchestrator(opts: { withFetch?: boolean } = {}) {
   const planJSON = JSON.stringify({ subquestions: ['q1', 'q2'], estimateSeconds: 60 });
   const synthProse = 'EV sales rose in 2026 [fake:1].';
   const synthClaims = JSON.stringify({
@@ -29,6 +31,7 @@ function makeOrchestrator() {
 
   const tools = new ToolRuntime();
   tools.register(new WebSearchTool(new FakeProvider()));
+  if (opts.withFetch) tools.register(new WebFetchTool(new StubFetchProvider()));
 
   const prompts = new PromptRegistry([
     { promptId: 'research.plan', version: '1', scene: 'plan', template: 'Decompose the question.', safetyConstraints: [], rollout: 1 },
@@ -83,6 +86,20 @@ describe('ResearchOrchestrator', () => {
     expect(types).toContain('citations');
     expect(types).toContain('artifact');
     expect(types.at(-1)).toBe('done');
+  });
+
+  it('S25: enriches SEARCH with fetched page text while keeping the source list clean', async () => {
+    const { orch } = makeOrchestrator({ withFetch: true });
+    const events = await collect(orch.run({ ownerId: 'u1', question: 'EV market 2026', taskId: 't1' }));
+
+    // Source list stays one-per-origin (not one per fetched paragraph) and reports fetched count.
+    const searchEnd: any = events.find((e) => e.type === 'step-end' && (e as any).state === 'search');
+    expect(searchEnd.summary).toMatch(/fetched/);
+    const sources: any = events.find((e) => e.type === 'sources');
+    expect(sources.sources).toHaveLength(1);
+    expect(sources.sources[0].id).toBe('fake:1');
+    // The run still completes end-to-end with fetch enrichment active.
+    expect(events.at(-1)?.type).toBe('done');
   });
 
   it('produces a cited report and drops claims without a valid source', async () => {

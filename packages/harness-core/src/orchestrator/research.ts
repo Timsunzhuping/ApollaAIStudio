@@ -23,6 +23,7 @@ import type { TaskRepository } from '../repo/types';
 import type { Memory } from '../memory/types';
 import { userModelDirective } from '../memory/types';
 import type { TaskEvent } from './events';
+import { fetchEnrichEvidence } from './fetch-enrich';
 
 const PlanResult = z.object({
   subquestions: z.array(z.string()).min(1),
@@ -124,6 +125,7 @@ export class ResearchOrchestrator {
       question: input.question,
       steps: [],
       sources: [],
+      snippets: [],
       citations: [],
       artifacts: [],
       totalCostUsd: 0,
@@ -175,8 +177,25 @@ export class ResearchOrchestrator {
           evidence.push(uc);
         }
       }
-      task.sources = evidence.map((uc) => toSource(uc));
-      step.summary = `${task.sources.length} sources`;
+      // Sources for display/citation are the search hits (one per origin) — captured before
+      // fetch enrichment so the list stays clean instead of one entry per fetched paragraph.
+      const searchEvidence = [...evidence];
+      // S25: fetch the top-N pages for their real article text; degrade gracefully to the
+      // search snippet when `web_fetch` is absent or a page can't be fetched (never blocks).
+      const enrich = await fetchEnrichEvidence(this.d.tools, searchEvidence, { taskId });
+      const degraded = new Set(enrich.degradedOrigins);
+      for (const uc of enrich.evidence) {
+        if (seen.has(uc.sourceId)) continue;
+        seen.add(uc.sourceId);
+        evidence.push(uc);
+      }
+      task.sources = searchEvidence.map((uc) => {
+        const s = toSource(uc);
+        return uc.origin && degraded.has(uc.origin) ? { ...s, degraded: true } : s;
+      });
+      step.summary = enrich.fetched > 0
+        ? `${task.sources.length} sources · ${enrich.fetched} fetched`
+        : `${task.sources.length} sources`;
       yield { type: 'sources', sources: task.sources };
       yield { type: 'step-end', state: 'search', stepId: step.id, summary: step.summary };
 

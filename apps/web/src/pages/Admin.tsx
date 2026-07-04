@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { api, type AdminStats, type AdminUserRow, type AdminAuditRow } from '../lib/api';
+import { api, type AdminStats, type AdminUserRow, type AdminAuditRow, type NorthStarResponse } from '../lib/api';
 import { Card } from '../components/ui';
 
 function Stat({ label, value }: { label: string; value: number | string }) {
@@ -13,6 +13,7 @@ function Stat({ label, value }: { label: string; value: number | string }) {
 
 export function Admin() {
   const [stats, setStats] = useState<AdminStats | null>(null);
+  const [northstar, setNorthstar] = useState<NorthStarResponse | null>(null);
   const [users, setUsers] = useState<AdminUserRow[]>([]);
   const [audit, setAudit] = useState<AdminAuditRow[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -23,6 +24,7 @@ export function Admin() {
     void api.adminStats().then(setStats).catch((e) => setError(e instanceof Error ? e.message : 'failed'));
     void api.adminUsers(100).then(setUsers).catch(() => {});
     void api.adminAudit(50).then(setAudit).catch(() => {});
+    void api.adminNorthstar().then(setNorthstar).catch(() => {});
   };
   useEffect(load, []);
 
@@ -38,6 +40,25 @@ export function Admin() {
 
   return (
     <div className="col">
+      <Card title="North star — effective workflows / active user / week">
+        {!northstar ? <span className="muted">Loading…</span> : (
+          <div data-testid="northstar-panel">
+            <div className="row" style={{ flexWrap: 'wrap', gap: '1.5rem' }}>
+              <Stat label="North star (target ≥ 3)" value={northstar.current.perActiveUser.toFixed(2)} />
+              <Stat label="Active users" value={northstar.current.activeUsers} />
+              <Stat label="Users at target" value={`${(northstar.current.usersAtTarget * 100).toFixed(0)}%`} />
+              <Stat label="Activation ≤24h" value={`${(northstar.current.activation.rate * 100).toFixed(0)}%`} />
+              <Stat label="Completion" value={`${(northstar.current.funnel.completionRate * 100).toFixed(0)}%`} />
+              <Stat label="Adoption" value={`${(northstar.current.funnel.adoptionRate * 100).toFixed(0)}%`} />
+            </div>
+            <div className="muted" style={{ marginTop: '0.5rem', fontSize: '0.85rem' }}>
+              Week of {northstar.current.weekStartIso.slice(0, 10)} · funnel {northstar.current.funnel.submitted} submitted → {northstar.current.funnel.delivered} delivered → {northstar.current.funnel.adopted} adopted
+              {northstar.current.perActiveUser < 3 && ' · below target — prioritize root-cause analysis over new features'}
+            </div>
+          </div>
+        )}
+      </Card>
+
       <Card title="Operations overview">
         {!stats ? <span className="muted">Loading…</span> : (
           <div className="row" style={{ flexWrap: 'wrap', gap: '1.5rem' }} data-testid="admin-stats">

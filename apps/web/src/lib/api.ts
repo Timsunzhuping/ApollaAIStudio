@@ -35,6 +35,16 @@ async function http<T>(method: string, path: string, body?: unknown): Promise<T>
 
 export interface User { id: string; email: string; identities?: { provider: string }[]; mfaEnabled?: boolean; isAdmin?: boolean }
 export interface AdminStats { users: number; projects: number; tasks: number; jobs: Record<string, number>; subscriptions: Record<string, number> }
+export interface NorthStarWeek {
+  weekStartIso: string;
+  effectiveWorkflowsByOwner: Record<string, number>;
+  activeUsers: number;
+  perActiveUser: number;
+  usersAtTarget: number;
+  funnel: { submitted: number; delivered: number; adopted: number; completionRate: number; adoptionRate: number };
+  activation: { registered: number; activated: number; rate: number };
+}
+export interface NorthStarResponse { current: NorthStarWeek; previous: NorthStarWeek; report: string }
 export interface AdminUserRow { id: string; email: string; createdAt: string; plan: string | null; projects: number }
 export interface AdminAuditRow { id: string; ownerId: string; tool: string; risk: string; decision: string; status: string; summary: string; createdAt: string }
 export type LoginResult = User | { mfaRequired: true; pendingToken: string };
@@ -82,6 +92,7 @@ export const api = {
   version: () => http<{ version: string; mode: string; persistence: string }>('GET', '/api/version'),
   // operator console (S23)
   adminStats: () => http<AdminStats>('GET', '/api/admin/stats'),
+  adminNorthstar: () => http<NorthStarResponse>('GET', '/api/admin/northstar'),
   adminAudit: (limit = 50) => http<AdminAuditRow[]>('GET', `/api/admin/audit?limit=${limit}`),
   adminUsers: (limit = 100) => http<AdminUserRow[]>('GET', `/api/admin/users?limit=${limit}`),
   adminSetPlan: (id: string, plan: string) => http<{ ok: boolean; plan: string }>('POST', `/api/admin/users/${encodeURIComponent(id)}/plan`, { plan }),

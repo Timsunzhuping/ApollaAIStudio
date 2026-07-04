@@ -65,6 +65,19 @@ describe('Research page', () => {
     await waitFor(() => expect((screen.getByTestId('report-audio') as HTMLAudioElement).getAttribute('src')).toContain('/media/spoken.mp3'));
   });
 
+  it('maps routing failures to actionable copy with the raw detail collapsed', async () => {
+    render(<Research />);
+    fireEvent.change(screen.getByPlaceholderText(/Ask a research question/i), { target: { value: 'q' } });
+    fireEvent.click(screen.getByRole('button', { name: /Research/i }));
+    await waitFor(() => expect(MockEventSource.instances.length).toBeGreaterThan(0));
+    await act(async () => {
+      MockEventSource.last().emit({ type: 'error', message: 'json() exhausted all candidates for "gpt_premium" :: openai/x[403]' });
+    });
+    expect(await screen.findByText(/模型服务暂时不可用/)).toBeInTheDocument();
+    expect(screen.getByText('技术细节')).toBeInTheDocument();
+    expect(screen.getByText(/exhausted all candidates/)).toBeInTheDocument();
+  });
+
   it('dictates the question via the mic without auto-submitting (S19)', async () => {
     class FakeMediaRecorder {
       ondataavailable: ((e: { data: Blob }) => void) | null = null;

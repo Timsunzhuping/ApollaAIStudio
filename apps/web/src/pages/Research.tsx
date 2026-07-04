@@ -9,6 +9,26 @@ interface Snippet { id: string; sourceId: string; quote: string; relevance?: str
 interface Citation { claim: string; sourceIds: string[]; snippetIds?: string[]; status?: 'corroborated' | 'single_source' | 'disputed' }
 type Ev = { type: string } & Record<string, unknown>;
 
+/** Map raw pipeline errors to actionable copy; the raw detail stays visible but secondary. */
+function friendlyError(raw: string): { headline: string; detail?: string } {
+  if (/exhausted all candidates|no adapter registered/i.test(raw)) {
+    return {
+      headline: '模型服务暂时不可用 — 平台的模型网关配置需要管理员检查（模型路由未配置或供应商不可达）。',
+      detail: raw,
+    };
+  }
+  if (/unsupported_country|request_forbidden/i.test(raw)) {
+    return {
+      headline: '模型供应商拒绝了当前服务器地域的请求 — 管理员需切换到可达的模型网关（见部署手册「大陆地域」一节）。',
+      detail: raw,
+    };
+  }
+  if (/quota reached/i.test(raw)) {
+    return { headline: '本月任务额度已用完 — 可在 Billing 页升级套餐。', detail: raw };
+  }
+  return { headline: raw };
+}
+
 const CLAIM_LABEL: Record<string, { text: string; color: string }> = {
   corroborated: { text: '多源证实', color: 'var(--ok)' },
   single_source: { text: '单一来源', color: 'var(--muted)' },
@@ -213,7 +233,16 @@ export function Research() {
             </div>
           </div>
         )}
-        {error && <ErrorMsg>{error}</ErrorMsg>}
+        {error && (() => { const fe = friendlyError(error); return (
+          <ErrorMsg>
+            {fe.headline}
+            {fe.detail && fe.detail !== fe.headline && (
+              <details style={{ marginTop: 4 }}><summary style={{ cursor: 'pointer', fontSize: '0.8rem' }}>技术细节</summary>
+                <code style={{ fontSize: '0.75rem', wordBreak: 'break-all' }}>{fe.detail}</code>
+              </details>
+            )}
+          </ErrorMsg>
+        ); })()}
       </Card>
 
       {!started ? (

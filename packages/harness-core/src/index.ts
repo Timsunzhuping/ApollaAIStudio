@@ -151,4 +151,5 @@ export { ResearchOrchestrator } from './orchestrator/research';
 export type { ResearchDeps, RunInput } from './orchestrator/research';
 export type { TaskEvent, PlanSketch, Estimate } from './orchestrator/events';
 export { exportArtifact, embedMedia } from './artifact/export';
+export { markdownToDocx, markdownToDocumentXml } from './artifact/docx';
 export type { ExportFormat, ExportedFile } from './artifact/export';

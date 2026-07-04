@@ -1331,14 +1331,15 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
       const media = (await harness.mediaRepo.list(ownerId)).filter((m) => m.sourceTaskId === taskId && m.status === 'ready');
       const assets = media.flatMap((m) => m.assets);
       const embedded = assets.length ? { ...artifact, content: embedMedia(artifact.content ?? '', assets) } : artifact;
-      const fmt = url.searchParams.get('fmt') === 'html' ? 'html' : 'markdown';
+      const fmtParam = url.searchParams.get('fmt');
+      const fmt = fmtParam === 'html' ? 'html' : fmtParam === 'docx' ? 'docx' : 'markdown';
       const file = exportArtifact(embedded, fmt);
       track({ type: 'artifact_adopted', ownerId, taskId, adoption: 'export' });
       res.writeHead(200, {
         'content-type': file.mime,
         'content-disposition': `attachment; filename="${file.filename}"`,
       });
-      res.end(file.content);
+      res.end(typeof file.content === 'string' ? file.content : Buffer.from(file.content));
       return;
     }
 

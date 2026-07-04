@@ -1,4 +1,4 @@
-import type { TaskState, Source, Citation, Artifact } from '@apolla/contracts';
+import type { TaskState, Source, Snippet, Citation, Artifact } from '@apolla/contracts';
 
 export interface PlanSketch {
   subquestions: string[];
@@ -14,6 +14,7 @@ export type TaskEvent =
   | { type: 'step-start'; state: TaskState; stepId: string }
   | { type: 'step-end'; state: TaskState; stepId: string; summary?: string }
   | { type: 'sources'; sources: Source[] }
+  | { type: 'snippets'; snippets: Snippet[] }
   | { type: 'delta'; text: string }
   | { type: 'citations'; citations: Citation[] }
   | { type: 'artifact'; artifact: Artifact }

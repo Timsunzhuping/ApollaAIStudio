@@ -6,7 +6,7 @@ import { MockAdapter } from '../router/mock';
 import { PromptRegistry } from '../prompts/registry';
 import { ToolRuntime } from '../tools/runtime';
 import { WebSearchTool, type SearchProvider, type SearchHit } from '../tools/search';
-import { WebFetchTool } from '../tools/fetch';
+import { WebFetchTool, shortHash } from '../tools/fetch';
 import { StubFetchProvider } from '../tools/fetch-stub';
 import { InMemoryCostLedger } from '../cost/ledger';
 import { PricingBook } from '../cost/pricing';
@@ -100,6 +100,89 @@ describe('ResearchOrchestrator', () => {
     expect(sources.sources[0].id).toBe('fake:1');
     // The run still completes end-to-end with fetch enrichment active.
     expect(events.at(-1)?.type).toBe('done');
+  });
+
+  it('S25 verified path: extract verifies quotes, compare recomputes claims, report carries footnotes', async () => {
+    // Stub-fetched chunk ids for the search hit's origin.
+    const page = `fetch:${shortHash('https://a.test')}`;
+    const verbatim = 'the trend has continued through 2026 with measurable growth';
+    const extractJSON = JSON.stringify({
+      snippets: [
+        { sourceId: `${page}:2`, quote: verbatim, relevance: 'growth' },
+        { sourceId: `${page}:2`, quote: 'a quote that does not exist in the chunk' }, // must be rejected
+      ],
+    });
+    // idGen: plan step id-0, search id-1, extract id-2, first verified snippet id-3.
+    const compareJSON = JSON.stringify({
+      claims: [
+        { claim: 'Growth continued in 2026.', supportingSnippetIds: ['id-3'], conflictingSnippetIds: [], status: 'corroborated' },
+        { claim: 'Unsupported.', supportingSnippetIds: ['id-999'], conflictingSnippetIds: [], status: 'single_source' },
+      ],
+    });
+    const planJSON = JSON.stringify({ subquestions: ['q1'], estimateSeconds: 30 });
+
+    const tools = new ToolRuntime();
+    tools.register(new WebSearchTool(new FakeProvider()));
+    tools.register(new WebFetchTool(new StubFetchProvider()));
+    const prompts = new PromptRegistry([
+      { promptId: 'research.plan', version: '1', scene: 'p', template: 'plan', safetyConstraints: [], rollout: 1 },
+      { promptId: 'research.synthesize', version: '1', scene: 's', template: 'synth', safetyConstraints: [], rollout: 1 },
+      { promptId: 'research.synthesize-cited', version: '1', scene: 's', template: 'cited synth footnote', safetyConstraints: [], rollout: 1 },
+      { promptId: 'research.extract-citations', version: '1', scene: 'x', template: 'extract-cit', safetyConstraints: [], rollout: 1 },
+      { promptId: 'research.extract', version: '1', scene: 'x', template: 'verbatim quotation', safetyConstraints: [], rollout: 1 },
+      { promptId: 'research.compare', version: '1', scene: 'c', template: 'comparison stage', safetyConstraints: [], rollout: 1 },
+    ]);
+    let n = 0;
+    const orch = new ResearchOrchestrator({
+      adapters: new Map([
+        ['planp', new MockAdapter('planp', { jsonSequence: [planJSON, extractJSON, compareJSON] })],
+        ['synthp', new MockAdapter('synthp', { streamText: 'Growth continued in 2026. [^id-3]' })],
+      ]),
+      prompts,
+      tools,
+      ledger: new InMemoryCostLedger(new PricingBook().set('planp/m', { in: 1, out: 1 }).set('synthp/m', { in: 1, out: 1 })),
+      repo: new InMemoryTaskRepository(),
+      env: { MOCK_KEY: 'k' },
+      idGen: () => `id-${n++}`,
+      routeFor: (alias: ModelAlias): RouteConfig => ({
+        alias,
+        primary: alias === 'gpt_premium' ? 'planp/m' : 'synthp/m',
+        fallbackChain: [],
+        keyPool: ['MOCK_KEY'],
+      }),
+    });
+    const events = await collect(orch.run({ ownerId: 'u1', question: 'EV market 2026', taskId: 't1' }));
+
+    // compare step ran between extract and generate
+    const states = events.filter((e) => e.type === 'step-start').map((e: any) => e.state);
+    expect(states).toEqual(['plan', 'search', 'extract', 'compare', 'generate', 'deliver']);
+
+    // extract: the fabricated quote was rejected, one verified snippet survived
+    const snippets: any = events.find((e) => e.type === 'snippets');
+    expect(snippets.snippets).toHaveLength(1);
+    expect(snippets.snippets[0].quote).toBe(verbatim);
+    const extractEnd: any = events.find((e) => e.type === 'step-end' && (e as any).state === 'extract');
+    expect(extractEnd.summary).toContain('1 verified quotes');
+    expect(extractEnd.summary).toContain('1 rejected');
+
+    // compare: unsupported claim dropped; status recomputed (one page → single_source);
+    // sourceIds mapped to the DISPLAY source id (citation-correctness invariant)
+    const citations: any = events.find((e) => e.type === 'citations');
+    expect(citations.citations).toHaveLength(1);
+    expect(citations.citations[0].status).toBe('single_source');
+    expect(citations.citations[0].sourceIds).toEqual(['fake:1']);
+    expect(citations.citations[0].snippetIds).toEqual(['id-3']);
+
+    // deliver: footnoted report with key-claims table
+    const artifact: any = events.find((e) => e.type === 'artifact');
+    expect(artifact.artifact.content).toContain('## Key claims');
+    expect(artifact.artifact.content).toContain('## Cited snippets');
+    expect(artifact.artifact.content).toContain(`[^id-3]: "${verbatim}"`);
+    expect(events.at(-1)?.type).toBe('done');
+
+    // contract round-trip with snippets persisted
+    const persisted = Task.parse(JSON.parse(JSON.stringify(await (orch as any).d.repo.get('t1'))));
+    expect(persisted.snippets).toHaveLength(1);
   });
 
   it('produces a cited report and drops claims without a valid source', async () => {

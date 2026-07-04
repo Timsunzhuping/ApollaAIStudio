@@ -55,6 +55,12 @@ export class PromptRegistry {
     return this.byId.get(promptId) ?? [];
   }
 
+  /** True when at least one active (rollout > 0) version of the prompt is registered. */
+  has(promptId: string): boolean {
+    const list = this.byId.get(promptId);
+    return !!list && list.some((p) => p.rollout > 0);
+  }
+
   /**
    * Resolve a prompt version.
    * - `pin` → that exact version (throws if absent).

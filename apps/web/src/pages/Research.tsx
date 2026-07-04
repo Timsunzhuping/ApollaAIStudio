@@ -4,8 +4,16 @@ import { useSSE } from '../lib/sse';
 import { Card, Field, ErrorMsg } from '../components/ui';
 import { Markdown } from '../components/Markdown';
 
-interface Source { id: string; title?: string; url?: string }
+interface Source { id: string; title?: string; url?: string; degraded?: boolean }
+interface Snippet { id: string; sourceId: string; quote: string; relevance?: string }
+interface Citation { claim: string; sourceIds: string[]; snippetIds?: string[]; status?: 'corroborated' | 'single_source' | 'disputed' }
 type Ev = { type: string } & Record<string, unknown>;
+
+const CLAIM_LABEL: Record<string, { text: string; color: string }> = {
+  corroborated: { text: '多源证实', color: 'var(--ok)' },
+  single_source: { text: '单一来源', color: 'var(--muted)' },
+  disputed: { text: '存在争议', color: 'var(--danger)' },
+};
 
 export function Research() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -20,6 +28,9 @@ export function Research() {
   const [plan, setPlan] = useState<string[]>([]);
   const [report, setReport] = useState('');
   const [sources, setSources] = useState<Source[]>([]);
+  const [snippets, setSnippets] = useState<Snippet[]>([]);
+  const [citations, setCitations] = useState<Citation[]>([]);
+  const [evidenceTab, setEvidenceTab] = useState<'sources' | 'quotes' | 'claims'>('sources');
   const [cost, setCost] = useState(0);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -95,7 +106,7 @@ export function Research() {
     if (!question.trim()) return;
     setRunning(true);
     setError(null);
-    setSteps([]); setPlan([]); setReport(''); setSources([]); setCost(0); setMedia(null); setFeedback(null);
+    setSteps([]); setPlan([]); setReport(''); setSources([]); setSnippets([]); setCitations([]); setEvidenceTab('sources'); setCost(0); setMedia(null); setFeedback(null);
     try {
       const { taskId: id } = skill ? await api.runSkill(skill, question) : await api.createTask(question, projectId || undefined);
       setTaskId(id);
@@ -112,6 +123,8 @@ export function Research() {
       case 'plan': setPlan(((ev.plan as { subquestions?: string[] })?.subquestions) ?? []); break;
       case 'delta': setReport((r) => r + String(ev.text ?? '')); break;
       case 'sources': setSources((ev.sources as Source[]) ?? []); break;
+      case 'snippets': setSnippets((ev.snippets as Snippet[]) ?? []); setEvidenceTab('quotes'); break;
+      case 'citations': setCitations((ev.citations as Citation[]) ?? []); break;
       case 'cost': setCost(Number(ev.totalUsd ?? 0)); break;
       case 'done': setRunning(false); setEventsUrl(null); break;
       case 'error': setError(String(ev.message ?? 'error')); setRunning(false); setEventsUrl(null); break;
@@ -239,14 +252,41 @@ export function Research() {
           {audioSrc && <audio data-testid="report-audio" src={audioSrc} controls style={{ marginTop: '0.5rem', width: '100%' }} />}
           {media && <pre className="muted" style={{ marginTop: '0.5rem', whiteSpace: 'pre-wrap' }}>{media}</pre>}
         </Card>
-        <Card title="Sources">
-          <span className="cost badge">${cost.toFixed(4)}</span>
-          {sources.length === 0 ? <div className="muted">—</div> : sources.map((s) => (
-            <div key={s.id} className="step">
-              <span className="badge">[{s.id}]</span> {s.title}
-              {s.url && <div><a href={s.url} target="_blank" rel="noopener">{s.url}</a></div>}
-            </div>
-          ))}
+        <Card title="Evidence">
+          <div className="row" style={{ marginBottom: '0.5rem' }}>
+            <button className={`chip${evidenceTab === 'sources' ? ' active' : ''}`} aria-pressed={evidenceTab === 'sources'} onClick={() => setEvidenceTab('sources')}>Sources {sources.length}</button>
+            <button className={`chip${evidenceTab === 'quotes' ? ' active' : ''}`} aria-pressed={evidenceTab === 'quotes'} onClick={() => setEvidenceTab('quotes')}>Quotes {snippets.length}</button>
+            <button className={`chip${evidenceTab === 'claims' ? ' active' : ''}`} aria-pressed={evidenceTab === 'claims'} onClick={() => setEvidenceTab('claims')}>Claims {citations.length}</button>
+            <span className="cost badge" style={{ marginLeft: 'auto' }}>${cost.toFixed(4)}</span>
+          </div>
+          {evidenceTab === 'sources' && (
+            sources.length === 0 ? <div className="muted">—</div> : sources.map((s) => (
+              <div key={s.id} className="step">
+                <span className="badge">[{s.id}]</span> {s.title}
+                {s.degraded && <span className="badge" title="Page fetch failed — search snippet only" style={{ marginLeft: 4, color: 'var(--danger)' }}>snippet only</span>}
+                {s.url && <div><a href={s.url} target="_blank" rel="noopener">{s.url}</a></div>}
+              </div>
+            ))
+          )}
+          {evidenceTab === 'quotes' && (
+            snippets.length === 0 ? <div className="muted">Verified quotes appear here once pages are fetched.</div> : snippets.map((sn) => (
+              <div key={sn.id} className="step" data-testid={`quote-${sn.id}`}>
+                <div>“{sn.quote}”</div>
+                <div className="muted" style={{ fontSize: '0.75rem' }}>✓ verified · {sn.sourceId}</div>
+              </div>
+            ))
+          )}
+          {evidenceTab === 'claims' && (
+            citations.length === 0 ? <div className="muted">Compared claims appear here after analysis.</div> : citations.map((c, i) => (
+              <div key={i} className="step">
+                {c.status && CLAIM_LABEL[c.status] && (
+                  <span className="badge" style={{ color: CLAIM_LABEL[c.status]!.color, marginRight: 4 }}>{CLAIM_LABEL[c.status]!.text}</span>
+                )}
+                {c.claim}
+                <div className="muted" style={{ fontSize: '0.75rem' }}>来源：{c.sourceIds.join(', ')}</div>
+              </div>
+            ))
+          )}
         </Card>
       </div>
       )}

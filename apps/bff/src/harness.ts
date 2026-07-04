@@ -75,6 +75,7 @@ import {
   InMemoryMediaRepository,
   InMemoryConnectorRepository,
   InMemoryAuditRepository,
+  InMemoryProductEventRepository,
   InMemoryJobRepository,
   InMemoryScheduledTaskRepository,
   InMemoryNotificationRepository,
@@ -85,6 +86,7 @@ import {
   type MediaRepository,
   type ConnectorRepository,
   type AuditRepository,
+  type ProductEventRepository,
   type JobRepository,
   type JobResolver,
   type JobQueue,
@@ -125,6 +127,7 @@ import {
   PostgresMediaRepository,
   PostgresConnectorRepository,
   PostgresAuditRepository,
+  PostgresProductEventRepository,
   PostgresJobRepository,
   PostgresScheduledTaskRepository,
   PostgresNotificationRepository,
@@ -182,6 +185,8 @@ export interface Harness {
   mediaRepo: MediaRepository;
   connectors: ConnectorRepository;
   audit: AuditRepository;
+  /** Product-event log (S29): the source the north-star metric is derived from. */
+  events: ProductEventRepository;
   jobs: JobRunner;
   jobRepo: JobRepository;
   jobQueue: JobQueue;
@@ -264,6 +269,7 @@ export async function buildHarness(): Promise<Harness> {
   let mediaRepo: MediaRepository;
   let connectorRepo: ConnectorRepository;
   let auditRepo: AuditRepository;
+  let eventsRepo: ProductEventRepository;
   let jobRepo: JobRepository;
   let scheduleRepo: ScheduledTaskRepository;
   let notificationRepo: NotificationRepository;
@@ -292,6 +298,7 @@ export async function buildHarness(): Promise<Harness> {
     mediaRepo = new PostgresMediaRepository(sql);
     connectorRepo = new PostgresConnectorRepository(sql);
     auditRepo = new PostgresAuditRepository(sql);
+    eventsRepo = new PostgresProductEventRepository(sql);
     jobRepo = new PostgresJobRepository(sql);
     scheduleRepo = new PostgresScheduledTaskRepository(sql);
     notificationRepo = new PostgresNotificationRepository(sql);
@@ -330,6 +337,7 @@ export async function buildHarness(): Promise<Harness> {
     mediaRepo = new InMemoryMediaRepository();
     connectorRepo = new InMemoryConnectorRepository();
     auditRepo = new InMemoryAuditRepository();
+    eventsRepo = new InMemoryProductEventRepository();
     jobRepo = new InMemoryJobRepository();
     scheduleRepo = new InMemoryScheduledTaskRepository();
     notificationRepo = new InMemoryNotificationRepository();
@@ -563,6 +571,7 @@ export async function buildHarness(): Promise<Harness> {
     mediaRepo,
     connectors: connectorRepo,
     audit: auditRepo,
+    events: eventsRepo,
     jobs,
     jobRepo,
     jobQueue,

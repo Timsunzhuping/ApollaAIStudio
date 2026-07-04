@@ -10,6 +10,7 @@ export { PostgresMemory } from './memory';
 export { PostgresMediaRepository } from './media';
 export { PostgresConnectorRepository } from './connector';
 export { PostgresAuditRepository } from './audit';
+export { PostgresProductEventRepository } from './product-events';
 export { PostgresJobRepository } from './job';
 export { PostgresScheduledTaskRepository } from './schedule';
 export { PostgresNotificationRepository } from './notification';
@@ -157,6 +158,15 @@ CREATE TABLE IF NOT EXISTS audit_log (
 );
 CREATE INDEX IF NOT EXISTS audit_owner_idx ON audit_log (owner_id);
 CREATE INDEX IF NOT EXISTS audit_task_idx ON audit_log (task_id);
+
+CREATE TABLE IF NOT EXISTS product_events (
+  id          text PRIMARY KEY,
+  owner_id    text NOT NULL,
+  at          timestamptz NOT NULL,
+  data        jsonb NOT NULL
+);
+CREATE INDEX IF NOT EXISTS product_events_at_idx ON product_events (at);
+CREATE INDEX IF NOT EXISTS product_events_owner_idx ON product_events (owner_id);
 
 CREATE TABLE IF NOT EXISTS jobs (
   id          text PRIMARY KEY,

@@ -1,4 +1,5 @@
-import type { Task, User, Project, SkillDef, MediaTask, Connector, AuditEntry, Job, ScheduledTask, Notification, Plugin } from '@apolla/contracts';
+import type { Task, User, Project, SkillDef, MediaTask, Connector, AuditEntry,
+  ProductEvent, Job, ScheduledTask, Notification, Plugin } from '@apolla/contracts';
 import type { PluginRepository } from '../plugins/types';
 import type { JobRepository } from '../jobs/types';
 import type { ScheduledTaskRepository } from '../schedule/scheduler';
@@ -10,6 +11,7 @@ import type {
   ProjectRepository,
   ConnectorRepository,
   AuditRepository,
+  ProductEventRepository,
 } from './types';
 import type { SkillRepository, SkillSource } from '../skills/types';
 import type { MediaRepository } from '../media/types';
@@ -310,5 +312,18 @@ export class CompositeSkillSource implements SkillSource {
     const user = await this.userSkills.list(ownerId);
     const fromPlugins = this.plugins ? await this.plugins.skillsFor(ownerId) : [];
     return [...this.builtIns, ...user, ...fromPlugins];
+  }
+}
+
+export class InMemoryProductEventRepository implements ProductEventRepository {
+  private readonly events: ProductEvent[] = [];
+
+  async record(event: ProductEvent): Promise<void> {
+    this.events.push(structuredClone(event));
+  }
+
+  async listSince(sinceIso: string): Promise<ProductEvent[]> {
+    const since = Date.parse(sinceIso);
+    return this.events.filter((e) => Date.parse(e.at) >= since).map((e) => structuredClone(e));
   }
 }

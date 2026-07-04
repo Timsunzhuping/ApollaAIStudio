@@ -4,8 +4,9 @@ import { existsSync, readFileSync } from 'node:fs';
 import { extname, normalize, join } from 'node:path';
 import { exportArtifact, autoDraftSkill, embedMedia, encryptSecret, decryptSecret, inferRisk, AgentOrchestrator, nextRun, resolveEntitlements, hasFeature, newState, newPkce } from '@apolla/harness-core';
 import type { ResolvedIdentity } from '@apolla/harness-core';
-import type { Connector, Subscription, WebhookEvent, PlanDef } from '@apolla/contracts';
+import type { Connector, Subscription, WebhookEvent, PlanDef, ProductEvent } from '@apolla/contracts';
 import { hashPassword, verifyPassword, newApiToken } from '@apolla/harness-core';
+import { weeklyNorthStar, weeklyReportMarkdown, WEEK_MS } from '@apolla/harness-core';
 import { newTotpSecret, verifyTotp, otpauthUri, newRecoveryCodes, newMagicToken, verifyMagicToken } from '@apolla/harness-core';
 import { buildHarness, type Harness } from './harness';
 import { readSession, readBearer, startSession, endSession, mfaPendingToken, verifyMfaPending, shareToken, verifyShareToken } from './auth';
@@ -223,6 +224,14 @@ async function probeConnector(c: Connector): Promise<{ ok: boolean; toolCount?: 
  * (cross-process propagation: web → worker). Inbound traceparent is intentionally NOT honored as a
  * parent — it is untrusted; correlation only.
  */
+
+/** S29: append a product event (north-star source). Fire-and-forget — never fails a request. */
+function track(e: Omit<ProductEvent, 'id' | 'at'>): void {
+  void harness.events
+    .record({ id: randomUUID(), at: new Date().toISOString(), ...e })
+    .catch(() => {});
+}
+
 export async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const tracer = harness?.tracer;
   if (!tracer) return handleInner(req, res);
@@ -340,6 +349,7 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
     try {
       const user = await harness.users.register(email, hashPassword(password));
       await startSession(res, harness.sessions, user.id);
+      track({ type: 'user_registered', ownerId: user.id });
       return json(res, 201, { id: user.id, email: user.email });
     } catch {
       return json(res, 409, { error: 'email already registered' });
@@ -493,6 +503,16 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
     if (!limiters.owner().allow(ownerId)) {
       res.setHeader('Retry-After', String(limiters.owner().retryAfterSec(ownerId)));
       return json(res, 429, { error: 'rate limit exceeded — slow down' });
+    }
+    if (method === 'GET' && pathname === '/api/admin/northstar') {
+      // North star works from the event log — available in memory mode too (S29).
+      const now = Date.now();
+      const weekStart = new Date(now - WEEK_MS);
+      const prevStart = new Date(now - 2 * WEEK_MS);
+      const events = await harness.events.listSince(prevStart.toISOString());
+      const current = weeklyNorthStar(events, weekStart);
+      const previous = weeklyNorthStar(events, prevStart);
+      return json(res, 200, { current, previous, report: weeklyReportMarkdown(current, previous) });
     }
     if (!harness.admin) return json(res, 503, { error: 'operator console requires a configured database' });
     const limit = Number(url.searchParams.get('limit') ?? 50);
@@ -1226,6 +1246,21 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
     return json(res, 201, { mediaId, estimateUsd });
   }
 
+  // Feedback (S29 / PRD §6.9): thumbs verdict on a completed task. Owner-scoped, audited.
+  const feedback = pathname.match(/^\/api\/tasks\/([^/]+)\/feedback$/);
+  if (method === 'POST' && feedback) {
+    const task = await harness.repo.get(feedback[1]!);
+    if (!task || task.ownerId !== ownerId) return json(res, 404, { error: 'unknown task' });
+    const body = await readBody(req);
+    const verdict = String(body.verdict ?? '');
+    if (!['up', 'down', 'unusable'].includes(verdict)) {
+      return json(res, 400, { error: "verdict must be 'up' | 'down' | 'unusable'" });
+    }
+    track({ type: 'feedback_given', ownerId, taskId: task.id, verdict: verdict as 'up' | 'down' | 'unusable' });
+    await harness.audit.record({ id: randomUUID(), ownerId, taskId: task.id, tool: 'feedback', risk: 'read', decision: 'allow', status: 'executed', summary: `feedback: ${verdict}` });
+    return json(res, 201, { ok: true });
+  }
+
   const saveSkill = pathname.match(/^\/api\/tasks\/([^/]+)\/save-as-skill$/);
   if (method === 'POST' && saveSkill) {
     const task = await harness.repo.get(saveSkill[1]!);
@@ -1236,6 +1271,7 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
     const draft = autoDraftSkill(task);
     if (!draft) return json(res, 400, { error: 'task is not a completed research task' });
     const saved = await harness.skillRepo.save(ownerId, draft);
+    track({ type: 'artifact_adopted', ownerId, taskId: saveSkill[1]!, adoption: 'save_skill' });
     return json(res, 201, saved);
   }
 
@@ -1250,6 +1286,7 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
     }
     const taskId = randomUUID();
     harness.pending.set(taskId, { question, ownerId, projectId: body.projectId });
+    track({ type: 'task_submitted', ownerId, taskId });
     // Static pre-run cost estimate for a research task (high-cost task hint, PRD §6.8).
     return json(res, 201, { taskId, estimatedCostUsd: 0.002, quota: q });
   }
@@ -1274,6 +1311,8 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
           ? harness.skills.run(skill, { ownerId, question: input.question, taskId, projectId: input.projectId })
           : harness.orchestrator.run({ ownerId, question: input.question, taskId, projectId: input.projectId, systemAddendum });
         for await (const ev of stream) {
+          if (ev.type === 'done') track({ type: 'task_delivered', ownerId, taskId });
+          else if (ev.type === 'error') track({ type: 'task_failed', ownerId, taskId });
           res.write(`data: ${JSON.stringify(ev)}\n\n`);
         }
       } catch (e) {
@@ -1294,6 +1333,7 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
       const embedded = assets.length ? { ...artifact, content: embedMedia(artifact.content ?? '', assets) } : artifact;
       const fmt = url.searchParams.get('fmt') === 'html' ? 'html' : 'markdown';
       const file = exportArtifact(embedded, fmt);
+      track({ type: 'artifact_adopted', ownerId, taskId, adoption: 'export' });
       res.writeHead(200, {
         'content-type': file.mime,
         'content-disposition': `attachment; filename="${file.filename}"`,

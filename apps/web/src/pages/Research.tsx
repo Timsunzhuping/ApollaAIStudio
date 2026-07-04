@@ -95,7 +95,7 @@ export function Research() {
     if (!question.trim()) return;
     setRunning(true);
     setError(null);
-    setSteps([]); setPlan([]); setReport(''); setSources([]); setCost(0); setMedia(null);
+    setSteps([]); setPlan([]); setReport(''); setSources([]); setCost(0); setMedia(null); setFeedback(null);
     try {
       const { taskId: id } = skill ? await api.runSkill(skill, question) : await api.createTask(question, projectId || undefined);
       setTaskId(id);
@@ -139,6 +139,18 @@ export function Research() {
     const s = await api.saveAsSkill(taskId);
     setSkills(await api.skills());
     setSkill(s.name);
+  };
+
+  // Feedback (S29): one verdict per task; feeds the effective-workflow metric.
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const sendFeedback = async (verdict: 'up' | 'down') => {
+    if (!taskId) return;
+    try {
+      await api.sendFeedback(taskId, verdict);
+      setFeedback(verdict);
+    } catch {
+      setError('Feedback failed.');
+    }
   };
 
   // Idle = nothing started yet → show the launcher hero + examples instead of empty result cards (QW2).
@@ -213,6 +225,15 @@ export function Research() {
               <button className="ghost" onClick={() => void genMedia('image_premium')}>🖼 Cover</button>
               <button className="ghost" onClick={() => void genMedia('video_standard')}>🎬 Video</button>
               <button className="ghost" disabled={voiceBusy} onClick={() => void readAloud()}>🔊 Read aloud</button>
+              <span style={{ marginLeft: 'auto' }} />
+              {feedback ? (
+                <span className="muted" data-testid="feedback-thanks">Thanks for the feedback</span>
+              ) : (
+                <>
+                  <button className="ghost" aria-label="Helpful" title="Helpful" onClick={() => void sendFeedback('up')}>👍</button>
+                  <button className="ghost" aria-label="Not helpful" title="Not helpful" onClick={() => void sendFeedback('down')}>👎</button>
+                </>
+              )}
             </div>
           )}
           {audioSrc && <audio data-testid="report-audio" src={audioSrc} controls style={{ marginTop: '0.5rem', width: '100%' }} />}

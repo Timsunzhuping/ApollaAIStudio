@@ -141,6 +141,15 @@ export function Research() {
     setSkill(s.name);
   };
 
+  // Idle = nothing started yet → show the launcher hero + examples instead of empty result cards (QW2).
+  const started = running || !!taskId;
+  const EXAMPLES = [
+    '2026 年电动车市场现状与主要玩家',
+    '对比 Notion 与 Obsidian 的核心差异与适用人群',
+    '面试准备：产品经理岗位的常见问题清单',
+    '固态电池的商业化进展到哪一步了？',
+  ];
+
   return (
     <div className="col">
       <Card title="Research">
@@ -169,9 +178,26 @@ export function Research() {
             </select>
           </Field>
         </div>
+        {!started && (
+          <div style={{ marginTop: '0.5rem' }}>
+            <div className="example-label">Try one of these</div>
+            <div className="chips">
+              {EXAMPLES.map((q) => (
+                <button key={q} type="button" className="chip" onClick={() => setQuestion(q)}>{q}</button>
+              ))}
+            </div>
+          </div>
+        )}
         {error && <ErrorMsg>{error}</ErrorMsg>}
       </Card>
 
+      {!started ? (
+        <Card>
+          <p className="muted" style={{ margin: 0 }}>
+            输入一个研究问题，Apolla 会自动拆解、检索、抓取来源并生成带引用的报告 —— 完成后可导出、存为技能或生成配图。
+          </p>
+        </Card>
+      ) : (
       <div className="grid" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr', gap: '0.75rem' }}>
         <Card title="Trace">
           {plan.length > 0 && <div className="muted" style={{ marginBottom: '0.5rem' }}>{plan.map((p, i) => <div key={i}>• {p}</div>)}</div>}
@@ -202,6 +228,7 @@ export function Research() {
           ))}
         </Card>
       </div>
+      )}
     </div>
   );
 }

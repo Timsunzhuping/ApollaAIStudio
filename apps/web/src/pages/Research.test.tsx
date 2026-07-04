@@ -34,14 +34,29 @@ describe('Research page', () => {
       const es = MockEventSource.last();
       es.emit({ type: 'plan', plan: { subquestions: ['angle one'] } });
       es.emit({ type: 'delta', text: 'Hello from research' });
-      es.emit({ type: 'sources', sources: [{ id: 's:1', title: 'A Source', url: 'https://x' }] });
+      es.emit({ type: 'sources', sources: [{ id: 's:1', title: 'A Source', url: 'https://x' }, { id: 's:2', title: 'Degraded Source', url: 'https://y', degraded: true }] });
+      es.emit({ type: 'snippets', snippets: [{ id: 'sn-1', sourceId: 'fetch:ab:2', quote: 'prices fell below $90' }] });
+      es.emit({ type: 'citations', citations: [{ claim: 'Prices are falling.', sourceIds: ['s:1'], snippetIds: ['sn-1'], status: 'corroborated' }] });
       es.emit({ type: 'cost', totalUsd: 0.1234 });
       es.emit({ type: 'done' });
     });
 
     expect(await screen.findByText(/Hello from research/)).toBeInTheDocument();
-    expect(screen.getByText('A Source')).toBeInTheDocument();
     expect(screen.getByText('$0.1234')).toBeInTheDocument();
+
+    // Evidence panel (S26): snippet arrival auto-switches to Quotes with the verification mark.
+    expect(screen.getByText(/prices fell below \$90/)).toBeInTheDocument();
+    expect(screen.getByText(/✓ verified · fetch:ab:2/)).toBeInTheDocument();
+
+    // Claims tab: status chip + claim text.
+    fireEvent.click(screen.getByRole('button', { name: /Claims 1/ }));
+    expect(screen.getByText('多源证实')).toBeInTheDocument();
+    expect(screen.getByText('Prices are falling.')).toBeInTheDocument();
+
+    // Sources tab: degraded badge for failed fetches.
+    fireEvent.click(screen.getByRole('button', { name: /Sources 2/ }));
+    expect(screen.getByText('A Source')).toBeInTheDocument();
+    expect(screen.getByText('snippet only')).toBeInTheDocument();
     // closed on done
     expect(MockEventSource.last().closed).toBe(true);
 

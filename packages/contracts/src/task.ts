@@ -23,13 +23,32 @@ export const Source = z.object({
   title: z.string().optional(),
   snippet: z.string().optional(),
   trusted: z.boolean().default(false),
+  /** S25: fetch failed → fell back to the search snippet for this source. */
+  degraded: z.boolean().optional(),
 });
 export type Source = z.infer<typeof Source>;
 
-/** A claim with its backing sources — the unit checked by citation-correctness evals. */
+/** S25: a verbatim, machine-verifiable quote anchored to a fetched source chunk. */
+export const Snippet = z.object({
+  id: z.string(),
+  sourceId: z.string(),
+  quote: z.string().max(600),
+  relevance: z.string().optional(),
+});
+export type Snippet = z.infer<typeof Snippet>;
+
+export const ClaimStatus = z.enum(['corroborated', 'single_source', 'disputed']);
+export type ClaimStatus = z.infer<typeof ClaimStatus>;
+
+/**
+ * A claim with its backing sources — the unit checked by citation-correctness evals.
+ * S25 adds snippet-level backing + a cross-source status (both optional for back-compat).
+ */
 export const Citation = z.object({
   claim: z.string(),
   sourceIds: z.array(z.string()).min(1),
+  snippetIds: z.array(z.string()).optional(),
+  status: ClaimStatus.optional(),
 });
 export type Citation = z.infer<typeof Citation>;
 
@@ -62,6 +81,7 @@ export const Task = z.object({
   question: z.string().optional(),
   steps: z.array(Step).default([]),
   sources: z.array(Source).default([]),
+  snippets: z.array(Snippet).default([]),
   citations: z.array(Citation).default([]),
   artifacts: z.array(Artifact).default([]),
   totalCostUsd: z.number().default(0),

@@ -4,6 +4,9 @@ import {
   PromptRegistry,
   ToolRuntime,
   WebSearchTool,
+  WebFetchTool,
+  StubFetchProvider,
+  HttpFetchProvider,
   InMemoryCostLedger,
   InMemoryTaskRepository,
   InMemoryUserRepository,
@@ -239,8 +242,13 @@ export async function buildHarness(): Promise<Harness> {
   const search = TavilySearchProvider.isConfigured()
     ? new TavilySearchProvider()
     : new StubSearchProvider();
+  // S25: real page fetch when FETCH_MODE=http (or a live-model deploy); deterministic stub otherwise
+  // so tests/CI and offline demo stay hermetic. The research SEARCH stage enriches with fetched text.
+  const fetchProvider =
+    (process.env.FETCH_MODE ?? '').toLowerCase() === 'http' ? new HttpFetchProvider() : new StubFetchProvider();
   const tools = new ToolRuntime();
   tools.register(new WebSearchTool(search));
+  tools.register(new WebFetchTool(fetchProvider));
 
   let repo: TaskRepository;
   let users: UserRepository;
@@ -411,6 +419,7 @@ export async function buildHarness(): Promise<Harness> {
   const agentToolsFor = async (ownerId: string): Promise<ToolRuntime> => {
     const rt = new ToolRuntime();
     rt.register(new WebSearchTool(search));
+    rt.register(new WebFetchTool(fetchProvider));
     // Workspace file tools (S7): fs_read/fs_list (read) + fs_write (low_write), owner-scoped.
     for (const t of makeWorkspaceTools(workspaceRepo, { ownerId })) rt.register(t);
     for (const c of await connectorRepo.list(ownerId)) {

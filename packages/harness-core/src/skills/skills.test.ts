@@ -86,6 +86,7 @@ describe('autoDraftSkill', () => {
     question: 'State of the EV market in 2026',
     steps: [{ id: 's', state: 'search', costUsd: 0 }],
     sources: [],
+    snippets: [],
     citations: [],
     artifacts: [],
     totalCostUsd: 0,

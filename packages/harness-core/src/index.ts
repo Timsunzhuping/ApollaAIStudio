@@ -29,6 +29,8 @@ export { StubFetchProvider } from './tools/fetch-stub';
 export { HttpFetchProvider, extractMainText } from './tools/fetch-http';
 export { fetchEnrichEvidence } from './orchestrator/fetch-enrich';
 export { wrapMCPTool, inferRisk } from './tools/mcp';
+export { weeklyNorthStar, weeklyReportMarkdown, effectiveWorkflows, WEEK_MS } from './metrics/northstar';
+export type { WeeklyNorthStar } from './metrics/northstar';
 export { StubSpeechProvider } from './speech/stub';
 export type { SpeechProvider } from './speech/types';
 export { Rga, Replica } from './collab/rga';
@@ -65,6 +67,7 @@ export {
   InMemoryMediaRepository,
   InMemoryConnectorRepository,
   InMemoryAuditRepository,
+  InMemoryProductEventRepository,
   InMemoryJobRepository,
   InMemoryScheduledTaskRepository,
   InMemoryNotificationRepository,
@@ -135,7 +138,7 @@ export type {
   MediaRouteConfig,
 } from './media/types';
 export type { MediaRouterDeps, MediaGenerateResult } from './media/router';
-export type { TaskRepository, UserRepository, MfaRecord, ProjectRepository, ConnectorRepository, AuditRepository } from './repo/types';
+export type { TaskRepository, UserRepository, MfaRecord, ProjectRepository, ConnectorRepository, AuditRepository , ProductEventRepository } from './repo/types';
 export { encryptSecret, decryptSecret } from './security/secrets';
 export { SkillRuntime } from './skills/runtime';
 export { makeResearchExecutor, makeGenericExecutor, makeMediaExecutor, makeAgentExecutor } from './skills/executors';

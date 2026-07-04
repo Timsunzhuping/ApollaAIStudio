@@ -106,6 +106,7 @@ export const api = {
   taskEventsUrl: (taskId: string) => `${BASE}/api/tasks/${taskId}/events`,
   exportUrl: (taskId: string, fmt: 'md' | 'html') => `${BASE}/api/tasks/${taskId}/export?fmt=${fmt}`,
   saveAsSkill: (taskId: string) => http<{ name: string }>('POST', `/api/tasks/${taskId}/save-as-skill`),
+  sendFeedback: (taskId: string, verdict: 'up' | 'down' | 'unusable') => http<{ ok: boolean }>('POST', `/api/tasks/${taskId}/feedback`, { verdict }),
   taskMedia: (taskId: string, alias: string, confirm: boolean) =>
     http<{ mediaId?: string; requiresConfirmation?: boolean; estimateUsd?: number }>('POST', `/api/tasks/${taskId}/media`, { alias, confirm }),
   mediaEventsUrl: (mediaId: string) => `${BASE}/api/media/${mediaId}/events`,

@@ -9,6 +9,7 @@ import {
   InMemoryTaskRepository,
   InMemoryMemory,
   InMemoryWorkspaceRepository,
+  InMemoryConversationRepository,
 } from '@apolla/harness-core';
 import { buildAccountBundle, importBundle } from '@apolla/bff/account';
 import type { CheckResult } from './checks';
@@ -26,6 +27,7 @@ function dataSource() {
     repo: new InMemoryTaskRepository(),
     memory: new InMemoryMemory(),
     workspace: new InMemoryWorkspaceRepository(),
+    conversations: new InMemoryConversationRepository(),
   };
 }
 

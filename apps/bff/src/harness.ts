@@ -319,7 +319,7 @@ export async function buildHarness(): Promise<Harness> {
     // Account deletion (S22): irreversibly cascade-purge ALL of one owner's data in a single
     // transaction. Owner-keyed tables by owner_id; identity tables by user_id; then the user row.
     purgeOwner = async (ownerId: string) => {
-      const ownerTables = ['tasks', 'sessions', 'api_tokens', 'subscriptions', 'projects', 'memory_items', 'user_model', 'skills', 'media_tasks', 'connectors', 'audit_log', 'jobs', 'scheduled_tasks', 'notifications', 'plugins', 'workspace_files'];
+      const ownerTables = ['tasks', 'sessions', 'api_tokens', 'subscriptions', 'projects', 'memory_items', 'user_model', 'skills', 'media_tasks', 'connectors', 'audit_log', 'jobs', 'scheduled_tasks', 'notifications', 'plugins', 'workspace_files', 'product_events', 'conversations'];
       const userTables = ['oauth_identities', 'collab_access'];
       await sql.begin(async (tx) => {
         await tx`DELETE FROM job_events WHERE job_id IN (SELECT id FROM jobs WHERE owner_id = ${ownerId})`;

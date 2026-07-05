@@ -9,7 +9,7 @@ import type { Harness } from './harness';
  * ids for id-keyed rows, so a bundle can never overwrite or impersonate another tenant.
  */
 export async function buildAccountBundle(h: Harness, ownerId: string, email: string): Promise<AccountBundle> {
-  const [projects, skills, wsEntries, schedules, notifications, plugins, connectors, tasks, userModel] = await Promise.all([
+  const [projects, skills, wsEntries, schedules, notifications, plugins, connectors, tasks, userModel, conversations] = await Promise.all([
     h.projects.list(ownerId),
     h.skillRepo.list(ownerId),
     h.workspace.list(ownerId),
@@ -19,6 +19,7 @@ export async function buildAccountBundle(h: Harness, ownerId: string, email: str
     h.connectors.list(ownerId),
     h.repo.list(ownerId),
     h.memory.getUserModel(ownerId),
+    h.conversations.list(ownerId),
   ]);
   // Workspace list returns metadata only — read each file's content for a faithful export.
   const workspace = await Promise.all(
@@ -40,6 +41,7 @@ export async function buildAccountBundle(h: Harness, ownerId: string, email: str
     // Connector secrets are encrypted credentials — they NEVER leave the server.
     connectors: connectors.map((c: Record<string, unknown>) => ({ ...c, secrets: {} })),
     tasks,
+    conversations,
     userModel: userModel ?? null,
   });
 }

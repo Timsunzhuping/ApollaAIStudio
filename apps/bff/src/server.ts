@@ -14,7 +14,7 @@ import { z } from 'zod';
 import { CollabOp, AccountBundle } from '@apolla/contracts';
 import { buildAccountBundle, importBundle } from './account';
 import { isAdmin } from './admin';
-import { enforceConfigOrExit } from './config';
+import { enforceConfigOrExit, routesHavePlaceholders } from './config';
 import { VERSION, versionInfo } from './version';
 import { applySecurityHeaders, applyCors, clientIp, limiters, isExpensive, MAX_BODY_BYTES } from './security';
 import { observe, metrics, type ObservedResponse } from './obs';
@@ -323,6 +323,7 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
       persistence: harness.persistence,
       jobQueue: harness.jobQueue.inProcess ? 'in-process' : 'distributed',
       tracing: process.env.OTEL_EXPORTER_OTLP_ENDPOINT ? 'otel' : 'noop',
+      routes: routesHavePlaceholders() ? 'placeholder' : 'ok',
       features: { auto_skill_write: harness.features.enabled('auto_skill_write') },
     });
   }

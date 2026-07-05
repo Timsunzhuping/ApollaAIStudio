@@ -76,6 +76,7 @@ import {
   InMemoryConnectorRepository,
   InMemoryAuditRepository,
   InMemoryProductEventRepository,
+  InMemoryConversationRepository,
   InMemoryJobRepository,
   InMemoryScheduledTaskRepository,
   InMemoryNotificationRepository,
@@ -87,6 +88,8 @@ import {
   type ConnectorRepository,
   type AuditRepository,
   type ProductEventRepository,
+  type ConversationRepository,
+  ChatOrchestrator,
   type JobRepository,
   type JobResolver,
   type JobQueue,
@@ -153,6 +156,8 @@ function buildAuthProviders(): Map<string, AuthProvider> {
 
 export interface Harness {
   orchestrator: ResearchOrchestrator;
+  chat: ChatOrchestrator;
+  conversations: ConversationRepository;
   repo: TaskRepository;
   users: UserRepository;
   sessions: SessionRepository;
@@ -365,6 +370,17 @@ export async function buildHarness(): Promise<Harness> {
     env: { ...process.env, DEMO_KEY: 'demo' },
   });
 
+  // Unified chat (S28 / PRD §6.1): conversations with auto-compaction, next to research.
+  const conversations = new InMemoryConversationRepository();
+  const chat = new ChatOrchestrator({
+    adapters,
+    prompts,
+    conversations,
+    ledger,
+    routeFor,
+    env: { ...process.env, DEMO_KEY: 'demo' },
+  });
+
   // Skill Runtime: built-in config skills + user skills; research → orchestrator, else generic.
   const router = new ModelRouter({ adapters, routeFor, env: { ...process.env, DEMO_KEY: 'demo' }, onUsage: (e) => ledger.recordLLM(e), tracer });
   const skills = new SkillRuntime(
@@ -536,6 +552,8 @@ export async function buildHarness(): Promise<Harness> {
 
   return {
     orchestrator,
+    chat,
+    conversations,
     repo,
     users,
     sessions,

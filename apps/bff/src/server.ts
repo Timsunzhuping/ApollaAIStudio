@@ -1250,6 +1250,40 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
     return json(res, 201, { mediaId, estimateUsd });
   }
 
+  // --- Unified chat (S28 / PRD §6.1) ---
+  if (method === 'GET' && pathname === '/api/conversations') {
+    const list = await harness.conversations.list(ownerId);
+    // List view: metadata only (messages can be large).
+    return json(res, 200, list.map((c) => ({ id: c.id, title: c.title, compacted: c.compacted, updatedAt: c.updatedAt })));
+  }
+  const convoMatch = pathname.match(/^\/api\/conversations\/([^/]+)$/);
+  if (method === 'GET' && convoMatch) {
+    const c = await harness.conversations.get(convoMatch[1]!);
+    if (!c || c.ownerId !== ownerId) return json(res, 404, { error: 'unknown conversation' });
+    return json(res, 200, c);
+  }
+  if (method === 'POST' && pathname === '/api/chat') {
+    if (!limiters.owner().allow(ownerId)) {
+      res.setHeader('Retry-After', String(limiters.owner().retryAfterSec(ownerId)));
+      return json(res, 429, { error: 'rate limit exceeded — slow down' });
+    }
+    const body = await readBody(req);
+    const text = String(body.text ?? '').trim();
+    if (!text) return json(res, 400, { error: 'text is required' });
+    const mode = ['auto', 'gpt', 'claude'].includes(String(body.mode)) ? (String(body.mode) as 'auto' | 'gpt' | 'claude') : 'auto';
+    const conversationId = body.conversationId ? String(body.conversationId) : undefined;
+    res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
+    try {
+      for await (const ev of harness.chat.run({ ownerId, conversationId, mode, text })) {
+        res.write(`data: ${JSON.stringify(ev)}\n\n`);
+      }
+    } catch (e) {
+      res.write(`data: ${JSON.stringify({ type: 'error', message: e instanceof Error ? e.message : String(e) })}\n\n`);
+    }
+    res.end();
+    return;
+  }
+
   // Feedback (S29 / PRD §6.9): thumbs verdict on a completed task. Owner-scoped, audited.
   const feedback = pathname.match(/^\/api\/tasks\/([^/]+)\/feedback$/);
   if (method === 'POST' && feedback) {

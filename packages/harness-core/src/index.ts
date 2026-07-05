@@ -34,6 +34,7 @@ export { chunkDocument } from './rag/chunk';
 export { StubEmbeddingProvider, cosine } from './rag/embed';
 export type { EmbeddingProvider } from './rag/embed';
 export { retrieveWorkspaceEvidence } from './rag/retrieve';
+export { OpenAIEmbeddingProvider } from './rag/embed-openai';
 export { wrapMCPTool, inferRisk } from './tools/mcp';
 export { weeklyNorthStar, weeklyReportMarkdown, effectiveWorkflows, WEEK_MS } from './metrics/northstar';
 export type { WeeklyNorthStar } from './metrics/northstar';

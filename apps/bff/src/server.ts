@@ -5,7 +5,7 @@ import { extname, normalize, join } from 'node:path';
 import { exportArtifact, autoDraftSkill, embedMedia, encryptSecret, decryptSecret, inferRisk, AgentOrchestrator, nextRun, resolveEntitlements, hasFeature, newState, newPkce } from '@apolla/harness-core';
 import type { ResolvedIdentity } from '@apolla/harness-core';
 import type { Connector, Subscription, WebhookEvent, PlanDef, ProductEvent } from '@apolla/contracts';
-import { hashPassword, verifyPassword, newApiToken, retrieveWorkspaceEvidence, StubEmbeddingProvider } from '@apolla/harness-core';
+import { hashPassword, verifyPassword, newApiToken, retrieveWorkspaceEvidence, StubEmbeddingProvider, OpenAIEmbeddingProvider } from '@apolla/harness-core';
 import { weeklyNorthStar, weeklyReportMarkdown, WEEK_MS } from '@apolla/harness-core';
 import { newTotpSecret, verifyTotp, otpauthUri, newRecoveryCodes, newMagicToken, verifyMagicToken } from '@apolla/harness-core';
 import { buildHarness, type Harness } from './harness';
@@ -232,8 +232,15 @@ function track(e: Omit<ProductEvent, 'id' | 'at'>): void {
     .catch(() => {});
 }
 
-/** S27: deterministic offline embedder for workspace retrieval (real provider slots in later). */
-const embedder = new StubEmbeddingProvider();
+/** S27: real embeddings via the OpenAI-compatible gateway when EMBEDDINGS_MODEL is set; stub otherwise. */
+const embedder =
+  process.env.EMBEDDINGS_MODEL && process.env.OPENAI_API_KEY
+    ? new OpenAIEmbeddingProvider({
+        model: process.env.EMBEDDINGS_MODEL,
+        apiKey: process.env.OPENAI_API_KEY,
+        baseUrl: process.env.OPENAI_BASE_URL,
+      })
+    : new StubEmbeddingProvider();
 
 export async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const tracer = harness?.tracer;

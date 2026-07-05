@@ -5,6 +5,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { Login } from './pages/Login';
 import { Research } from './pages/Research';
 import { Chat } from './pages/Chat';
+import { Inbox } from './pages/Inbox';
 import { Workspace } from './pages/Workspace';
 import { Surfaces } from './pages/Surfaces';
 import { Agent } from './pages/Agent';
@@ -24,6 +25,7 @@ function Gate() {
       <Route element={<Shell />}>
         <Route path="/research" element={<Research />} />
         <Route path="/chat" element={<Chat />} />
+        <Route path="/inbox" element={<Inbox />} />
         <Route path="/workspace" element={<Workspace />} />
         <Route path="/collab" element={<Collab />} />
         <Route path="/collab/accept" element={<Collab />} />

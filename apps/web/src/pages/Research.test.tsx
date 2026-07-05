@@ -13,6 +13,7 @@ describe('Research page', () => {
       const u = String(url);
       const method = init?.method ?? 'GET';
       if (u.endsWith('/api/projects')) return fakeRes(200, []);
+      if (u.endsWith('/api/tasks') && method === 'GET') return fakeRes(200, []);
       if (u.endsWith('/api/skills')) return fakeRes(200, []);
       if (u.endsWith('/api/tasks') && method === 'POST') return fakeRes(200, { taskId: 't1' });
       if (u.endsWith('/api/speech/transcribe') && method === 'POST') return fakeRes(200, { text: 'spoken question' });
@@ -63,6 +64,17 @@ describe('Research page', () => {
     // S19: read the report aloud → synthesized audio plays.
     fireEvent.click(screen.getByRole('button', { name: /Read aloud/i }));
     await waitFor(() => expect((screen.getByTestId('report-audio') as HTMLAudioElement).getAttribute('src')).toContain('/media/spoken.mp3'));
+  });
+
+  it('S30: a brand-new account sees the first-run hero and can run the sample in one click', async () => {
+    render(<Research />);
+    const hero = await screen.findByTestId('first-run-hero');
+    expect(hero).toHaveTextContent('逐字核验过的引用');
+
+    fireEvent.click(screen.getByRole('button', { name: /跑一个示例/ }));
+    await waitFor(() => expect(MockEventSource.instances.length).toBeGreaterThan(0));
+    // the sample question was submitted (task created → SSE opened) and the hero yields to the run view
+    expect(screen.queryByTestId('first-run-hero')).not.toBeInTheDocument();
   });
 
   it('S26: citation marks in the report are numbered links that focus the verified quote', async () => {

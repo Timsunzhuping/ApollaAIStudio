@@ -160,4 +160,5 @@ export type { ResearchDeps, RunInput } from './orchestrator/research';
 export type { TaskEvent, PlanSketch, Estimate } from './orchestrator/events';
 export { exportArtifact, embedMedia } from './artifact/export';
 export { markdownToDocx, markdownToDocumentXml } from './artifact/docx';
+export { markdownToPptx, planSlides } from './artifact/pptx';
 export type { ExportFormat, ExportedFile } from './artifact/export';

@@ -1392,7 +1392,7 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
       const assets = media.flatMap((m) => m.assets);
       const embedded = assets.length ? { ...artifact, content: embedMedia(artifact.content ?? '', assets) } : artifact;
       const fmtParam = url.searchParams.get('fmt');
-      const fmt = fmtParam === 'html' ? 'html' : fmtParam === 'docx' ? 'docx' : 'markdown';
+      const fmt = fmtParam === 'html' ? 'html' : fmtParam === 'docx' ? 'docx' : fmtParam === 'pptx' ? 'pptx' : 'markdown';
       const file = exportArtifact(embedded, fmt);
       track({ type: 'artifact_adopted', ownerId, taskId, adoption: 'export' });
       res.writeHead(200, {

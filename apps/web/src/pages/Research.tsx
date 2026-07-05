@@ -308,6 +308,7 @@ export function Research() {
               <a className="badge" href={api.exportUrl(taskId, 'md')}>Export .md</a>
               <a className="badge" href={api.exportUrl(taskId, 'html')}>Export .html</a>
               <a className="badge" href={api.exportUrl(taskId, 'docx')}>Export .docx</a>
+              <a className="badge" href={api.exportUrl(taskId, 'pptx')}>Export .pptx</a>
               <button className="ghost" onClick={() => void saveSkill()}>★ Save as skill</button>
               <button className="ghost" onClick={() => void genMedia('image_premium')}>🖼 Cover</button>
               <button className="ghost" onClick={() => void genMedia('video_standard')}>🎬 Video</button>

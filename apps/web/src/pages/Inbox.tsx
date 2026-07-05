@@ -86,6 +86,7 @@ export function Inbox() {
                           <a className="badge" href={api.exportUrl(t.id, 'md')}>Export .md</a>
                           <a className="badge" href={api.exportUrl(t.id, 'html')}>Export .html</a>
                           <a className="badge" href={api.exportUrl(t.id, 'docx')}>Export .docx</a>
+                          <a className="badge" href={api.exportUrl(t.id, 'pptx')}>Export .pptx</a>
                         </div>
                       )}
                     </>

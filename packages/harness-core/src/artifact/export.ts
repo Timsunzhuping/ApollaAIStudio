@@ -1,7 +1,8 @@
 import type { Artifact } from '@apolla/contracts';
 import { markdownToDocx } from './docx';
+import { markdownToPptx } from './pptx';
 
-export type ExportFormat = 'markdown' | 'html' | 'docx';
+export type ExportFormat = 'markdown' | 'html' | 'docx' | 'pptx';
 
 export interface ExportedFile {
   filename: string;
@@ -89,6 +90,13 @@ export function exportArtifact(artifact: Artifact, fmt: ExportFormat): ExportedF
   const md = artifact.content ?? '';
   if (fmt === 'markdown') {
     return { filename: `${slug(artifact)}.md`, mime: 'text/markdown', content: md };
+  }
+  if (fmt === 'pptx') {
+    return {
+      filename: `${slug(artifact)}.pptx`,
+      mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      content: markdownToPptx(md),
+    };
   }
   if (fmt === 'docx') {
     return {

@@ -118,18 +118,23 @@ export function Research() {
     }
   };
 
+  // S30 onboarding: distinguish a brand-new account (zero tasks) for the guided first run.
+  const [taskCount, setTaskCount] = useState<number | null>(null);
   useEffect(() => {
     void api.projects().then(setProjects).catch(() => {});
     void api.skills().then(setSkills).catch(() => {});
+    void api.tasks().then((t) => setTaskCount(t.length)).catch(() => setTaskCount(null));
   }, []);
 
-  const run = async () => {
-    if (!question.trim()) return;
+  const run = async (q?: string) => {
+    const effective = (q ?? question).trim();
+    if (!effective) return;
+    if (q) setQuestion(q);
     setRunning(true);
     setError(null);
     setSteps([]); setPlan([]); setReport(''); setSources([]); setSnippets([]); setCitations([]); setEvidenceTab('sources'); setCost(0); setMedia(null); setFeedback(null);
     try {
-      const { taskId: id } = skill ? await api.runSkill(skill, question) : await api.createTask(question, projectId || undefined);
+      const { taskId: id } = skill ? await api.runSkill(skill, effective) : await api.createTask(effective, projectId || undefined);
       setTaskId(id);
       setEventsUrl(api.taskEventsUrl(id));
     } catch (e) {
@@ -265,11 +270,31 @@ export function Research() {
       </Card>
 
       {!started ? (
+        taskCount === 0 ? (
+          <Card title="欢迎使用 Apolla 👋">
+            <div className="col" data-testid="first-run-hero" style={{ gap: '0.75rem' }}>
+              <p style={{ margin: 0 }}>
+                Apolla 和普通 AI 聊天的区别：研究报告的每条结论都带<strong>逐字核验过的引用</strong>——
+                原文里没有的话，不会出现在报告里。
+              </p>
+              <ol className="muted" style={{ margin: 0, paddingLeft: '1.2rem', lineHeight: 2 }}>
+                <li>提问 → 自动拆解、检索、抓取来源原文</li>
+                <li>引文逐字验真 → 点击报告角标可回看原文片段</li>
+                <li>成品导出 Word / 存为技能复用 / 👍👎 反馈</li>
+              </ol>
+              <div className="row">
+                <button onClick={() => void run('2026 年固态电池商业化进展如何？')}>▶ 跑一个示例看看（约 1 分钟）</button>
+                <span className="muted">或直接在上方输入你自己的问题</span>
+              </div>
+            </div>
+          </Card>
+        ) : (
         <Card>
           <p className="muted" style={{ margin: 0 }}>
             输入一个研究问题，Apolla 会自动拆解、检索、抓取来源并生成带引用的报告 —— 完成后可导出、存为技能或生成配图。
           </p>
         </Card>
+        )
       ) : (
       <div className="grid" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr', gap: '0.75rem' }}>
         <Card title="Trace">

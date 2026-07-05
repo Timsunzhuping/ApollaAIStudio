@@ -6,6 +6,7 @@
  */
 export interface EmbeddingProvider {
   readonly name: string;
+  /** Vector dimension when fixed by the provider; -1 when provider-defined at runtime. */
   readonly dim: number;
   embed(texts: string[]): Promise<number[][]>;
 }

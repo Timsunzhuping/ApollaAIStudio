@@ -11,6 +11,7 @@ export { PostgresMediaRepository } from './media';
 export { PostgresConnectorRepository } from './connector';
 export { PostgresAuditRepository } from './audit';
 export { PostgresProductEventRepository } from './product-events';
+export { PostgresConversationRepository } from './conversations';
 export { PostgresJobRepository } from './job';
 export { PostgresScheduledTaskRepository } from './schedule';
 export { PostgresNotificationRepository } from './notification';
@@ -167,6 +168,14 @@ CREATE TABLE IF NOT EXISTS product_events (
 );
 CREATE INDEX IF NOT EXISTS product_events_at_idx ON product_events (at);
 CREATE INDEX IF NOT EXISTS product_events_owner_idx ON product_events (owner_id);
+
+CREATE TABLE IF NOT EXISTS conversations (
+  id          text PRIMARY KEY,
+  owner_id    text NOT NULL,
+  updated_at  timestamptz NOT NULL,
+  data        jsonb NOT NULL
+);
+CREATE INDEX IF NOT EXISTS conversations_owner_idx ON conversations (owner_id, updated_at DESC);
 
 CREATE TABLE IF NOT EXISTS jobs (
   id          text PRIMARY KEY,

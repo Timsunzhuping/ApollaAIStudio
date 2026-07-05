@@ -131,6 +131,7 @@ import {
   PostgresConnectorRepository,
   PostgresAuditRepository,
   PostgresProductEventRepository,
+  PostgresConversationRepository,
   PostgresJobRepository,
   PostgresScheduledTaskRepository,
   PostgresNotificationRepository,
@@ -275,6 +276,7 @@ export async function buildHarness(): Promise<Harness> {
   let connectorRepo: ConnectorRepository;
   let auditRepo: AuditRepository;
   let eventsRepo: ProductEventRepository;
+  let conversationsRepo: ConversationRepository;
   let jobRepo: JobRepository;
   let scheduleRepo: ScheduledTaskRepository;
   let notificationRepo: NotificationRepository;
@@ -304,6 +306,7 @@ export async function buildHarness(): Promise<Harness> {
     connectorRepo = new PostgresConnectorRepository(sql);
     auditRepo = new PostgresAuditRepository(sql);
     eventsRepo = new PostgresProductEventRepository(sql);
+    conversationsRepo = new PostgresConversationRepository(sql);
     jobRepo = new PostgresJobRepository(sql);
     scheduleRepo = new PostgresScheduledTaskRepository(sql);
     notificationRepo = new PostgresNotificationRepository(sql);
@@ -343,6 +346,7 @@ export async function buildHarness(): Promise<Harness> {
     connectorRepo = new InMemoryConnectorRepository();
     auditRepo = new InMemoryAuditRepository();
     eventsRepo = new InMemoryProductEventRepository();
+    conversationsRepo = new InMemoryConversationRepository();
     jobRepo = new InMemoryJobRepository();
     scheduleRepo = new InMemoryScheduledTaskRepository();
     notificationRepo = new InMemoryNotificationRepository();
@@ -371,7 +375,7 @@ export async function buildHarness(): Promise<Harness> {
   });
 
   // Unified chat (S28 / PRD §6.1): conversations with auto-compaction, next to research.
-  const conversations = new InMemoryConversationRepository();
+  const conversations = conversationsRepo;
   const chat = new ChatOrchestrator({
     adapters,
     prompts,

@@ -1,5 +1,5 @@
 import type { Task, User, Project, SkillDef, MediaTask, Connector, AuditEntry,
-  ProductEvent, Job, ScheduledTask, Notification, Plugin } from '@apolla/contracts';
+  ProductEvent, Conversation, Job, ScheduledTask, Notification, Plugin } from '@apolla/contracts';
 import type { PluginRepository } from '../plugins/types';
 import type { JobRepository } from '../jobs/types';
 import type { ScheduledTaskRepository } from '../schedule/scheduler';
@@ -12,6 +12,7 @@ import type {
   ConnectorRepository,
   AuditRepository,
   ProductEventRepository,
+  ConversationRepository,
 } from './types';
 import type { SkillRepository, SkillSource } from '../skills/types';
 import type { MediaRepository } from '../media/types';
@@ -325,5 +326,25 @@ export class InMemoryProductEventRepository implements ProductEventRepository {
   async listSince(sinceIso: string): Promise<ProductEvent[]> {
     const since = Date.parse(sinceIso);
     return this.events.filter((e) => Date.parse(e.at) >= since).map((e) => structuredClone(e));
+  }
+}
+
+export class InMemoryConversationRepository implements ConversationRepository {
+  private readonly items = new Map<string, Conversation>();
+
+  async create(c: Conversation): Promise<Conversation> {
+    this.items.set(c.id, structuredClone(c));
+    return structuredClone(c);
+  }
+  async get(id: string): Promise<Conversation | undefined> {
+    const c = this.items.get(id);
+    return c ? structuredClone(c) : undefined;
+  }
+  async save(c: Conversation): Promise<void> {
+    this.items.set(c.id, structuredClone(c));
+  }
+  async list(ownerId: string): Promise<Conversation[]> {
+    return [...this.items.values()].filter((c) => c.ownerId === ownerId)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map((c) => structuredClone(c));
   }
 }

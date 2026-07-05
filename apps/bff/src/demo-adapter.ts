@@ -123,6 +123,14 @@ export class DemoLLMAdapter implements LLMAdapter {
     if (sys.includes('professional translator') && data[0]) {
       return `> _Translated (demo)_\n\n${data[0].content}`;
     }
+    // Chat (S28): conversational reply grounded in the last user turn.
+    if (sys.includes('helpful assistant')) {
+      return `你好！关于「${q.slice(0, 80)}」：这是离线演示模式的回复 — 接入真实模型 key 后这里会是真正的对话。需要带来源的答案请用 Research。`;
+    }
+    // Compaction (S28): terse bullet summary of the transcript.
+    if (sys.includes('compact briefing') || sys.includes('Summarize the following conversation')) {
+      return '- 早前对话要点（演示摘要）';
+    }
     // Cited synthesis (S25): the data channel holds verified quotes → cite them as [^snippetId].
     if (sys.includes('footnote')) {
       const lines = data.map((d) => `${d.content.replace(/\s+/g, ' ').trim()} [^${d.sourceId}]`);

@@ -35,6 +35,14 @@ async function http<T>(method: string, path: string, body?: unknown): Promise<T>
 
 export interface User { id: string; email: string; identities?: { provider: string }[]; mfaEnabled?: boolean; isAdmin?: boolean }
 export interface AdminStats { users: number; projects: number; tasks: number; jobs: Record<string, number>; subscriptions: Record<string, number> }
+export interface ConversationSummary { id: string; title: string; compacted: boolean; updatedAt: string }
+export interface ConversationFull { id: string; title: string; messages: { role: 'system' | 'user' | 'assistant'; content: string }[] }
+export type ChatEvent =
+  | { type: 'conversation'; conversationId: string; title: string }
+  | { type: 'delta'; text: string }
+  | { type: 'done'; conversationId: string; alias: string; compacted: boolean; costUsd: number }
+  | { type: 'error'; message: string };
+
 export interface NorthStarWeek {
   weekStartIso: string;
   effectiveWorkflowsByOwner: Record<string, number>;
@@ -93,6 +101,35 @@ export const api = {
   // operator console (S23)
   adminStats: () => http<AdminStats>('GET', '/api/admin/stats'),
   adminNorthstar: () => http<NorthStarResponse>('GET', '/api/admin/northstar'),
+  conversations: () => http<ConversationSummary[]>('GET', '/api/conversations'),
+  conversation: (id: string) => http<ConversationFull>('GET', `/api/conversations/${id}`),
+  /** POST-SSE chat turn: parses `data:` frames and invokes onEvent per ChatEvent. */
+  chatStream: async (body: { conversationId?: string; text: string; mode: 'auto' | 'gpt' | 'claude' }, onEvent: (ev: ChatEvent) => void): Promise<void> => {
+    const res = await fetch(`${BASE}/api/chat`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok || !res.body) throw new Error(`chat failed: ${res.status}`);
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf('\n\n')) >= 0) {
+        const frame = buf.slice(0, idx);
+        buf = buf.slice(idx + 2);
+        const line = frame.split('\n').find((l) => l.startsWith('data: '));
+        if (line) {
+          try { onEvent(JSON.parse(line.slice(6)) as ChatEvent); } catch { /* skip malformed frame */ }
+        }
+      }
+    }
+  },
   adminAudit: (limit = 50) => http<AdminAuditRow[]>('GET', `/api/admin/audit?limit=${limit}`),
   adminUsers: (limit = 100) => http<AdminUserRow[]>('GET', `/api/admin/users?limit=${limit}`),
   adminSetPlan: (id: string, plan: string) => http<{ ok: boolean; plan: string }>('POST', `/api/admin/users/${encodeURIComponent(id)}/plan`, { plan }),

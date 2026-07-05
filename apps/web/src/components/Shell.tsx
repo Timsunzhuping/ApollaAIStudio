@@ -6,6 +6,7 @@ import { api } from '../lib/api';
 // Icon paths (Lucide-style, 24x24 viewBox) keyed by nav route.
 const ICONS: Record<string, string> = {
   '/research': 'M11 3a8 8 0 1 0 4.9 14.3l4.4 4.4M11 3a8 8 0 0 1 8 8',
+  '/chat': 'M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-4-1L3 20l1-5.5a8.5 8.5 0 1 1 17-3z',
   '/workspace': 'M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
   '/collab': 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 7a4 4 0 1 0 0 .01M23 21v-2a4 4 0 0 0-3-3.87',
   '/surfaces': 'M4 5h16v4H4zM4 13h7v6H4zM15 13h5v6h-5z',
@@ -18,6 +19,7 @@ const ICONS: Record<string, string> = {
 
 const PRIMARY = [
   { to: '/research', label: 'Research' },
+  { to: '/chat', label: 'Chat' },
   { to: '/workspace', label: 'Workspace' },
   { to: '/collab', label: 'Collab' },
   { to: '/surfaces', label: 'Surfaces' },

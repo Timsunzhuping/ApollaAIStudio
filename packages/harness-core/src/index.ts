@@ -28,6 +28,8 @@ export type { FetchProvider, FetchedPage, FetchOpts } from './tools/fetch';
 export { StubFetchProvider } from './tools/fetch-stub';
 export { HttpFetchProvider, extractMainText } from './tools/fetch-http';
 export { fetchEnrichEvidence } from './orchestrator/fetch-enrich';
+export { ChatOrchestrator, aliasForTurn, compactMessages, COMPACT_PREFIX } from './orchestrator/chat';
+export type { ChatDeps, ChatTurnInput, ChatEvent } from './orchestrator/chat';
 export { chunkDocument } from './rag/chunk';
 export { StubEmbeddingProvider, cosine } from './rag/embed';
 export type { EmbeddingProvider } from './rag/embed';
@@ -72,6 +74,7 @@ export {
   InMemoryConnectorRepository,
   InMemoryAuditRepository,
   InMemoryProductEventRepository,
+  InMemoryConversationRepository,
   InMemoryJobRepository,
   InMemoryScheduledTaskRepository,
   InMemoryNotificationRepository,
@@ -142,7 +145,7 @@ export type {
   MediaRouteConfig,
 } from './media/types';
 export type { MediaRouterDeps, MediaGenerateResult } from './media/router';
-export type { TaskRepository, UserRepository, MfaRecord, ProjectRepository, ConnectorRepository, AuditRepository , ProductEventRepository } from './repo/types';
+export type { TaskRepository, UserRepository, MfaRecord, ProjectRepository, ConnectorRepository, AuditRepository , ProductEventRepository, ConversationRepository } from './repo/types';
 export { encryptSecret, decryptSecret } from './security/secrets';
 export { SkillRuntime } from './skills/runtime';
 export { makeResearchExecutor, makeGenericExecutor, makeMediaExecutor, makeAgentExecutor } from './skills/executors';

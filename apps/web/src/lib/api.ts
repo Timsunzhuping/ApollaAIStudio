@@ -35,6 +35,8 @@ async function http<T>(method: string, path: string, body?: unknown): Promise<T>
 
 export interface User { id: string; email: string; identities?: { provider: string }[]; mfaEnabled?: boolean; isAdmin?: boolean }
 export interface AdminStats { users: number; projects: number; tasks: number; jobs: Record<string, number>; subscriptions: Record<string, number> }
+export interface TaskSummary { id: string; question?: string; state: string; totalCostUsd: number; createdAt?: string; citations: number }
+export interface TaskDetail { id: string; state: string; question?: string; artifacts: { content?: string }[]; totalCostUsd: number }
 export interface ConversationSummary { id: string; title: string; compacted: boolean; updatedAt: string }
 export interface ConversationFull { id: string; title: string; messages: { role: 'system' | 'user' | 'assistant'; content: string }[] }
 export type ChatEvent =
@@ -150,6 +152,8 @@ export const api = {
   setMemoryModel: (m: { language?: string; style?: string }) => http<void>('POST', '/api/memory/model', m),
   clearMemory: () => http<void>('DELETE', '/api/memory'),
   // research / tasks
+  tasks: () => http<TaskSummary[]>('GET', '/api/tasks'),
+  task: (id: string) => http<TaskDetail>('GET', `/api/tasks/${id}`),
   createTask: (question: string, projectId?: string) => http<{ taskId: string }>('POST', '/api/tasks', { question, projectId }),
   taskEventsUrl: (taskId: string) => `${BASE}/api/tasks/${taskId}/events`,
   exportUrl: (taskId: string, fmt: 'md' | 'html' | 'docx') => `${BASE}/api/tasks/${taskId}/export?fmt=${fmt}`,

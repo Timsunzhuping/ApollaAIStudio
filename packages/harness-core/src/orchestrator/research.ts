@@ -58,6 +58,8 @@ export interface ResearchDeps {
   synthAlias?: ModelAlias;
   /** Injectable id generator for deterministic tests. */
   idGen?: () => string;
+  /** Injectable clock for deterministic tests. */
+  now?: () => Date;
 }
 
 export interface RunInput {
@@ -138,6 +140,7 @@ export class ResearchOrchestrator {
       artifacts: [],
       totalCostUsd: 0,
       replayable: true,
+      createdAt: (this.d.now ? this.d.now() : new Date()).toISOString(),
     };
     await this.d.repo.create(task);
 

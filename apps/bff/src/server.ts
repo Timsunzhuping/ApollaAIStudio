@@ -1321,6 +1321,15 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
   }
 
   // --- Tasks ---
+  // Inbox (S26): the owner's task history, newest first, metadata only (artifacts via /:id).
+  if (method === 'GET' && pathname === '/api/tasks') {
+    const all = await harness.repo.list(ownerId);
+    const items = all
+      .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))
+      .slice(0, 100)
+      .map((t) => ({ id: t.id, question: t.question, state: t.state, totalCostUsd: t.totalCostUsd, createdAt: t.createdAt, citations: t.citations.length }));
+    return json(res, 200, items);
+  }
   if (method === 'POST' && pathname === '/api/tasks') {
     const body = await readBody(req);
     const question = String(body.question ?? '').trim();

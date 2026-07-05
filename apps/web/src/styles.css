@@ -107,3 +107,7 @@ label { font-size: 0.85rem; color: var(--muted); }
 .avatar-pop .meta { font-size: 0.72rem; color: var(--faint); padding: 0.35rem 0.6rem 0.15rem; word-break: break-all; }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* S26: inline citation marks in the report (numbered, clickable → evidence panel) */
+.markdown a[href^="#snippet-"] { font-size: 0.72em; vertical-align: super; background: var(--cite); color: var(--accent-deep); padding: 0 5px; border-radius: 5px; text-decoration: none; font-weight: 700; }
+.markdown a[href^="#snippet-"]:hover { background: var(--accent-wash); text-decoration: none; }

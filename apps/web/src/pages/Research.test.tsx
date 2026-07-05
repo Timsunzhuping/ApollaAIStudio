@@ -65,6 +65,27 @@ describe('Research page', () => {
     await waitFor(() => expect((screen.getByTestId('report-audio') as HTMLAudioElement).getAttribute('src')).toContain('/media/spoken.mp3'));
   });
 
+  it('S26: citation marks in the report are numbered links that focus the verified quote', async () => {
+    render(<Research />);
+    fireEvent.change(screen.getByPlaceholderText(/Ask a research question/i), { target: { value: 'q' } });
+    fireEvent.click(screen.getByRole('button', { name: /Research/i }));
+    await waitFor(() => expect(MockEventSource.instances.length).toBeGreaterThan(0));
+    await act(async () => {
+      const es = MockEventSource.last();
+      es.emit({ type: 'snippets', snippets: [{ id: 'sn-1', sourceId: 'fetch:ab:2', quote: 'prices fell below $90' }] });
+      es.emit({ type: 'delta', text: 'Prices are falling. [^sn-1]' });
+      es.emit({ type: 'done' });
+    });
+
+    // The marker renders as a numbered link…
+    const mark = await screen.findByRole('link', { name: '1' });
+    expect(mark.getAttribute('href')).toBe('#snippet-sn-1');
+    // …and clicking it switches to Quotes with the target card highlighted.
+    fireEvent.click(mark);
+    await waitFor(() => expect(screen.getByTestId('quote-sn-1')).toBeInTheDocument());
+    expect(screen.getByTestId('quote-sn-1').getAttribute('style')).toContain('outline');
+  });
+
   it('maps routing failures to actionable copy with the raw detail collapsed', async () => {
     render(<Research />);
     fireEvent.change(screen.getByPlaceholderText(/Ask a research question/i), { target: { value: 'q' } });

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api, type Project } from '../lib/api';
 import { useSSE } from '../lib/sse';
 import { Card, Field, ErrorMsg } from '../components/ui';
@@ -51,6 +51,7 @@ export function Research() {
   const [snippets, setSnippets] = useState<Snippet[]>([]);
   const [citations, setCitations] = useState<Citation[]>([]);
   const [evidenceTab, setEvidenceTab] = useState<'sources' | 'quotes' | 'claims'>('sources');
+  const [highlightId, setHighlightId] = useState<string | null>(null);
   const [cost, setCost] = useState(0);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -195,6 +196,24 @@ export function Research() {
     '固态电池的商业化进展到哪一步了？',
   ];
 
+  // S26: verified quotes get numbered, clickable citation marks in the streamed report.
+  const citeIndex = useMemo(() => new Map(snippets.map((sn, i) => [sn.id, i + 1])), [snippets]);
+  const decoratedReport = useMemo(
+    () => report.replace(/\[\^([\w-]+)\]/g, (m, id: string) => (citeIndex.has(id) ? `[${citeIndex.get(id)}](#snippet-${id})` : m)),
+    [report, citeIndex],
+  );
+  const onReportClick = (e: React.MouseEvent) => {
+    const a = (e.target as HTMLElement).closest('a');
+    const href = a?.getAttribute('href') ?? '';
+    if (!href.startsWith('#snippet-')) return;
+    e.preventDefault();
+    const id = href.slice('#snippet-'.length);
+    setEvidenceTab('quotes');
+    setHighlightId(id);
+    // The quotes tab may not be mounted yet — scroll on the next frame.
+    requestAnimationFrame(() => document.getElementById(`quote-${id}`)?.scrollIntoView?.({ block: 'nearest' }));
+  };
+
   return (
     <div className="col">
       <Card title="Research">
@@ -258,7 +277,7 @@ export function Research() {
           {steps.length === 0 ? <span className="muted">—</span> : steps.map((s, i) => <div key={i} className="step">{s}</div>)}
         </Card>
         <Card title="Report">
-          {report ? <Markdown>{report}</Markdown> : <span className="muted">Enter a question to begin.</span>}
+          {report ? <div onClick={onReportClick}><Markdown>{decoratedReport}</Markdown></div> : <span className="muted">Enter a question to begin.</span>}
           {taskId && !running && (
             <div className="row" style={{ marginTop: '0.5rem' }}>
               <a className="badge" href={api.exportUrl(taskId, 'md')}>Export .md</a>
@@ -300,7 +319,9 @@ export function Research() {
           )}
           {evidenceTab === 'quotes' && (
             snippets.length === 0 ? <div className="muted">Verified quotes appear here once pages are fetched.</div> : snippets.map((sn) => (
-              <div key={sn.id} className="step" data-testid={`quote-${sn.id}`}>
+              <div key={sn.id} id={`quote-${sn.id}`} className="step" data-testid={`quote-${sn.id}`}
+                style={highlightId === sn.id ? { background: 'var(--accent-wash)', borderRadius: 8, padding: '0.4rem 0.5rem', outline: '2px solid var(--accent)' } : undefined}>
+                <span className="badge" style={{ marginRight: 4 }}>{citeIndex.get(sn.id) ?? '·'}</span>
                 <div>“{sn.quote}”</div>
                 <div className="muted" style={{ fontSize: '0.75rem' }}>✓ verified · {sn.sourceId}</div>
               </div>

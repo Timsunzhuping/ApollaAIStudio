@@ -1,4 +1,5 @@
 import { DEV_SESSION_SECRET } from './auth';
+import { loadRoutes } from '@apolla/config';
 
 /**
  * Startup configuration validation (S24). In production we FAIL FAST on insecure config (a missing or
@@ -24,6 +25,21 @@ export function validateConfig(env: NodeJS.ProcessEnv = process.env): { errors: 
   }
 
   if (!env.OPENAI_API_KEY && !env.ANTHROPIC_API_KEY) warnings.push('No LLM API key (OPENAI_API_KEY / ANTHROPIC_API_KEY) — running the deterministic stub model.');
+  // Real mode with placeholder routes would 403/404 on every model call at runtime (first
+  // production deploy hit exactly this). Fail fast with the fix instead of booting broken.
+  if (env.OPENAI_API_KEY || env.ANTHROPIC_API_KEY) {
+    try {
+      if (routesHavePlaceholders()) {
+        errors.push(
+          'Model routes still contain *-PLACEHOLDER ids while an LLM key is set — every model call would fail. ' +
+            'Point APOLLA_ROUTES_FILE at a routes file with real model ids (see deploy runbook / routes.override.json), ' +
+            'or unset the LLM keys to run the offline stub.',
+        );
+      }
+    } catch (e) {
+      errors.push(`Model routes failed to load: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
   if (!env.ADMIN_EMAILS) warnings.push('ADMIN_EMAILS is unset — the operator console has no admins.');
   if (!env.REDIS_URL) warnings.push('REDIS_URL is unset — jobs run in-process (no distributed worker).');
 
@@ -39,4 +55,9 @@ export function enforceConfigOrExit(label: string, env: NodeJS.ProcessEnv = proc
     console.error(`[${label}] refusing to start with ${errors.length} configuration error(s).`);
     process.exit(1);
   }
+}
+
+/** True when the effective alias→model mapping still contains provisioning placeholders. */
+export function routesHavePlaceholders(): boolean {
+  return loadRoutes().some((r) => r.primary.includes('PLACEHOLDER') || r.fallbackChain.some((m) => m.includes('PLACEHOLDER')));
 }

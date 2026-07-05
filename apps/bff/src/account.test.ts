@@ -30,16 +30,39 @@ describe('account export + purge (S22)', () => {
     expect(JSON.stringify(bundle)).not.toContain('SUPER_SECRET_VALUE');
   });
 
+  it('exports chat conversations as part of the owner data (S28 follow-up)', async () => {
+    const owner = await mk();
+    await h.conversations.create({
+      id: 'c-export', ownerId: owner, title: '固态电池', compacted: false,
+      messages: [{ role: 'user', content: '你好' }],
+      createdAt: '2026-07-05T00:00:00.000Z', updatedAt: '2026-07-05T00:00:00.000Z',
+    });
+    const bundle = await buildAccountBundle(h, owner, 'me@x.ai');
+    expect(bundle.conversations.map((c) => c.id)).toContain('c-export');
+    // another owner's export must not see it
+    const other = await mk();
+    expect((await buildAccountBundle(h, other, 'o@x.ai')).conversations).toHaveLength(0);
+  });
+
   it('purgeOwner cascades the caller and leaves other tenants intact', async () => {
     const a = await mk();
     const b = await mk();
     await seed(a);
     await seed(b);
+    // S28/S29 tables joined the cascade: conversations + product events must not survive deletion.
+    await h.conversations.create({
+      id: `conv-${a}`, ownerId: a, title: 't', compacted: false,
+      messages: [{ role: 'user', content: 'hi' }],
+      createdAt: '2026-07-05T00:00:00.000Z', updatedAt: '2026-07-05T00:00:00.000Z',
+    });
+    await h.events.record({ id: `ev-${a}`, ownerId: a, type: 'task_submitted', taskId: 't1', at: '2026-07-05T00:00:00.000Z' });
     expect(h.purgeOwner).toBeTypeOf('function');
     await h.purgeOwner!(a);
     expect(await h.projects.list(a)).toHaveLength(0);
     expect(await h.skillRepo.list(a)).toHaveLength(0);
     expect(await h.workspace.list(a)).toHaveLength(0);
+    expect(await h.conversations.list(a)).toHaveLength(0);
+    expect((await h.events.listSince('2026-01-01T00:00:00.000Z')).filter((e) => e.ownerId === a)).toHaveLength(0);
     expect(await h.users.get(a)).toBeUndefined();
     // b is untouched
     expect(await h.projects.list(b)).toHaveLength(1);

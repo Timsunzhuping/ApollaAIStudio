@@ -16,6 +16,7 @@ export const AccountBundle = z.object({
   plugins: z.array(z.record(z.any())).default([]),
   connectors: z.array(z.record(z.any())).default([]),
   tasks: z.array(z.record(z.any())).default([]),
+  conversations: z.array(z.record(z.any())).default([]),
   userModel: z.record(z.any()).nullable().default(null),
 });
 export type AccountBundle = z.infer<typeof AccountBundle>;

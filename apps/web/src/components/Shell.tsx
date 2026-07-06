@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
+import { CommandPalette } from './CommandPalette';
 import { api } from '../lib/api';
 
 // Icon paths (Lucide-style, 24x24 viewBox) keyed by nav route.
@@ -60,6 +61,7 @@ export function Shell() {
 
   return (
     <div className="shell">
+      <CommandPalette />
       <nav className="sidebar" aria-label="Primary">
         <div className="brand">Apolla AI</div>
         {PRIMARY.map((n) => <NavItem key={n.to} to={n.to} label={n.label} />)}
@@ -81,6 +83,7 @@ export function Shell() {
         <header className="topbar">
           <span className="title">Workbench</span>
           <div className="row">
+            <span className="badge" title="命令面板" style={{ cursor: 'default' }}>⌘K</span>
             <span className="muted" style={{ fontSize: '0.85rem' }}>{user?.email}</span>
             <button className="ghost" onClick={() => void logout()}>Sign out</button>
           </div>

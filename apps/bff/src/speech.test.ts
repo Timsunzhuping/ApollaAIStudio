@@ -49,4 +49,16 @@ describe('speech endpoints (S19)', () => {
     expect((await post(c, '/api/speech/transcribe', { audio: '', mime: 'audio/webm' })).status).toBe(400);
     expect((await post(c, '/api/speech/synthesize', { text: 'x'.repeat(6000) })).status).toBe(413);
   });
+
+  it('streams a transcript word-by-word over SSE, final chunk marked done (S32)', async () => {
+    const c = await cookie();
+    const syn = (await (await post(c, '/api/speech/synthesize', { text: 'alpha beta gamma' })).json()) as { uri: string };
+    const audioB64 = Buffer.from(await (await fetch(`${base}${syn.uri}`)).arrayBuffer()).toString('base64');
+
+    const res = await post(c, '/api/speech/stream', { audio: audioB64, mime: 'audio/wav' });
+    expect(res.headers.get('content-type')).toContain('text/event-stream');
+    const frames = (await res.text()).split('\n\n').filter((l) => l.startsWith('data:')).map((l) => JSON.parse(l.slice(5)) as { text: string; done: boolean });
+    expect(frames.map((f) => f.text)).toEqual(['alpha', 'alpha beta', 'alpha beta gamma']);
+    expect(frames.at(-1)!.done).toBe(true);
+  });
 });

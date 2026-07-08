@@ -6,6 +6,17 @@ import { MockEventSource } from '../test/mockSSE';
 function fakeRes(status: number, payload: unknown) {
   return { ok: status >= 200 && status < 300, status, json: async () => payload, text: async () => JSON.stringify(payload) };
 }
+/** A fake Response whose body streams SSE frames (for the streaming transcription path). */
+function sseRes(frames: unknown[]) {
+  const enc = new TextEncoder();
+  const body = new ReadableStream<Uint8Array>({
+    start(c) {
+      for (const f of frames) c.enqueue(enc.encode(`data: ${JSON.stringify(f)}\n\n`));
+      c.close();
+    },
+  });
+  return { ok: true, status: 200, body, json: async () => ({}), text: async () => '' };
+}
 
 describe('Research page', () => {
   beforeEach(() => {
@@ -16,6 +27,7 @@ describe('Research page', () => {
       if (u.endsWith('/api/tasks') && method === 'GET') return fakeRes(200, []);
       if (u.endsWith('/api/skills')) return fakeRes(200, []);
       if (u.endsWith('/api/tasks') && method === 'POST') return fakeRes(200, { taskId: 't1' });
+      if (u.endsWith('/api/speech/stream') && method === 'POST') return sseRes([{ text: 'spoken', done: false }, { text: 'spoken question', done: true }]);
       if (u.endsWith('/api/speech/transcribe') && method === 'POST') return fakeRes(200, { text: 'spoken question' });
       if (u.endsWith('/api/speech/synthesize') && method === 'POST') return fakeRes(200, { uri: '/media/spoken.mp3' });
       return fakeRes(200, {});
@@ -129,7 +141,8 @@ describe('Research page', () => {
     fireEvent.click(screen.getByRole('button', { name: /Dictate question/i })); // start
     fireEvent.click(await screen.findByRole('button', { name: /Stop recording/i })); // stop → transcribe
 
+    // streamed word-by-word (S32) into the input, ending at the full transcript — NOT auto-submitted
     await waitFor(() => expect((screen.getByPlaceholderText(/Ask a research question/i) as HTMLInputElement).value).toBe('spoken question'));
-    expect(MockEventSource.instances).toHaveLength(0); // transcript filled the input — NOT auto-submitted
+    expect(MockEventSource.instances).toHaveLength(0);
   });
 });

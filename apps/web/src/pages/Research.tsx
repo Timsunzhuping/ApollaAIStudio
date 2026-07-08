@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, type Project } from '../lib/api';
 import { useSSE } from '../lib/sse';
 import { Card, Field, ErrorMsg } from '../components/ui';
@@ -39,6 +39,8 @@ export function Research() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [skills, setSkills] = useState<{ name: string }[]>([]);
   const [question, setQuestion] = useState('');
+  const questionRef = useRef('');
+  useEffect(() => { questionRef.current = question; });
   const [projectId, setProjectId] = useState('');
   const [skill, setSkill] = useState('');
 
@@ -96,8 +98,15 @@ export function Research() {
         r.onerror = () => reject(new Error('read failed'));
         r.readAsDataURL(blob);
       });
-      const { text } = await api.transcribe(dataUrl.split(',')[1] ?? '', mime);
-      setQuestion((q) => (q ? `${q} ${text}` : text));
+      const b64 = dataUrl.split(',')[1] ?? '';
+      // Stream the transcript so words appear as they're recognized; fall back to one-shot on error.
+      const prefix = questionRef.current ? `${questionRef.current} ` : '';
+      try {
+        await api.transcribeStream(b64, mime, (text) => setQuestion(prefix + text));
+      } catch {
+        const { text } = await api.transcribe(b64, mime);
+        setQuestion(prefix + text);
+      }
     } catch {
       setError('Transcription failed.');
     } finally {

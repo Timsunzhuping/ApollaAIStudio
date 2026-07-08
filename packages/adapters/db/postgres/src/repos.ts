@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { User, Project, SkillDef, Session, ApiToken, Subscription, OAuthIdentity, type User as UserT, type Project as ProjectT, type SkillDef as SkillDefT, type Session as SessionT, type ApiToken as ApiTokenT, type Subscription as SubscriptionT, type OAuthIdentity as OAuthIdentityT } from '@apolla/contracts';
-import type { UserRepository, ProjectRepository, SkillRepository, SessionRepository, ApiTokenRepository, SubscriptionRepository, IdentityRepository, MagicLinkRepository, MfaRecord, CollabAccessRepository } from '@apolla/harness-core';
+import type { UserRepository, ProjectRepository, SkillRepository, SessionRepository, ApiTokenRepository, SubscriptionRepository, IdentityRepository, MagicLinkRepository, MfaRecord, CollabAccessRepository, PasskeyRepository, PasskeyCredential } from '@apolla/harness-core';
 import type { Sql } from './index';
 
 export class PostgresUserRepository implements UserRepository {
@@ -225,5 +225,24 @@ export class PostgresCollabAccessRepository implements CollabAccessRepository {
   async list(docId: string): Promise<string[]> {
     const rows = await this.sql<{ user_id: string }[]>`SELECT user_id FROM collab_access WHERE doc_id = ${docId}`;
     return rows.map((r) => r.user_id);
+  }
+}
+
+export class PostgresPasskeyRepository implements PasskeyRepository {
+  constructor(private readonly sql: Sql) {}
+
+  async save(cred: PasskeyCredential): Promise<void> {
+    await this.sql`INSERT INTO passkeys (id, user_id, data) VALUES (${cred.id}, ${cred.userId}, ${this.sql.json(cred)}) ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data`;
+  }
+  async getById(id: string): Promise<PasskeyCredential | undefined> {
+    const rows = await this.sql<{ data: unknown }[]>`SELECT data FROM passkeys WHERE id = ${id}`;
+    return rows[0] ? (rows[0].data as PasskeyCredential) : undefined;
+  }
+  async listByUser(userId: string): Promise<PasskeyCredential[]> {
+    const rows = await this.sql<{ data: unknown }[]>`SELECT data FROM passkeys WHERE user_id = ${userId} ORDER BY created_at`;
+    return rows.map((r) => r.data as PasskeyCredential);
+  }
+  async delete(userId: string, id: string): Promise<void> {
+    await this.sql`DELETE FROM passkeys WHERE id = ${id} AND user_id = ${userId}`;
   }
 }

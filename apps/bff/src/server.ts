@@ -2,8 +2,8 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { extname, normalize, join } from 'node:path';
-import { exportArtifact, autoDraftSkill, embedMedia, encryptSecret, decryptSecret, inferRisk, AgentOrchestrator, nextRun, resolveEntitlements, hasFeature, newState, newPkce, streamTranscription } from '@apolla/harness-core';
-import type { ResolvedIdentity } from '@apolla/harness-core';
+import { exportArtifact, autoDraftSkill, embedMedia, encryptSecret, decryptSecret, inferRisk, AgentOrchestrator, nextRun, resolveEntitlements, hasFeature, newState, newPkce, streamTranscription, verifyAssertion } from '@apolla/harness-core';
+import type { ResolvedIdentity, PasskeyCredential, PublicKeyJwk } from '@apolla/harness-core';
 import type { Connector, Subscription, WebhookEvent, PlanDef, ProductEvent } from '@apolla/contracts';
 import { hashPassword, verifyPassword, newApiToken, retrieveWorkspaceEvidence, StubEmbeddingProvider, OpenAIEmbeddingProvider } from '@apolla/harness-core';
 import { weeklyNorthStar, weeklyReportMarkdown, WEEK_MS } from '@apolla/harness-core';
@@ -366,6 +366,34 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
       return json(res, 409, { error: 'email already registered' });
     }
   }
+  // Passkey (WebAuthn) sign-in (S33). Public — the assertion signature over a fresh single-use
+  // challenge IS the proof. Enumeration-safe: unknown emails still get a challenge + empty id list.
+  if (method === 'POST' && pathname === '/api/auth/passkey/login/start') {
+    const body = await readBody(req);
+    const email = String(body.email ?? '').trim().toLowerCase();
+    const cred = await harness.users.findCredentialByEmail(email);
+    const creds = cred ? await harness.passkeys.listByUser(cred.user.id) : [];
+    const challenge = harness.passkeyChallenges.issue(cred?.user.id);
+    return json(res, 200, { challenge, credentialIds: creds.map((c) => c.id) });
+  }
+  if (method === 'POST' && pathname === '/api/auth/passkey/login/finish') {
+    const body = await readBody(req);
+    const credId = String(body.credentialId ?? '');
+    const challenge = String(body.challenge ?? '');
+    const signature = String(body.signature ?? '');
+    const cred = await harness.passkeys.getById(credId);
+    const consumed = harness.passkeyChallenges.consume(challenge);
+    // Fail closed: unknown credential, unknown/reused challenge, challenge bound to a different user,
+    // or a signature that doesn't verify against the stored public key → generic 401.
+    if (!cred || !consumed || consumed.userId !== cred.userId || !verifyAssertion(cred, challenge, signature)) {
+      return json(res, 401, { error: 'passkey authentication failed' });
+    }
+    const user = await harness.users.get(cred.userId);
+    if (!user) return json(res, 401, { error: 'passkey authentication failed' });
+    await startSession(res, harness.sessions, user.id);
+    await harness.audit.record({ id: randomUUID(), ownerId: user.id, taskId: 'auth', tool: 'auth.passkey-login', risk: 'read', decision: 'allow', status: 'executed', summary: 'signed in with a passkey' });
+    return json(res, 200, { id: user.id, email: user.email });
+  }
   if (method === 'POST' && pathname === '/api/auth/login') {
     const body = await readBody(req);
     const email = String(body.email ?? '').trim().toLowerCase();
@@ -548,6 +576,39 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
       }
     }
     return json(res, 404, { error: 'unknown admin route' });
+  }
+
+  // --- Passkeys (S33): authed registration + management. A passkey is a phishing-resistant strong
+  // factor (public-key challenge–response), so a passkey login is a full session on its own. ---
+  if (method === 'POST' && pathname === '/api/auth/passkey/register/start') {
+    return json(res, 200, { challenge: harness.passkeyChallenges.issue(ownerId) });
+  }
+  if (method === 'POST' && pathname === '/api/auth/passkey/register/finish') {
+    const body = await readBody(req);
+    const credId = String(body.credentialId ?? '');
+    const challenge = String(body.challenge ?? '');
+    const signature = String(body.signature ?? '');
+    const publicKey = body.publicKey as PublicKeyJwk | undefined;
+    if (!credId || !publicKey || typeof publicKey !== 'object') return json(res, 400, { error: 'credentialId and publicKey required' });
+    const consumed = harness.passkeyChallenges.consume(challenge);
+    if (!consumed || consumed.userId !== ownerId) return json(res, 400, { error: 'invalid or expired challenge' });
+    // Prove possession of the private key before trusting the public key (a self-signed assertion).
+    const candidate: PasskeyCredential = { id: credId, userId: ownerId, publicKey, label: String(body.label ?? 'passkey').slice(0, 40), createdAt: new Date().toISOString() };
+    if (!verifyAssertion(candidate, challenge, signature)) return json(res, 400, { error: 'signature does not verify against the public key' });
+    await harness.passkeys.save(candidate);
+    await harness.audit.record({ id: randomUUID(), ownerId, taskId: 'auth', tool: 'auth.passkey-register', risk: 'low_write', decision: 'allow', status: 'executed', summary: `registered passkey ${candidate.label}` });
+    return json(res, 201, { id: credId, label: candidate.label });
+  }
+  if (method === 'GET' && pathname === '/api/auth/passkey') {
+    const creds = await harness.passkeys.listByUser(ownerId);
+    return json(res, 200, creds.map((c) => ({ id: c.id, label: c.label, createdAt: c.createdAt })));
+  }
+  {
+    const del = pathname.match(/^\/api\/auth\/passkey\/([^/]+)$/);
+    if (method === 'DELETE' && del) {
+      await harness.passkeys.delete(ownerId, del[1]!);
+      return json(res, 200, { ok: true });
+    }
   }
 
   // --- MFA enrollment (S20): authed. enroll → verify confirms → disable requires a code. ---

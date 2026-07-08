@@ -5,7 +5,7 @@ import type { TaskRepository } from '@apolla/harness-core';
 
 export type Sql = postgres.Sql;
 
-export { PostgresUserRepository, PostgresProjectRepository, PostgresSkillRepository, PostgresSessionRepository, PostgresApiTokenRepository, PostgresSubscriptionRepository, PostgresIdentityRepository, PostgresMagicLinkRepository, PostgresCollabAccessRepository } from './repos';
+export { PostgresUserRepository, PostgresProjectRepository, PostgresSkillRepository, PostgresSessionRepository, PostgresApiTokenRepository, PostgresSubscriptionRepository, PostgresIdentityRepository, PostgresMagicLinkRepository, PostgresCollabAccessRepository, PostgresPasskeyRepository } from './repos';
 export { PostgresMemory } from './memory';
 export { PostgresMediaRepository } from './media';
 export { PostgresConnectorRepository } from './connector';
@@ -98,6 +98,14 @@ CREATE TABLE IF NOT EXISTS collab_access (
   PRIMARY KEY (doc_id, user_id)
 );
 CREATE INDEX IF NOT EXISTS collab_access_doc_idx ON collab_access (doc_id);
+
+CREATE TABLE IF NOT EXISTS passkeys (
+  id          text PRIMARY KEY,
+  user_id     text NOT NULL,
+  data        jsonb NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS passkeys_user_idx ON passkeys (user_id);
 
 CREATE TABLE IF NOT EXISTS projects (
   id          text PRIMARY KEY,

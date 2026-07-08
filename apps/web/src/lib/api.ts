@@ -141,7 +141,8 @@ export const api = {
   accountImport: (bundle: unknown) => http<{ projects: number; skills: number; workspace: number }>('POST', '/api/account/import', { bundle }),
   // collab (S21)
   collabGet: (docId: string, since = 0) => http<{ docId: string; ownerId: string; text: string; seq: number; ops: unknown[]; participants: string[] }>('GET', `/api/collab/${encodeURIComponent(docId)}?since=${since}`),
-  collabPushOps: (docId: string, ops: unknown[]) => http<{ seq: number }>('POST', `/api/collab/${encodeURIComponent(docId)}/ops`, { ops }),
+  collabPushOps: (docId: string, ops: unknown[], cursor?: number, label?: string) => http<{ seq: number }>('POST', `/api/collab/${encodeURIComponent(docId)}/ops`, { ops, cursor, label }),
+  collabPresence: (docId: string, cursor: number, label?: string) => http<{ ok: boolean }>('POST', `/api/collab/${encodeURIComponent(docId)}/presence`, { cursor, label }),
   collabShare: (docId: string) => http<{ token: string; link: string }>('POST', `/api/collab/${encodeURIComponent(docId)}/share`, {}),
   collabAccept: (token: string) => http<{ docId: string }>('POST', '/api/collab/share/accept', { token }),
   collabEventsUrl: (docId: string, since = 0) => `${BASE}/api/collab/${encodeURIComponent(docId)}/events?since=${since}`,

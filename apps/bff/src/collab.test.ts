@@ -69,4 +69,20 @@ describe('collab sync + sharing (S21)', () => {
     // a shared (non-owner) collaborator cannot re-share
     expect((await post(guest, `/api/collab/${docId}/share`, {})).status).toBe(403);
   });
+
+  it('presence carries the caret position across editors (S31)', async () => {
+    const owner = await user();
+    const docId = `doc3-${Date.now()}`;
+    await get(owner, `/api/collab/${docId}?since=0`);
+    // owner reports a caret; a shared guest sees it in the pull state with a color + label.
+    expect((await post(owner, `/api/collab/${docId}/presence`, { cursor: 5, label: 'Owner' })).status).toBe(200);
+
+    const guest = await user();
+    const token = ((await (await post(owner, `/api/collab/${docId}/share`, {})).json()) as { token: string }).token;
+    await post(guest, '/api/collab/share/accept', { token });
+    const state = (await (await get(guest, `/api/collab/${docId}?since=0`)).json()) as { presence: { cursor: number; label: string; color: string }[] };
+    const ownerCaret = state.presence.find((p) => p.label === 'Owner');
+    expect(ownerCaret?.cursor).toBe(5);
+    expect(ownerCaret?.color).toMatch(/^#[0-9a-f]{6}$/);
+  });
 });

@@ -68,6 +68,9 @@ importers:
       '@apolla/queue-redis':
         specifier: workspace:*
         version: link:../../packages/adapters/queue/redis
+      '@apolla/search-ddg':
+        specifier: workspace:*
+        version: link:../../packages/adapters/search/ddg
       '@apolla/search-stub':
         specifier: workspace:*
         version: link:../../packages/adapters/search/stub
@@ -328,6 +331,12 @@ importers:
       ioredis:
         specifier: ^5.4.1
         version: 5.11.1
+
+  packages/adapters/search/ddg:
+    dependencies:
+      '@apolla/harness-core':
+        specifier: workspace:*
+        version: link:../../../harness-core
 
   packages/adapters/search/stub:
     dependencies:

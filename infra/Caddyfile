@@ -1,0 +1,22 @@
+# Optional production TLS via Caddy (S-ops). Terminates HTTPS with an automatic Let's Encrypt
+# certificate for a real hostname and reverse-proxies to the Apolla BFF. Use a hostname that resolves
+# to this box — a registered domain, or a wildcard-DNS host like 47-76-168-50.sslip.io for IP-only
+# boxes. Caddy uses the TLS-ALPN-01 challenge on :443, so it does not need :80 free.
+#
+#   docker run -d --name apolla-caddy --restart unless-stopped \
+#     -p 443:443 --add-host host.docker.internal:host-gateway \
+#     -v /opt/apolla/infra/Caddyfile:/etc/caddy/Caddyfile:ro \
+#     -v apolla_caddy_data:/data caddy:2
+#
+# Replace the site label below with your hostname before running.
+
+{$APOLLA_HOSTNAME:47-76-168-50.sslip.io} {
+	encode zstd gzip
+	reverse_proxy host.docker.internal:8080 {
+		flush_interval -1
+		header_up X-Forwarded-Proto https
+	}
+	request_body {
+		max_size 16MB
+	}
+}

@@ -119,7 +119,7 @@ import { OpenAIAdapter } from '@apolla/adapter-openai';
 import { AnthropicAdapter } from '@apolla/adapter-anthropic';
 import { StubSearchProvider } from '@apolla/search-stub';
 import { TavilySearchProvider } from '@apolla/search-tavily';
-import { DdgSearchProvider } from '@apolla/search-ddg';
+import { DdgSearchProvider, BraveSearchProvider } from '@apolla/search-ddg';
 import {
   createSql,
   migrate,
@@ -258,7 +258,9 @@ export async function buildHarness(): Promise<Harness> {
     ? new TavilySearchProvider()
     : DdgSearchProvider.isConfigured()
       ? new DdgSearchProvider()
-      : new StubSearchProvider();
+      : BraveSearchProvider.isConfigured()
+        ? new BraveSearchProvider()
+        : new StubSearchProvider();
   // S25: real page fetch when FETCH_MODE=http (or a live-model deploy); deterministic stub otherwise
   // so tests/CI and offline demo stay hermetic. The research SEARCH stage enriches with fetched text.
   const fetchProvider =

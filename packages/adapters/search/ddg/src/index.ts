@@ -71,3 +71,68 @@ function stripTags(s: string): string {
     .replace(/\s+/g, ' ')
     .trim();
 }
+
+const BRAVE_BASE = 'https://search.brave.com';
+
+/**
+ * Keyless Brave Search over its server-rendered HTML (SEARCH_PROVIDER=brave). In practice Brave is
+ * the engine that serves real results to datacenter IPs where DuckDuckGo answers with a bot
+ * challenge, so it's the default recommendation for cloud deployments. Same trust model as every
+ * remote source: results are UNTRUSTED DATA.
+ */
+export class BraveSearchProvider implements SearchProvider {
+  readonly name = 'brave';
+  private readonly baseUrl: string;
+
+  constructor(opts: DdgOptions = {}) {
+    this.baseUrl = opts.baseUrl ?? process.env.BRAVE_BASE_URL ?? BRAVE_BASE;
+  }
+
+  static isConfigured(): boolean {
+    return process.env.SEARCH_PROVIDER === 'brave';
+  }
+
+  async search(query: string, opts?: SearchOpts): Promise<SearchHit[]> {
+    const res = await fetch(`${this.baseUrl}/search?q=${encodeURIComponent(query)}`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+        Accept: 'text/html',
+      },
+      signal: opts?.signal,
+    });
+    if (!res.ok) throw new Error(`Brave ${res.status}`);
+    return parseBraveHtml(await res.text(), opts?.limit ?? 5);
+  }
+}
+
+/**
+ * Brave results are `<div class="snippet …" data-pos="N" data-type="web">` blocks: the first external
+ * anchor is the result url, the element whose class contains `title` holds the title, and the
+ * remaining block text (minus svg noise) is the description. Class names are svelte-hashed, so we
+ * anchor on the stable bits (`snippet`, `data-pos`, `title`).
+ */
+export function parseBraveHtml(html: string, limit: number): SearchHit[] {
+  const hits: SearchHit[] = [];
+  const blocks = html.split(/<div class="snippet[^"]*" data-pos="/).slice(1);
+  for (const block of blocks) {
+    if (hits.length >= limit) break;
+    const seg = block.slice(0, 6000).replace(/<svg[\s\S]*?<\/svg>/g, ' ').replace(/<path[^>]*>/g, ' ');
+    // First acceptable anchor wins — skip favicons/imgs proxies and brave-internal links.
+    let url = '';
+    const anchorRe = /<a[^>]*href="(https?:\/\/[^"]+)"/g;
+    for (let a = anchorRe.exec(seg); a; a = anchorRe.exec(seg)) {
+      const candidate = a[1] ?? '';
+      if (candidate && !/\bbrave\.com\//.test(candidate)) { url = candidate; break; }
+    }
+    if (!url) continue;
+    const titleMatch = seg.match(/class="[^"]*\btitle\b[^"]*"[^>]*>([\s\S]{0,400}?)<\/(?:div|span|a|h\d)>/);
+    const title = stripTags(titleMatch?.[1] ?? '');
+    if (!title) continue;
+    // Description: the block's text after the title text.
+    const text = stripTags(seg);
+    const at = text.indexOf(title);
+    const snippet = (at >= 0 ? text.slice(at + title.length) : text).trim().slice(0, 300);
+    hits.push({ title, url, snippet });
+  }
+  return hits;
+}

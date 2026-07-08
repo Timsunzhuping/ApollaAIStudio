@@ -650,7 +650,7 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
     await harness.audit.record({ id: randomUUID(), ownerId, taskId: 'collab', tool: 'collab.share-accept', risk: 'low_write', decision: 'allow', status: 'executed', summary: `granted access to ${docId}` });
     return json(res, 200, { docId });
   }
-  const collabMatch = pathname.match(/^\/api\/collab\/([^/]+)(\/ops|\/events|\/share)?$/);
+  const collabMatch = pathname.match(/^\/api\/collab\/([^/]+)(\/ops|\/events|\/share|\/presence)?$/);
   if (collabMatch) {
     const docId = collabMatch[1]!;
     const sub = collabMatch[2];
@@ -665,7 +665,20 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
       const body = await readBody(req);
       const parsed = z.array(CollabOp).safeParse(body.ops);
       if (!parsed.success) return json(res, 400, { error: 'invalid ops' });
+      // Piggyback presence (caret position + label) on the edit so co-editors see the caret move.
+      if (typeof body.cursor === 'number' || typeof body.label === 'string') {
+        doc.session.join(ownerId, Date.now(), { cursor: Number(body.cursor) || 0, label: body.label ? String(body.label).slice(0, 40) : undefined });
+      }
       return json(res, 200, doc.session.applyOps(parsed.data));
+    }
+    // Presence-only ping (S31): a bare caret move produces no op, so report it on its own channel.
+    if (method === 'POST' && sub === '/presence') {
+      const body = await readBody(req);
+      doc.session.join(ownerId, Date.now(), {
+        cursor: Number(body.cursor) || 0,
+        label: body.label ? String(body.label).slice(0, 40) : undefined,
+      });
+      return json(res, 200, { ok: true });
     }
     if (method === 'POST' && sub === '/share') {
       if (doc.ownerId !== ownerId) return json(res, 403, { error: 'only the owner can share' });
@@ -684,7 +697,7 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
         doc.session.join(ownerId); // presence heartbeat
         const ops = doc.session.opsSince(cursor);
         if (ops.length) cursor = doc.session.seq;
-        res.write(`data: ${JSON.stringify({ ops, seq: cursor, participants: doc.session.participants() })}\n\n`);
+        res.write(`data: ${JSON.stringify({ ops, seq: cursor, participants: doc.session.participants(), presence: doc.session.presence() })}\n\n`);
         await sleep(500);
       }
       res.end();
@@ -693,7 +706,7 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
     if (method === 'GET' && !sub) {
       doc.session.join(ownerId);
       const since = Number(url.searchParams.get('since') ?? 0);
-      return json(res, 200, { docId, ownerId: doc.ownerId, text: doc.session.text(), seq: doc.session.seq, ops: doc.session.opsSince(since), participants: doc.session.participants() });
+      return json(res, 200, { docId, ownerId: doc.ownerId, text: doc.session.text(), seq: doc.session.seq, ops: doc.session.opsSince(since), participants: doc.session.participants(), presence: doc.session.presence() });
     }
   }
 

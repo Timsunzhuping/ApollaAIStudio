@@ -2,7 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { extname, normalize, join } from 'node:path';
-import { exportArtifact, autoDraftSkill, embedMedia, encryptSecret, decryptSecret, inferRisk, AgentOrchestrator, nextRun, resolveEntitlements, hasFeature, newState, newPkce } from '@apolla/harness-core';
+import { exportArtifact, autoDraftSkill, embedMedia, encryptSecret, decryptSecret, inferRisk, AgentOrchestrator, nextRun, resolveEntitlements, hasFeature, newState, newPkce, streamTranscription } from '@apolla/harness-core';
 import type { ResolvedIdentity } from '@apolla/harness-core';
 import type { Connector, Subscription, WebhookEvent, PlanDef, ProductEvent } from '@apolla/contracts';
 import { hashPassword, verifyPassword, newApiToken, retrieveWorkspaceEvidence, StubEmbeddingProvider, OpenAIEmbeddingProvider } from '@apolla/harness-core';
@@ -288,7 +288,7 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
     return json(res, 429, { error: 'rate limit exceeded' });
   }
   // Body size limit for write methods (speech audio uploads get a larger cap, S19).
-  const bodyLimit = pathname === '/api/speech/transcribe' ? SPEECH_MAX_BODY_BYTES : MAX_BODY_BYTES;
+  const bodyLimit = pathname === '/api/speech/transcribe' || pathname === '/api/speech/stream' ? SPEECH_MAX_BODY_BYTES : MAX_BODY_BYTES;
   if ((method === 'POST' || method === 'PUT' || method === 'PATCH') && Number(req.headers['content-length'] ?? 0) > bodyLimit) {
     return json(res, 413, { error: 'payload too large' });
   }
@@ -621,6 +621,26 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
     const { text } = await harness.speech.transcribe(new Uint8Array(bytes), { mime });
     await harness.audit.record({ id: randomUUID(), ownerId, taskId: 'speech', tool: 'speech.transcribe', risk: 'read', decision: 'allow', status: 'executed', summary: `transcribed ${bytes.length} bytes` });
     return json(res, 200, { text });
+  }
+  // Streaming transcription (S32): the transcript is pushed word-by-word over SSE so the UI shows it
+  // as it arrives. Same limits/audit as one-shot; the transcript is still UNTRUSTED (fills an input).
+  if (method === 'POST' && pathname === '/api/speech/stream') {
+    if (!limiters.owner().allow(ownerId)) {
+      res.setHeader('Retry-After', String(limiters.owner().retryAfterSec(ownerId)));
+      return json(res, 429, { error: 'rate limit exceeded — slow down' });
+    }
+    const body = await readBody(req);
+    const bytes = Buffer.from(String(body.audio ?? ''), 'base64');
+    const mime = String(body.mime ?? 'audio/webm');
+    if (bytes.length === 0) return json(res, 400, { error: 'empty or invalid audio' });
+    if (bytes.length > SPEECH_MAX_AUDIO_BYTES) return json(res, 413, { error: 'audio too large' });
+    res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
+    for await (const chunk of streamTranscription(harness.speech, new Uint8Array(bytes), { mime })) {
+      res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+    }
+    await harness.audit.record({ id: randomUUID(), ownerId, taskId: 'speech', tool: 'speech.transcribe-stream', risk: 'read', decision: 'allow', status: 'executed', summary: `streamed ${bytes.length} bytes` });
+    res.end();
+    return;
   }
   if (method === 'POST' && pathname === '/api/speech/synthesize') {
     if (!limiters.owner().allow(ownerId)) {

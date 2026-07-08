@@ -148,6 +148,26 @@ export const api = {
   collabEventsUrl: (docId: string, since = 0) => `${BASE}/api/collab/${encodeURIComponent(docId)}/events?since=${since}`,
   // speech (S19)
   transcribe: (audio: string, mime: string) => http<{ text: string }>('POST', '/api/speech/transcribe', { audio, mime }),
+  // Streaming transcription (S32): calls back with the growing transcript as words arrive over SSE.
+  transcribeStream: async (audio: string, mime: string, onChunk: (text: string, done: boolean) => void): Promise<void> => {
+    const res = await fetch(`${BASE}/api/speech/stream`, { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ audio, mime }) });
+    if (!res.ok || !res.body) throw new ApiError(res.status, 'stream failed');
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const frames = buf.split('\n\n');
+      buf = frames.pop() ?? '';
+      for (const f of frames) {
+        if (!f.startsWith('data:')) continue;
+        const c = JSON.parse(f.slice(5)) as { text: string; done: boolean };
+        onChunk(c.text, c.done);
+      }
+    }
+  },
   synthesize: (text: string, voice?: string) => http<{ uri: string }>('POST', '/api/speech/synthesize', { text, voice }),
   getMemoryModel: () => http<Record<string, unknown>>('GET', '/api/memory/model'),
   setMemoryModel: (m: { language?: string; style?: string }) => http<void>('POST', '/api/memory/model', m),

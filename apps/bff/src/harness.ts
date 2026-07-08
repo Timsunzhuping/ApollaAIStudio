@@ -44,6 +44,9 @@ import {
   InMemoryCollabAccessRepository,
   type CollabRepository,
   type CollabAccessRepository,
+  InMemoryPasskeyRepository,
+  InMemoryChallengeStore,
+  type PasskeyRepository,
   resolveEntitlements,
   StubOAuthProvider,
   InMemoryIdentityRepository,
@@ -144,6 +147,7 @@ import {
   PostgresIdentityRepository,
   PostgresMagicLinkRepository,
   PostgresCollabAccessRepository,
+  PostgresPasskeyRepository,
 } from '@apolla/db-postgres';
 import { DemoLLMAdapter } from './demo-adapter';
 import { buildAdminApi, type AdminApi } from './admin';
@@ -171,6 +175,8 @@ export interface Harness {
   magicLinkDelivery: StubMagicLinkDelivery;
   collab: CollabRepository;
   collabAccess: CollabAccessRepository;
+  passkeys: PasskeyRepository;
+  passkeyChallenges: InMemoryChallengeStore;
   /** Irreversibly cascade-delete all of an owner's data (S22). Present only with a real database. */
   purgeOwner?: (ownerId: string) => Promise<void>;
   /** Operator-console aggregations (S23). Present only with a real database. */
@@ -277,6 +283,7 @@ export async function buildHarness(): Promise<Harness> {
   let identities: IdentityRepository;
   let magicLinks: MagicLinkRepository;
   let collabAccess: CollabAccessRepository;
+  let passkeys: PasskeyRepository;
   let projects: ProjectRepository;
   let memory: Memory;
   let skillRepo: SkillRepository;
@@ -307,6 +314,7 @@ export async function buildHarness(): Promise<Harness> {
     identities = new PostgresIdentityRepository(sql);
     magicLinks = new PostgresMagicLinkRepository(sql);
     collabAccess = new PostgresCollabAccessRepository(sql);
+    passkeys = new PostgresPasskeyRepository(sql);
     projects = new PostgresProjectRepository(sql);
     memory = new PostgresMemory(sql);
     skillRepo = new PostgresSkillRepository(sql);
@@ -347,6 +355,7 @@ export async function buildHarness(): Promise<Harness> {
     identities = new InMemoryIdentityRepository();
     magicLinks = new InMemoryMagicLinkRepository();
     collabAccess = new InMemoryCollabAccessRepository();
+    passkeys = new InMemoryPasskeyRepository();
     projects = new InMemoryProjectRepository();
     memory = new InMemoryMemory();
     skillRepo = new InMemorySkillRepository();
@@ -582,6 +591,8 @@ export async function buildHarness(): Promise<Harness> {
     // Collab (S21): in-memory live sessions; access grants persist (Postgres/in-memory).
     collab: new InMemoryCollabRepository(),
     collabAccess,
+    passkeys,
+    passkeyChallenges: new InMemoryChallengeStore(),
     purgeOwner,
     admin,
     ping,

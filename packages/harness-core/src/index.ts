@@ -87,6 +87,8 @@ export { hashPassword, verifyPassword } from './auth/password';
 export { newTotpSecret, generateTotp, verifyTotp, otpauthUri, newRecoveryCodes } from './auth/totp';
 export { newMagicToken, verifyMagicToken, InMemoryMagicLinkRepository, StubMagicLinkDelivery } from './auth/magiclink';
 export type { MagicLinkRepository, MagicLinkDelivery } from './auth/magiclink';
+export { newChallenge, verifyAssertion, InMemoryChallengeStore, InMemoryPasskeyRepository } from './auth/passkey';
+export type { PasskeyCredential, PasskeyRepository, PublicKeyJwk } from './auth/passkey';
 export { RateLimiter } from './security/ratelimit';
 export type { RateLimiterOptions } from './security/ratelimit';
 export { Metrics } from './obs/metrics';

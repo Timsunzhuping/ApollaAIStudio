@@ -96,3 +96,36 @@ provider console. For Stripe, point the webhook at `https://<your-host>/api/bill
 The Playwright e2e suite (`pnpm e2e`) runs the exact single-origin serving path against a hermetic
 in-memory BFF + stub providers (no network). It is the integration net over the unit/contract/web
 tests + evals. See [SPRINT_15](./SPRINT_15.md).
+
+## 6. Production operations (backup / monitoring / TLS)
+
+Scripts live in [`infra/`](../infra). All are optional and self-contained.
+
+**Search & pricing (real deployments).** Set `SEARCH_PROVIDER=brave` for keyless real web search
+(DuckDuckGo's html endpoint bot-challenges datacenter IPs; Brave serves them), or `TAVILY_API_KEY`
+for the search API (it takes precedence). Point `APOLLA_PRICING_FILE` at a JSON of `modelId → {in,out}`
+USD-per-1K-token prices so cost metering reflects your gateway models (see `config/pricing.json`).
+
+**Nightly database backup.** `infra/backup.sh` dumps the Postgres container (`pg_dump --clean`),
+gzips to `$BACKUP_DIR` (default `/var/backups/apolla`), and keeps the newest `$KEEP` (default 14).
+
+```
+0 3 * * * /opt/apolla/infra/backup.sh >> /var/log/apolla-backup.log 2>&1
+```
+
+Restore: `gunzip -c /var/backups/apolla/apolla-<stamp>.sql.gz | docker exec -i infra-postgres-1 psql -U postgres apolla`.
+
+**Liveness watchdog.** `infra/healthcheck.sh` polls `/api/ready`; on a sustained failure it restarts
+the service and (optionally, if `ALERT_WEBHOOK` is set) posts an alert.
+
+```
+*/5 * * * * /opt/apolla/infra/healthcheck.sh
+```
+
+For external uptime, point a monitor (UptimeRobot, Better Stack, …) at `https://<host>/api/ready`
+(200 = ready, 503 = DB unreachable) and scrape `/metrics` for per-operation SLOs.
+
+**Production TLS.** For a real hostname, `infra/Caddyfile` terminates HTTPS with an automatic
+Let's Encrypt certificate (TLS-ALPN-01 on :443 — no port 80 needed) and reverse-proxies to the BFF.
+IP-only boxes can use a wildcard-DNS host such as `47-76-168-50.sslip.io`. Set `NODE_ENV=production`
+once served over real HTTPS so cookies get the `Secure` flag.

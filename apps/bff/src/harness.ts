@@ -103,7 +103,7 @@ import {
   type Memory,
   type SkillRepository,
 } from '@apolla/harness-core';
-import { getRoute, loadSkills, loadPlugins, loadSurfaces, loadConnectorCatalog, loadPlans, loadFeatureGates, getMediaRoute } from '@apolla/config';
+import { getRoute, loadSkills, loadPlugins, loadSurfaces, loadConnectorCatalog, loadPlans, loadFeatureGates, getMediaRoute, loadPricing } from '@apolla/config';
 import { StripePaymentProvider } from '@apolla/payment-stripe';
 import { GoogleOAuthProvider, GitHubOAuthProvider } from '@apolla/auth-oauth';
 import { RedisJobQueue } from '@apolla/queue-redis';
@@ -119,6 +119,7 @@ import { OpenAIAdapter } from '@apolla/adapter-openai';
 import { AnthropicAdapter } from '@apolla/adapter-anthropic';
 import { StubSearchProvider } from '@apolla/search-stub';
 import { TavilySearchProvider } from '@apolla/search-tavily';
+import { DdgSearchProvider } from '@apolla/search-ddg';
 import {
   createSql,
   migrate,
@@ -243,6 +244,8 @@ export async function buildHarness(): Promise<Harness> {
     if (hasOpenAI) adapters.set('openai', new OpenAIAdapter());
     if (hasAnthropic) adapters.set('anthropic', new AnthropicAdapter());
     routeFor = getRoute;
+    // Cost metering: prices come from config/pricing.json (or the APOLLA_PRICING_FILE override).
+    for (const [modelId, price] of Object.entries(loadPricing())) pricing.set(modelId, price);
   } else {
     adapters.set('demo', new DemoLLMAdapter());
     routeFor = (alias) => ({ alias, primary: `demo/${alias}`, fallbackChain: [], keyPool: ['DEMO_KEY'] });
@@ -250,9 +253,12 @@ export async function buildHarness(): Promise<Harness> {
     pricing.set('demo/claude_write', { in: 0.001, out: 0.002 });
   }
 
+  // Search provider chain: Tavily (keyed) > keyless DuckDuckGo (SEARCH_PROVIDER=duckduckgo) > stub.
   const search = TavilySearchProvider.isConfigured()
     ? new TavilySearchProvider()
-    : new StubSearchProvider();
+    : DdgSearchProvider.isConfigured()
+      ? new DdgSearchProvider()
+      : new StubSearchProvider();
   // S25: real page fetch when FETCH_MODE=http (or a live-model deploy); deterministic stub otherwise
   // so tests/CI and offline demo stay hermetic. The research SEARCH stage enriches with fetched text.
   const fetchProvider =

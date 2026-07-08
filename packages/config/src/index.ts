@@ -61,6 +61,22 @@ export function loadRoutes(): RouteConfigT[] {
   return routes;
 }
 
+const PricingTable = z.record(z.object({ in: z.number().min(0), out: z.number().min(0) }));
+export type PricingTable = z.infer<typeof PricingTable>;
+
+/**
+ * Model pricing (USD per 1K tokens), modelId → {in, out}. Lives in pricing.json; a deployment can
+ * swap it via APOLLA_PRICING_FILE (absolute path) — same pattern as APOLLA_ROUTES_FILE. Unknown
+ * models simply cost $0 (PricingBook's default), so this file is additive.
+ */
+export function loadPricing(): PricingTable {
+  const override = process.env.APOLLA_PRICING_FILE;
+  const raw = (
+    override ? (JSON.parse(fs.readFileSync(override, 'utf8')) as unknown) : readJson('pricing.json')
+  ) as { pricing?: unknown };
+  return PricingTable.parse(raw.pricing ?? {});
+}
+
 /** Resolve a single route by alias. */
 export function getRoute(alias: z.infer<typeof ModelAlias>): RouteConfigT {
   const route = loadRoutes().find((r) => r.alias === alias);

@@ -81,6 +81,13 @@ export const api = {
   mfaDisable: (code: string) => http<{ mfaEnabled: boolean }>('POST', '/api/auth/mfa/disable', { code }),
   magicLinkRequest: (email: string) => http<{ ok: boolean }>('POST', '/api/auth/magic-link/request', { email }),
   magicLinkVerify: (token: string) => http<User>('POST', '/api/auth/magic-link/verify', { token }),
+  // Passkeys (S33)
+  passkeyRegisterStart: () => http<{ challenge: string }>('POST', '/api/auth/passkey/register/start', {}),
+  passkeyRegisterFinish: (body: { credentialId: string; publicKey: JsonWebKey; signature: string; challenge: string; label?: string }) => http<{ id: string; label: string }>('POST', '/api/auth/passkey/register/finish', body),
+  passkeyLoginStart: (email: string) => http<{ challenge: string; credentialIds: string[] }>('POST', '/api/auth/passkey/login/start', { email }),
+  passkeyLoginFinish: (body: { credentialId: string; challenge: string; signature: string }) => http<User>('POST', '/api/auth/passkey/login/finish', body),
+  passkeyList: () => http<{ id: string; label: string; createdAt: string }[]>('GET', '/api/auth/passkey'),
+  passkeyDelete: (id: string) => http<{ ok: boolean }>('DELETE', `/api/auth/passkey/${encodeURIComponent(id)}`),
   register: (email: string, password: string) => http<User>('POST', '/api/auth/register', { email, password }),
   logout: () => http<void>('POST', '/api/auth/logout'),
   authProviders: () => http<{ providers: string[] }>('GET', '/api/auth/providers'),

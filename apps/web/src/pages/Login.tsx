@@ -1,12 +1,13 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { useAuth } from '../lib/auth';
 import { api, isMfaRequired } from '../lib/api';
+import { passkeySupported } from '../lib/passkey';
 import { Card, Field, ErrorMsg } from '../components/ui';
 
 const PROVIDER_LABEL: Record<string, string> = { google: 'Continue with Google', github: 'Continue with GitHub', stub: 'Continue with Demo SSO' };
 
 export function Login() {
-  const { login, register, completeMfa, loginWithMagicToken } = useAuth();
+  const { login, register, completeMfa, loginWithMagicToken, loginWithPasskey } = useAuth();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -92,6 +93,11 @@ export function Login() {
             </button>
           </div>
           <span className="muted">Demo mode allows passwordless sign-in; production requires a password.</span>
+          {mode === 'login' && passkeySupported() && (
+            <button type="button" className="ghost" data-testid="passkey-login" disabled={busy || !email.trim()} onClick={() => void run(async () => { await loginWithPasskey(email.trim()); })}>
+              🔑 Sign in with a passkey
+            </button>
+          )}
           {mode === 'login' && (
             magicSent
               ? <span className="badge">✓ If that email exists, a sign-in link is on its way.</span>

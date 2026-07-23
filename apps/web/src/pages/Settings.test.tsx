@@ -20,6 +20,7 @@ describe('Settings page', () => {
       if (u.endsWith('/api/auth/mfa/enroll') && init?.method === 'POST') return fakeRes(200, { secret: 'JBSWY3DPEHPK3PXP', otpauthUri: 'otpauth://totp/Apolla:a@b.c?secret=JBSWY3DPEHPK3PXP', recoveryCodes: ['aaaa1', 'bbbb2'] });
       if (u.endsWith('/api/auth/mfa/verify') && init?.method === 'POST') return fakeRes(200, { mfaEnabled: true });
       if (u.endsWith('/api/auth/me')) return fakeRes(200, { id: 'u1', email: 'me@x.ai' });
+      if (u.endsWith('/api/auth/passkey') && (init?.method ?? 'GET') === 'GET') return fakeRes(200, [{ id: 'pk1', label: 'MacBook', createdAt: '2026-01-01' }]);
       if (u.endsWith('/api/account/export')) return fakeRes(200, { version: 1, projects: [] });
       if (u.endsWith('/api/account/import')) return fakeRes(200, { projects: 2, skills: 1, workspace: 3 });
       if (u.endsWith('/api/account/delete')) return fakeRes(200, { deleted: true });
@@ -62,6 +63,16 @@ describe('Settings page', () => {
     fireEvent.change(screen.getByPlaceholderText('123456'), { target: { value: '111111' } });
     fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
     expect(await screen.findByText('✓ Enabled')).toBeInTheDocument();
+  });
+
+  it('lists registered passkeys and can remove one (S33)', async () => {
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    renderSettings();
+    // the registered passkey renders in the list (jsdom has no IndexedDB → "Add" is disabled)
+    expect(await screen.findByTestId('passkey-list')).toHaveTextContent('MacBook');
+    expect((screen.getByTestId('add-passkey') as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    await waitFor(() => expect(fetchMock.mock.calls.some((c) => /\/api\/auth\/passkey\/pk1$/.test(String(c[0])) && (c[1] as RequestInit)?.method === 'DELETE')).toBe(true));
   });
 
   it('exports data (calls the endpoint + triggers a download)', async () => {

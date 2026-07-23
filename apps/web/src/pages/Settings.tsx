@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { Card, Field, ErrorMsg } from '../components/ui';
+import { passkeySupported, registerPasskey } from '../lib/passkey';
 
 export function Settings() {
   const [language, setLanguage] = useState('');
@@ -29,6 +30,17 @@ export function Settings() {
     catch (e) { setMfaError(e instanceof Error ? e.message : 'invalid code'); }
   };
 
+  // Passkeys (S33)
+  const [passkeys, setPasskeys] = useState<{ id: string; label: string }[]>([]);
+  const [passkeyMsg, setPasskeyMsg] = useState<string | null>(null);
+  const loadPasskeys = () => api.passkeyList().then(setPasskeys).catch(() => {});
+  const addPasskey = async () => {
+    setPasskeyMsg(null);
+    try { await registerPasskey(); setPasskeyMsg('Passkey added.'); await loadPasskeys(); }
+    catch (e) { setPasskeyMsg(e instanceof Error ? e.message : 'Could not add passkey.'); }
+  };
+  const removePasskey = async (id: string) => { await api.passkeyDelete(id).catch(() => {}); await loadPasskeys(); };
+
   // API tokens (browser extension / CLI)
   const [tokens, setTokens] = useState<{ id: string; name: string }[]>([]);
   const [tokenName, setTokenName] = useState('');
@@ -47,6 +59,7 @@ export function Settings() {
       setStyle(String((m as { style?: string }).style ?? ''));
     }).catch(() => {});
     void loadTokens();
+    void loadPasskeys();
     void api.me().then((u) => { setIdentities(u.identities ?? []); setMfaEnabled(u.mfaEnabled ?? false); }).catch(() => {});
     void api.mcpManifest().then((m) => setMcpTools(m.tools ?? [])).catch(() => {});
   }, []);
@@ -128,6 +141,26 @@ export function Settings() {
           </>
         )}
         {mfaError && <span className="muted" style={{ color: 'var(--danger, #c00)' }}>{mfaError}</span>}
+      </Card>
+      <Card title="Passkeys">
+        <span className="muted">Sign in without a password using a device key (WebAuthn-style). The private key stays on this device.</span>
+        {passkeys.length === 0 ? (
+          <span className="muted" data-testid="passkey-empty">No passkeys yet.</span>
+        ) : (
+          <ul className="col" data-testid="passkey-list" style={{ gap: '0.3rem', listStyle: 'none', padding: 0 }}>
+            {passkeys.map((p) => (
+              <li key={p.id} className="row" style={{ justifyContent: 'space-between' }}>
+                <span>🔑 {p.label}</span>
+                <button className="ghost" onClick={() => void removePasskey(p.id)}>Remove</button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="row">
+          <button data-testid="add-passkey" disabled={!passkeySupported()} onClick={() => void addPasskey()}>Add a passkey</button>
+          {!passkeySupported() && <span className="muted">This browser doesn't support passkeys.</span>}
+        </div>
+        {passkeyMsg && <span className="muted" data-testid="passkey-msg">{passkeyMsg}</span>}
       </Card>
       <Card title="Linked accounts">
         <span className="muted">Single sign-on identities connected to your account.</span>

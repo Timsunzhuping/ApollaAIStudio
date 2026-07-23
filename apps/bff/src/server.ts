@@ -19,7 +19,7 @@ import { VERSION, versionInfo } from './version';
 import { applySecurityHeaders, applyCors, clientIp, limiters, isExpensive, MAX_BODY_BYTES } from './security';
 import { observe, metrics, type ObservedResponse } from './obs';
 import { reconcileJobs, withSpanContext, McpServer, type JsonRpcRequest } from '@apolla/harness-core';
-import { buildCapabilityTools } from './mcp-tools';
+import { buildCapabilityTools, buildResourceProvider, buildPromptProvider } from './mcp-tools';
 import { UI_HTML } from './ui';
 
 // Assigned by the entry point (or by tests via setHarness) — keeps handlers free of a build-at-import
@@ -318,7 +318,7 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
   // MCP tool catalog (S18) — public discovery (names/descriptions only, no secrets); the Settings
   // page renders it + connection instructions. Calling tools still requires an API token.
   if (method === 'GET' && pathname === '/api/mcp/manifest') {
-    mcpServer ??= new McpServer(buildCapabilityTools(harness));
+    mcpServer ??= new McpServer(buildCapabilityTools(harness), { resources: buildResourceProvider(harness), prompts: buildPromptProvider(harness) });
     return json(res, 200, { endpoint: '/api/mcp', protocol: 'mcp/2024-11-05', tools: mcpServer.list().map((t) => ({ name: t.name, description: t.description })) });
   }
 
@@ -662,7 +662,7 @@ async function handleInner(req: IncomingMessage, res: ServerResponse): Promise<v
       const toolName = (rpc.params as { name?: string } | undefined)?.name ?? '';
       await harness.audit.record({ id: randomUUID(), ownerId, taskId: 'mcp', tool: `mcp:${toolName}`, risk: 'read', decision: 'allow', status: 'executed', summary: `mcp tools/call ${toolName}` });
     }
-    mcpServer ??= new McpServer(buildCapabilityTools(harness));
+    mcpServer ??= new McpServer(buildCapabilityTools(harness), { resources: buildResourceProvider(harness), prompts: buildPromptProvider(harness) });
     return json(res, 200, await mcpServer.handle(rpc, ownerId));
   }
 

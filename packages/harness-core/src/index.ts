@@ -48,6 +48,7 @@ export type { CollabDoc, CollabRepository, Presence } from './collab/session';
 export { InMemoryCollabAccessRepository } from './collab/access';
 export type { CollabAccessRepository } from './collab/access';
 export { McpServer } from './mcp-server/server';
+export type { McpResource, ResourceProvider, McpPrompt, PromptProvider } from './mcp-server/server';
 export { defineTool } from './mcp-server/types';
 export type { CapabilityTool, JsonRpcRequest, JsonRpcResponse } from './mcp-server/types';
 export type { MCPClient, MCPSession, MCPToolDef, MCPCallResult } from './tools/mcp';

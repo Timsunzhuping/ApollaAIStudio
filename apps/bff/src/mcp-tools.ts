@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { defineTool, type CapabilityTool } from '@apolla/harness-core';
+import { defineTool, type CapabilityTool, type ResourceProvider, type PromptProvider } from '@apolla/harness-core';
 import type { Harness } from './harness';
 
 /** Accumulate the streamed prose (`delta`) from an orchestrator/skill event stream. */
@@ -99,4 +99,55 @@ export function buildCapabilityTools(harness: Harness): CapabilityTool[] {
       },
     }),
   ];
+}
+
+/** Workspace files as MCP resources (S35/B5): apolla://workspace/<path>, owner-scoped, read-only. */
+export function buildResourceProvider(harness: Harness): ResourceProvider {
+  const PREFIX = 'apolla://workspace/';
+  return {
+    async list(ownerId) {
+      const entries = await harness.workspace.list(ownerId);
+      return entries.map((e) => ({
+        uri: `${PREFIX}${e.path}`,
+        name: e.path,
+        mimeType: e.mime ?? 'text/plain',
+        description: `Workspace file (v${e.version}, ${e.size} bytes)`,
+      }));
+    },
+    async read(ownerId, uri) {
+      if (!uri.startsWith(PREFIX)) return undefined;
+      const file = await harness.workspace.read(ownerId, uri.slice(PREFIX.length));
+      return file ? { uri, mimeType: file.mime ?? 'text/plain', text: file.content } : undefined;
+    },
+  };
+}
+
+/** Owner skills as MCP prompt templates (S35/B5): a client can pull a skill as a reusable prompt. */
+export function buildPromptProvider(harness: Harness): PromptProvider {
+  return {
+    async list(ownerId) {
+      const skills = await harness.skills.list(ownerId);
+      return skills.map((s) => ({
+        name: s.name,
+        description: (s as { description?: string }).description ?? `Apolla skill: ${s.name}`,
+        arguments: [{ name: 'input', description: 'The input/question for the skill', required: true }],
+      }));
+    },
+    async get(ownerId, name, args) {
+      const skill = await harness.skills.get(name, ownerId);
+      if (!skill) return undefined;
+      const description = (skill as { description?: string }).description ?? `Apolla skill: ${name}`;
+      const input = args.input ?? '';
+      return {
+        description,
+        messages: [{
+          role: 'user',
+          content: {
+            type: 'text',
+            text: `Use the Apolla skill "${name}" (${description}).\n\nInput:\n${input}`,
+          },
+        }],
+      };
+    },
+  };
 }

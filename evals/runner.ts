@@ -24,6 +24,7 @@ import { runCollabScenarios } from './src/collab-scenarios';
 import { runAccountScenarios } from './src/account-scenarios';
 import { runAdminScenarios } from './src/admin-scenarios';
 import { runReleaseScenarios } from './src/release-scenarios';
+import { runFormulaScenarios } from './src/formula-scenarios';
 
 /** Baseline cost for the deterministic golden (mock pricing). Tighten as the loop evolves. */
 const BASELINE_USD = 0.001;
@@ -53,6 +54,7 @@ const results: CheckResult[] = [
   ...(await runAccountScenarios()),
   ...(await runAdminScenarios()),
   ...(await runReleaseScenarios()),
+  ...(await runFormulaScenarios()),
 ];
 
 console.log('Apolla eval — research golden\n');

@@ -60,6 +60,15 @@ describe('Sheets surface', () => {
     expect(events.at(-1)?.type).toBe('error');
     expect(await workspace.read('u', 'bad.csv')).toBeUndefined();
   });
+
+  it('compute mode evaluates =formulas deterministically with ZERO model calls (S34/B4)', async () => {
+    // the mock adapter would return garbage — proving compute never touches the router
+    const { rt, workspace } = build('THIS MUST NOT BE CALLED');
+    await workspace.write({ ownerId: 'u', path: 'sales.csv', content: 'item,qty,price,total\nwidget,2,3,"=B1*C1"\ngadget,4,5,"=B2*C2"\nsum,,,=SUM(D1:D2)' });
+    await collect(rt.run({ ownerId: 'u', surface: sheetEdit, sourcePath: 'sales.csv', params: { mode: 'compute' }, outputPath: 'sales.csv' }));
+    const file = await workspace.read('u', 'sales.csv');
+    expect(file?.content).toBe('item,qty,price,total\nwidget,2,3,6\ngadget,4,5,20\nsum,,,26');
+  });
 });
 
 describe('Meeting Notes surface', () => {

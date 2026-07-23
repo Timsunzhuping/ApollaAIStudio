@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { api, ApiError, isMfaRequired, type User, type LoginResult } from './api';
+import { loginWithPasskey as passkeyLogin } from './passkey';
 
 interface AuthState {
   user: User | null;
@@ -8,6 +9,7 @@ interface AuthState {
   login: (email: string, password?: string) => Promise<LoginResult>;
   completeMfa: (pendingToken: string, code: string) => Promise<void>;
   loginWithMagicToken: (token: string) => Promise<void>;
+  loginWithPasskey: (email: string) => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -35,13 +37,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
   const completeMfa = async (pendingToken: string, code: string) => setUser(await api.mfaLogin(pendingToken, code));
   const loginWithMagicToken = async (token: string) => setUser(await api.magicLinkVerify(token));
+  // The passkey ceremony establishes the session server-side (set-cookie); refresh the user from it.
+  const loginWithPasskey = async (email: string) => { await passkeyLogin(email); setUser(await api.me()); };
   const register = async (email: string, password: string) => setUser(await api.register(email, password));
   const logout = async () => {
     await api.logout();
     setUser(null);
   };
 
-  return <AuthContext.Provider value={{ user, loading, login, completeMfa, loginWithMagicToken, register, logout }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, loading, login, completeMfa, loginWithMagicToken, loginWithPasskey, register, logout }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth(): AuthState {

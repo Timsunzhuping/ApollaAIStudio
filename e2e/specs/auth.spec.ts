@@ -22,7 +22,7 @@ test('register, sign out, and sign back in', async ({ page }) => {
 
   await page.getByPlaceholder('you@example.com').fill(email);
   await page.getByPlaceholder('at least 8 characters').fill(PASSWORD);
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click(); // exact: '🔑 Sign in with a passkey' also matches otherwise (S33)
   await expect(page.getByRole('link', { name: 'Research' })).toBeVisible();
 });
 

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { ModelAlias } from '@apolla/contracts';
 import { assembleRequest } from '../safety/untrusted';
 import type { SurfaceExecCtx, SurfaceChunk } from './types';
+import { evaluateSheet } from './formula';
 
 export const SheetSchema = z.object({
   columns: z.array(z.string()).min(1),
@@ -48,6 +49,15 @@ function decodeCsv(text: string): Sheet {
  */
 export async function* sheetExecutor(ctx: SurfaceExecCtx, alias: ModelAlias = 'gpt_premium'): AsyncIterable<SurfaceChunk> {
   const mode = String(ctx.params.mode ?? 'generate');
+
+  // compute (S34/B4): evaluate =formulas deterministically — NO LLM. Numbers users act on must come
+  // from arithmetic, not token prediction; this is the only mode with zero model calls.
+  if (mode === 'compute') {
+    const { sheet: computed, errors } = evaluateSheet(decodeCsv(ctx.inputContent));
+    yield { content: encodeCsv(computed), structured: { ...computed, formulaErrors: errors } };
+    return;
+  }
+
   const system = ctx.prompts.render(ctx.surface.promptRef, { mode }).text;
 
   if (mode === 'addColumn') {

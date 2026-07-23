@@ -131,6 +131,7 @@ export { SurfaceRuntime, surfaceTaskId } from './surface/runtime';
 export type { SurfaceRuntimeDeps } from './surface/runtime';
 export { genericExecutor, translateExecutor, notesExecutor, NotesSchema } from './surface/executors';
 export { sheetExecutor, SheetSchema } from './surface/sheet';
+export { evaluateSheet, colToIndex, indexToCol } from './surface/formula';
 export type { SurfaceRunInput, SurfaceEvent, SurfaceExecCtx, SurfaceChunk, SurfaceExecutorFn } from './surface/types';
 export { MediaRouter } from './media/router';
 export { StubMediaAdapter } from './media/stub';
